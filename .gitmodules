@@ -1,0 +1,3 @@
+[submodule "db"]
+	path = db
+	url = C:/Projects/wav/wav-db-schema
