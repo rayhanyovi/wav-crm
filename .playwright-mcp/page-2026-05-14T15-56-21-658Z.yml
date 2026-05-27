@@ -1,0 +1,41 @@
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - img [ref=e6]
+      - generic [ref=e9]: CRM Pro
+    - paragraph [ref=e10]: Telemarketing & Advisory CRM
+    - paragraph [ref=e11]: Select a role to explore the prototype
+  - generic [ref=e12]:
+    - button "Admin User ADMIN admin@demo.com Full access. Manage users, audit logs, products, campaigns." [ref=e13] [cursor=pointer]:
+      - img [ref=e15]
+      - generic [ref=e17]:
+        - generic [ref=e18]:
+          - generic [ref=e19]: Admin User
+          - generic [ref=e20]: ADMIN
+        - paragraph [ref=e21]: admin@demo.com
+        - paragraph [ref=e22]: Full access. Manage users, audit logs, products, campaigns.
+    - button "Sarah Manager MANAGER sarah@demo.com View team dashboards, assign leads & deals, manage campaigns." [ref=e23] [cursor=pointer]:
+      - img [ref=e25]
+      - generic [ref=e30]:
+        - generic [ref=e31]:
+          - generic [ref=e32]: Sarah Manager
+          - generic [ref=e33]: MANAGER
+        - paragraph [ref=e34]: sarah@demo.com
+        - paragraph [ref=e35]: View team dashboards, assign leads & deals, manage campaigns.
+    - button "Mike Sales SALES mike@demo.com Create leads & deals, log calls, run calling sessions." [ref=e36] [cursor=pointer]:
+      - img [ref=e38]
+      - generic [ref=e41]:
+        - generic [ref=e42]:
+          - generic [ref=e43]: Mike Sales
+          - generic [ref=e44]: SALES
+        - paragraph [ref=e45]: mike@demo.com
+        - paragraph [ref=e46]: Create leads & deals, log calls, run calling sessions.
+    - button "Jane Viewer VIEWER jane@demo.com Read-only access to all data. Cannot create or edit anything." [ref=e47] [cursor=pointer]:
+      - img [ref=e49]
+      - generic [ref=e52]:
+        - generic [ref=e53]:
+          - generic [ref=e54]: Jane Viewer
+          - generic [ref=e55]: VIEWER
+        - paragraph [ref=e56]: jane@demo.com
+        - paragraph [ref=e57]: Read-only access to all data. Cannot create or edit anything.
+  - paragraph [ref=e58]: Prototype demo — no passwords required

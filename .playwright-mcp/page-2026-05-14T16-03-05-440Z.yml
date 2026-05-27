@@ -1,0 +1,125 @@
+- generic [ref=e4]:
+  - banner [ref=e5]:
+    - link "CRM Pro" [ref=e6] [cursor=pointer]:
+      - /url: /
+      - img [ref=e7]
+      - text: CRM Pro
+    - navigation [ref=e10]:
+      - link "Dashboard" [ref=e11] [cursor=pointer]:
+        - /url: /
+        - img [ref=e12]
+        - text: Dashboard
+      - link "Leads" [ref=e17] [cursor=pointer]:
+        - /url: /leads
+        - img [ref=e18]
+        - text: Leads
+      - link "Contacts" [ref=e23] [cursor=pointer]:
+        - /url: /contacts
+        - img [ref=e24]
+        - text: Contacts
+      - link "Companies" [ref=e28] [cursor=pointer]:
+        - /url: /companies
+        - img [ref=e29]
+        - text: Companies
+      - link "Deals" [ref=e33] [cursor=pointer]:
+        - /url: /deals
+        - img [ref=e34]
+        - text: Deals
+      - link "Activities" [ref=e37] [cursor=pointer]:
+        - /url: /activities
+        - img [ref=e38]
+        - text: Activities
+      - link "Campaigns" [ref=e40] [cursor=pointer]:
+        - /url: /campaigns
+        - img [ref=e41]
+        - text: Campaigns
+      - link "Team" [ref=e44] [cursor=pointer]:
+        - /url: /team
+        - img [ref=e45]
+        - text: Team
+    - button "Search Ctrl+K" [ref=e57]:
+      - img
+      - generic [ref=e58]: Search
+      - generic [ref=e59]: Ctrl+K
+    - button "1" [ref=e60]:
+      - img
+      - generic [ref=e61]: "1"
+    - button [ref=e62]:
+      - img
+    - button "SM Sarah Manager" [ref=e63]:
+      - generic [ref=e65]: SM
+      - generic [ref=e66]: Sarah Manager
+  - main [ref=e67]:
+    - generic [ref=e68]:
+      - generic [ref=e69]:
+        - heading "Contacts" [level=1] [ref=e70]
+        - button "New Contact" [ref=e71]:
+          - img
+          - text: New Contact
+      - textbox "Search contacts…" [ref=e72]
+      - table [ref=e75]:
+        - rowgroup [ref=e76]:
+          - row "Name Email Phone Title Company Deals" [ref=e77]:
+            - columnheader "Name" [ref=e78]
+            - columnheader "Email" [ref=e79]
+            - columnheader "Phone" [ref=e80]
+            - columnheader "Title" [ref=e81]
+            - columnheader "Company" [ref=e82]
+            - columnheader "Deals" [ref=e83]
+        - rowgroup [ref=e84]:
+          - row "Budi Santoso budi@acme.example.com +62 812 1111 0001 CTO Acme Corp 1" [ref=e85] [cursor=pointer]:
+            - cell "Budi Santoso" [ref=e86]
+            - cell "budi@acme.example.com" [ref=e87]
+            - cell "+62 812 1111 0001" [ref=e88]
+            - cell "CTO" [ref=e89]
+            - cell "Acme Corp" [ref=e90]
+            - cell "1" [ref=e91]
+          - row "Dewi Rahayu dewi@acme.example.com +62 812 1111 0002 CFO Acme Corp 1" [ref=e92] [cursor=pointer]:
+            - cell "Dewi Rahayu" [ref=e93]
+            - cell "dewi@acme.example.com" [ref=e94]
+            - cell "+62 812 1111 0002" [ref=e95]
+            - cell "CFO" [ref=e96]
+            - cell "Acme Corp" [ref=e97]
+            - cell "1" [ref=e98]
+          - row "Ahmad Fauzi ahmad@northstar.example.com +62 812 2222 0001 Director of Finance Northstar Health 1" [ref=e99] [cursor=pointer]:
+            - cell "Ahmad Fauzi" [ref=e100]
+            - cell "ahmad@northstar.example.com" [ref=e101]
+            - cell "+62 812 2222 0001" [ref=e102]
+            - cell "Director of Finance" [ref=e103]
+            - cell "Northstar Health" [ref=e104]
+            - cell "1" [ref=e105]
+          - row "Rina Kusuma rina@bluesky.example.com +62 812 3333 0001 Investment Manager BlueSky Ventures 2" [ref=e106] [cursor=pointer]:
+            - cell "Rina Kusuma" [ref=e107]
+            - cell "rina@bluesky.example.com" [ref=e108]
+            - cell "+62 812 3333 0001" [ref=e109]
+            - cell "Investment Manager" [ref=e110]
+            - cell "BlueSky Ventures" [ref=e111]
+            - cell "2" [ref=e112]
+          - row "Eko Prasetyo eko@selaras.example.com +62 812 4444 0001 CEO Selaras Retail 1" [ref=e113] [cursor=pointer]:
+            - cell "Eko Prasetyo" [ref=e114]
+            - cell "eko@selaras.example.com" [ref=e115]
+            - cell "+62 812 4444 0001" [ref=e116]
+            - cell "CEO" [ref=e117]
+            - cell "Selaras Retail" [ref=e118]
+            - cell "1" [ref=e119]
+          - row "Siti Wahyuni siti@mitra.example.com +62 812 5555 0001 Treasury Manager Mitra Energi 2" [ref=e120] [cursor=pointer]:
+            - cell "Siti Wahyuni" [ref=e121]
+            - cell "siti@mitra.example.com" [ref=e122]
+            - cell "+62 812 5555 0001" [ref=e123]
+            - cell "Treasury Manager" [ref=e124]
+            - cell "Mitra Energi" [ref=e125]
+            - cell "2" [ref=e126]
+          - row "Hendra Wijaya hendra@bluesky.example.com +62 812 3333 0002 Partner BlueSky Ventures 1" [ref=e127] [cursor=pointer]:
+            - cell "Hendra Wijaya" [ref=e128]
+            - cell "hendra@bluesky.example.com" [ref=e129]
+            - cell "+62 812 3333 0002" [ref=e130]
+            - cell "Partner" [ref=e131]
+            - cell "BlueSky Ventures" [ref=e132]
+            - cell "1" [ref=e133]
+          - row "Maya Indah maya@acme.example.com +62 812 1111 0003 VP Operations Acme Corp 1" [ref=e134] [cursor=pointer]:
+            - cell "Maya Indah" [ref=e135]
+            - cell "maya@acme.example.com" [ref=e136]
+            - cell "+62 812 1111 0003" [ref=e137]
+            - cell "VP Operations" [ref=e138]
+            - cell "Acme Corp" [ref=e139]
+            - cell "1" [ref=e140]

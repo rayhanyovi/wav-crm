@@ -1,0 +1,192 @@
+- generic [ref=e4]:
+  - banner [ref=e5]:
+    - link "CRM Pro" [ref=e6] [cursor=pointer]:
+      - /url: /
+      - img [ref=e7]
+      - text: CRM Pro
+    - navigation [ref=e10]:
+      - link "Dashboard" [ref=e11] [cursor=pointer]:
+        - /url: /
+        - img [ref=e12]
+        - text: Dashboard
+      - button "Accounts" [ref=e17]:
+        - img
+        - text: Accounts
+      - link "Deals" [ref=e18] [cursor=pointer]:
+        - /url: /deals
+        - img [ref=e19]
+        - text: Deals
+      - link "Activities" [ref=e22] [cursor=pointer]:
+        - /url: /activities
+        - img [ref=e23]
+        - text: Activities
+      - link "Campaigns" [ref=e25] [cursor=pointer]:
+        - /url: /campaigns
+        - img [ref=e26]
+        - text: Campaigns
+      - link "Team" [ref=e29] [cursor=pointer]:
+        - /url: /team
+        - img [ref=e30]
+        - text: Team
+    - button "Search Ctrl+K" [ref=e42]:
+      - img
+      - generic [ref=e43]: Search
+      - generic [ref=e44]: Ctrl+K
+    - button "1" [ref=e45]:
+      - img
+      - generic [ref=e46]: "1"
+    - button [ref=e47]:
+      - img
+    - button "SM Sarah Manager" [ref=e48]:
+      - generic [ref=e50]: SM
+      - generic [ref=e51]: Sarah Manager
+  - main [ref=e52]:
+    - generic [ref=e53]:
+      - generic [ref=e54]:
+        - heading "Leads" [level=1] [ref=e55]
+        - button "New Lead" [ref=e56]:
+          - img
+          - text: New Lead
+      - generic [ref=e57]:
+        - textbox "Search leads…" [ref=e58]
+        - combobox [ref=e59]:
+          - generic: All Statuses
+          - img [ref=e60]
+        - combobox [ref=e62]:
+          - generic: All Sources
+          - img [ref=e63]
+        - combobox [ref=e65]:
+          - generic: All Assignees
+          - img [ref=e66]
+      - table [ref=e70]:
+        - rowgroup [ref=e71]:
+          - row "Name Email Phone Status Source Company Assigned To Last Contacted" [ref=e72]:
+            - columnheader "Name" [ref=e73]
+            - columnheader "Email" [ref=e74]
+            - columnheader "Phone" [ref=e75]
+            - columnheader "Status" [ref=e76]
+            - columnheader "Source" [ref=e77]
+            - columnheader "Company" [ref=e78]
+            - columnheader "Assigned To" [ref=e79]
+            - columnheader "Last Contacted" [ref=e80]
+        - rowgroup [ref=e81]:
+          - row "Toni Hartono toni.h@example.com +62 813 1000 0001 QUALIFIED COLD CALL BlueSky Ventures Mike Sales 28 Apr 2025" [ref=e82] [cursor=pointer]:
+            - cell "Toni Hartono" [ref=e83]
+            - cell "toni.h@example.com" [ref=e84]
+            - cell "+62 813 1000 0001" [ref=e85]
+            - cell "QUALIFIED" [ref=e86]:
+              - generic [ref=e87]: QUALIFIED
+            - cell "COLD CALL" [ref=e88]
+            - cell "BlueSky Ventures" [ref=e89]
+            - cell "Mike Sales" [ref=e90]
+            - cell "28 Apr 2025" [ref=e91]
+          - row "Lina Setiawan lina.s@example.com +62 813 1000 0002 NEW WEBSITE — Mike Sales Never" [ref=e92] [cursor=pointer]:
+            - cell "Lina Setiawan" [ref=e93]
+            - cell "lina.s@example.com" [ref=e94]
+            - cell "+62 813 1000 0002" [ref=e95]
+            - cell "NEW" [ref=e96]:
+              - generic [ref=e97]: NEW
+            - cell "WEBSITE" [ref=e98]
+            - cell "—" [ref=e99]
+            - cell "Mike Sales" [ref=e100]
+            - cell "Never" [ref=e101]
+          - row "Joko Purnomo joko.p@example.com +62 813 1000 0003 CONTACTED REFERRAL Selaras Retail Mike Sales 25 Apr 2025" [ref=e102] [cursor=pointer]:
+            - cell "Joko Purnomo" [ref=e103]
+            - cell "joko.p@example.com" [ref=e104]
+            - cell "+62 813 1000 0003" [ref=e105]
+            - cell "CONTACTED" [ref=e106]:
+              - generic [ref=e107]: CONTACTED
+            - cell "REFERRAL" [ref=e108]
+            - cell "Selaras Retail" [ref=e109]
+            - cell "Mike Sales" [ref=e110]
+            - cell "25 Apr 2025" [ref=e111]
+          - row "Ratna Anggraini ratna.a@example.com +62 813 1000 0004 NEW ADVERTISEMENT — Mike Sales Never" [ref=e112] [cursor=pointer]:
+            - cell "Ratna Anggraini" [ref=e113]
+            - cell "ratna.a@example.com" [ref=e114]
+            - cell "+62 813 1000 0004" [ref=e115]
+            - cell "NEW" [ref=e116]:
+              - generic [ref=e117]: NEW
+            - cell "ADVERTISEMENT" [ref=e118]
+            - cell "—" [ref=e119]
+            - cell "Mike Sales" [ref=e120]
+            - cell "Never" [ref=e121]
+          - row "Fajar Nugroho fajar.n@example.com +62 813 1000 0005 QUALIFIED EVENT Mitra Energi Mike Sales 2 May 2025" [ref=e122] [cursor=pointer]:
+            - cell "Fajar Nugroho" [ref=e123]
+            - cell "fajar.n@example.com" [ref=e124]
+            - cell "+62 813 1000 0005" [ref=e125]
+            - cell "QUALIFIED" [ref=e126]:
+              - generic [ref=e127]: QUALIFIED
+            - cell "EVENT" [ref=e128]
+            - cell "Mitra Energi" [ref=e129]
+            - cell "Mike Sales" [ref=e130]
+            - cell "2 May 2025" [ref=e131]
+          - row "Nurul Hidayah nurul.h@example.com +62 813 1000 0006 CONTACTED SOCIAL MEDIA — Mike Sales 30 Apr 2025" [ref=e132] [cursor=pointer]:
+            - cell "Nurul Hidayah" [ref=e133]
+            - cell "nurul.h@example.com" [ref=e134]
+            - cell "+62 813 1000 0006" [ref=e135]
+            - cell "CONTACTED" [ref=e136]:
+              - generic [ref=e137]: CONTACTED
+            - cell "SOCIAL MEDIA" [ref=e138]
+            - cell "—" [ref=e139]
+            - cell "Mike Sales" [ref=e140]
+            - cell "30 Apr 2025" [ref=e141]
+          - row "Bambang Kurniawan bambang.k@example.com +62 813 1000 0007 LOST COLD CALL Northstar Health Mike Sales Never" [ref=e142] [cursor=pointer]:
+            - cell "Bambang Kurniawan" [ref=e143]
+            - cell "bambang.k@example.com" [ref=e144]
+            - cell "+62 813 1000 0007" [ref=e145]
+            - cell "LOST" [ref=e146]:
+              - generic [ref=e147]: LOST
+            - cell "COLD CALL" [ref=e148]
+            - cell "Northstar Health" [ref=e149]
+            - cell "Mike Sales" [ref=e150]
+            - cell "Never" [ref=e151]
+          - row "Sri Mulyani sri.m@example.com +62 813 1000 0008 NEW WEBSITE — Mike Sales Never" [ref=e152] [cursor=pointer]:
+            - cell "Sri Mulyani" [ref=e153]
+            - cell "sri.m@example.com" [ref=e154]
+            - cell "+62 813 1000 0008" [ref=e155]
+            - cell "NEW" [ref=e156]:
+              - generic [ref=e157]: NEW
+            - cell "WEBSITE" [ref=e158]
+            - cell "—" [ref=e159]
+            - cell "Mike Sales" [ref=e160]
+            - cell "Never" [ref=e161]
+          - row "Wahyu Santoso wahyu.s@example.com +62 813 1000 0009 CONVERTED REFERRAL Acme Corp Mike Sales Never" [ref=e162] [cursor=pointer]:
+            - cell "Wahyu Santoso" [ref=e163]
+            - cell "wahyu.s@example.com" [ref=e164]
+            - cell "+62 813 1000 0009" [ref=e165]
+            - cell "CONVERTED" [ref=e166]:
+              - generic [ref=e167]: CONVERTED
+            - cell "REFERRAL" [ref=e168]
+            - cell "Acme Corp" [ref=e169]
+            - cell "Mike Sales" [ref=e170]
+            - cell "Never" [ref=e171]
+          - row "Dian Pertiwi dian.p@example.com +62 813 1000 0010 QUALIFIED COLD CALL BlueSky Ventures Mike Sales 6 May 2025" [ref=e172] [cursor=pointer]:
+            - cell "Dian Pertiwi" [ref=e173]
+            - cell "dian.p@example.com" [ref=e174]
+            - cell "+62 813 1000 0010" [ref=e175]
+            - cell "QUALIFIED" [ref=e176]:
+              - generic [ref=e177]: QUALIFIED
+            - cell "COLD CALL" [ref=e178]
+            - cell "BlueSky Ventures" [ref=e179]
+            - cell "Mike Sales" [ref=e180]
+            - cell "6 May 2025" [ref=e181]
+          - row "Agus Wibowo agus.w@example.com +62 813 1000 0011 NEW COLD CALL — Mike Sales Never" [ref=e182] [cursor=pointer]:
+            - cell "Agus Wibowo" [ref=e183]
+            - cell "agus.w@example.com" [ref=e184]
+            - cell "+62 813 1000 0011" [ref=e185]
+            - cell "NEW" [ref=e186]:
+              - generic [ref=e187]: NEW
+            - cell "COLD CALL" [ref=e188]
+            - cell "—" [ref=e189]
+            - cell "Mike Sales" [ref=e190]
+            - cell "Never" [ref=e191]
+          - row "Putri Marlina putri.m@example.com +62 813 1000 0012 CONTACTED ADVERTISEMENT Mitra Energi Mike Sales 9 May 2025" [ref=e192] [cursor=pointer]:
+            - cell "Putri Marlina" [ref=e193]
+            - cell "putri.m@example.com" [ref=e194]
+            - cell "+62 813 1000 0012" [ref=e195]
+            - cell "CONTACTED" [ref=e196]:
+              - generic [ref=e197]: CONTACTED
+            - cell "ADVERTISEMENT" [ref=e198]
+            - cell "Mitra Energi" [ref=e199]
+            - cell "Mike Sales" [ref=e200]
+            - cell "9 May 2025" [ref=e201]

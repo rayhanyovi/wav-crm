@@ -1,0 +1,57 @@
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - img [ref=e7]
+      - generic [ref=e10]: CRM Pro
+    - paragraph [ref=e11]: Telemarketing & Advisory CRM
+    - paragraph [ref=e12]: Select a role to explore the prototype
+  - generic [ref=e13]:
+    - button "Admin User ADMIN admin@demo.com Full access. Manage users, audit logs, products, campaigns." [ref=e14] [cursor=pointer]:
+      - img [ref=e16]
+      - generic [ref=e18]:
+        - generic [ref=e19]:
+          - generic [ref=e20]: Admin User
+          - generic [ref=e21]: ADMIN
+        - paragraph [ref=e22]: admin@demo.com
+        - paragraph [ref=e23]: Full access. Manage users, audit logs, products, campaigns.
+    - button "Sarah Manager MANAGER sarah@demo.com Run calling sessions, manage leads & deals, view team performance dashboards." [ref=e24] [cursor=pointer]:
+      - img [ref=e26]
+      - generic [ref=e31]:
+        - generic [ref=e32]:
+          - generic [ref=e33]: Sarah Manager
+          - generic [ref=e34]: MANAGER
+        - paragraph [ref=e35]: sarah@demo.com
+        - paragraph [ref=e36]: Run calling sessions, manage leads & deals, view team performance dashboards.
+    - button "Mike Sales SALES mike@demo.com Create leads & deals, log calls, run calling sessions." [ref=e37] [cursor=pointer]:
+      - img [ref=e39]
+      - generic [ref=e42]:
+        - generic [ref=e43]:
+          - generic [ref=e44]: Mike Sales
+          - generic [ref=e45]: SALES
+        - paragraph [ref=e46]: mike@demo.com
+        - paragraph [ref=e47]: Create leads & deals, log calls, run calling sessions.
+    - button "Jane Viewer VIEWER jane@demo.com Read-only access to all data. Cannot create or edit anything." [ref=e48] [cursor=pointer]:
+      - img [ref=e50]
+      - generic [ref=e53]:
+        - generic [ref=e54]:
+          - generic [ref=e55]: Jane Viewer
+          - generic [ref=e56]: VIEWER
+        - paragraph [ref=e57]: jane@demo.com
+        - paragraph [ref=e58]: Read-only access to all data. Cannot create or edit anything.
+    - button "Reza Firmansyah SALES reza@demo.com Create leads & deals, log calls, run calling sessions." [ref=e59] [cursor=pointer]:
+      - img [ref=e61]
+      - generic [ref=e64]:
+        - generic [ref=e65]:
+          - generic [ref=e66]: Reza Firmansyah
+          - generic [ref=e67]: SALES
+        - paragraph [ref=e68]: reza@demo.com
+        - paragraph [ref=e69]: Create leads & deals, log calls, run calling sessions.
+    - button "Putri Handayani SALES putri@demo.com Create leads & deals, log calls, run calling sessions." [ref=e70] [cursor=pointer]:
+      - img [ref=e72]
+      - generic [ref=e75]:
+        - generic [ref=e76]:
+          - generic [ref=e77]: Putri Handayani
+          - generic [ref=e78]: SALES
+        - paragraph [ref=e79]: putri@demo.com
+        - paragraph [ref=e80]: Create leads & deals, log calls, run calling sessions.
+  - paragraph [ref=e81]: Prototype demo - no passwords required

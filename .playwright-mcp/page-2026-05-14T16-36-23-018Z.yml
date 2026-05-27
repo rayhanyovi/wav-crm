@@ -1,0 +1,157 @@
+- generic [ref=e4]:
+  - banner [ref=e5]:
+    - generic [ref=e6]:
+      - generic [ref=e7]:
+        - link "CRM Pro" [ref=e8] [cursor=pointer]:
+          - /url: /
+          - img [ref=e9]
+          - text: CRM Pro
+        - navigation [ref=e12]:
+          - link "Dashboard" [ref=e13] [cursor=pointer]:
+            - /url: /
+            - img [ref=e14]
+            - text: Dashboard
+          - link "Accounts" [ref=e19] [cursor=pointer]:
+            - /url: /leads
+            - img [ref=e20]
+            - text: Accounts
+          - link "Deals" [ref=e24] [cursor=pointer]:
+            - /url: /deals
+            - img [ref=e25]
+            - text: Deals
+          - link "Activities" [ref=e28] [cursor=pointer]:
+            - /url: /activities
+            - img [ref=e29]
+            - text: Activities
+          - link "Calendar" [ref=e31] [cursor=pointer]:
+            - /url: /calendar
+            - img [ref=e32]
+            - text: Calendar
+          - link "Campaigns" [ref=e34] [cursor=pointer]:
+            - /url: /campaigns
+            - img [ref=e35]
+            - text: Campaigns
+        - link "Team" [ref=e39] [cursor=pointer]:
+          - /url: /team
+          - img [ref=e40]
+          - text: Team
+      - button "Search Ctrl+K" [ref=e52]:
+        - img
+        - generic [ref=e53]: Search
+        - generic [ref=e54]: Ctrl+K
+      - button "1" [ref=e55]:
+        - img
+        - generic [ref=e56]: "1"
+      - button [ref=e57]:
+        - img
+      - button "SM Sarah Manager" [ref=e58]:
+        - generic [ref=e60]: SM
+        - generic [ref=e61]: Sarah Manager
+  - main [ref=e62]:
+    - generic [ref=e64]:
+      - generic [ref=e65]:
+        - generic [ref=e66]:
+          - heading "Calendar" [level=1] [ref=e67]
+          - paragraph [ref=e68]: Track scheduled calls, meetings, follow-ups, tasks, demos, emails, and notes.
+        - button "New Activity" [ref=e69]:
+          - img
+          - text: New Activity
+      - generic [ref=e70]:
+        - combobox [ref=e71]:
+          - generic: All Types
+          - img [ref=e72]
+        - combobox [ref=e74]:
+          - generic: All Statuses
+          - img [ref=e75]
+        - combobox [ref=e77]:
+          - generic: All Related
+          - img [ref=e78]
+        - combobox [ref=e80]:
+          - generic: All Owners
+          - img [ref=e81]
+      - generic [ref=e83]:
+        - generic [ref=e84]:
+          - button [ref=e85]:
+            - img
+          - heading "May 2026" [level=2] [ref=e86]
+          - button [ref=e87]:
+            - img
+        - generic [ref=e88]:
+          - generic [ref=e89]: Mon
+          - generic [ref=e90]: Tue
+          - generic [ref=e91]: Wed
+          - generic [ref=e92]: Thu
+          - generic [ref=e93]: Fri
+          - generic [ref=e94]: Sat
+          - generic [ref=e95]: Sun
+        - generic [ref=e96]:
+          - button "27" [ref=e97]:
+            - generic [ref=e99]: "27"
+          - button "28" [ref=e100]:
+            - generic [ref=e102]: "28"
+          - button "29" [ref=e103]:
+            - generic [ref=e105]: "29"
+          - button "30" [ref=e106]:
+            - generic [ref=e108]: "30"
+          - button "1" [ref=e109]:
+            - generic [ref=e111]: "1"
+          - button "2" [ref=e112]:
+            - generic [ref=e114]: "2"
+          - button "3" [ref=e115]:
+            - generic [ref=e117]: "3"
+          - button "4" [ref=e118]:
+            - generic [ref=e120]: "4"
+          - button "5" [ref=e121]:
+            - generic [ref=e123]: "5"
+          - button "6" [ref=e124]:
+            - generic [ref=e126]: "6"
+          - button "7" [ref=e127]:
+            - generic [ref=e129]: "7"
+          - button "8" [ref=e130]:
+            - generic [ref=e132]: "8"
+          - button "9" [ref=e133]:
+            - generic [ref=e135]: "9"
+          - button "10" [ref=e136]:
+            - generic [ref=e138]: "10"
+          - button "11" [ref=e139]:
+            - generic [ref=e141]: "11"
+          - button "12" [ref=e142]:
+            - generic [ref=e144]: "12"
+          - button "13" [ref=e145]:
+            - generic [ref=e147]: "13"
+          - button "14" [ref=e148]:
+            - generic [ref=e150]: "14"
+          - button "15" [ref=e151]:
+            - generic [ref=e153]: "15"
+          - button "16" [ref=e154]:
+            - generic [ref=e156]: "16"
+          - button "17" [ref=e157]:
+            - generic [ref=e159]: "17"
+          - button "18" [ref=e160]:
+            - generic [ref=e162]: "18"
+          - button "19" [ref=e163]:
+            - generic [ref=e165]: "19"
+          - button "20" [ref=e166]:
+            - generic [ref=e168]: "20"
+          - button "21" [ref=e169]:
+            - generic [ref=e171]: "21"
+          - button "22" [ref=e172]:
+            - generic [ref=e174]: "22"
+          - button "23" [ref=e175]:
+            - generic [ref=e177]: "23"
+          - button "24" [ref=e178]:
+            - generic [ref=e180]: "24"
+          - button "25" [ref=e181]:
+            - generic [ref=e183]: "25"
+          - button "26" [ref=e184]:
+            - generic [ref=e186]: "26"
+          - button "27" [ref=e187]:
+            - generic [ref=e189]: "27"
+          - button "28" [ref=e190]:
+            - generic [ref=e192]: "28"
+          - button "29" [ref=e193]:
+            - generic [ref=e195]: "29"
+          - button "30" [ref=e196]:
+            - generic [ref=e198]: "30"
+          - button "31" [ref=e199]:
+            - generic [ref=e201]: "31"

@@ -1,0 +1,239 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e59]:
+    - complementary [ref=e60]:
+      - generic [ref=e62]: CRM Pro
+      - navigation [ref=e63]:
+        - link "Dashboard" [ref=e64] [cursor=pointer]:
+          - /url: /
+          - img [ref=e65]
+          - generic [ref=e70]: Dashboard
+        - link "Leads" [ref=e71] [cursor=pointer]:
+          - /url: /leads
+          - img [ref=e72]
+          - generic [ref=e77]: Leads
+        - link "Contacts" [ref=e78] [cursor=pointer]:
+          - /url: /contacts
+          - img [ref=e79]
+          - generic [ref=e83]: Contacts
+        - link "Companies" [ref=e84] [cursor=pointer]:
+          - /url: /companies
+          - img [ref=e85]
+          - generic [ref=e89]: Companies
+        - link "Deals" [ref=e90] [cursor=pointer]:
+          - /url: /deals
+          - img [ref=e91]
+          - generic [ref=e94]: Deals
+        - link "Activities" [ref=e95] [cursor=pointer]:
+          - /url: /activities
+          - img [ref=e96]
+          - generic [ref=e98]: Activities
+        - link "Campaigns" [ref=e99] [cursor=pointer]:
+          - /url: /campaigns
+          - img [ref=e100]
+          - generic [ref=e103]: Campaigns
+        - link "Team" [ref=e105] [cursor=pointer]:
+          - /url: /team
+          - img [ref=e106]
+          - generic [ref=e118]: Team
+      - button "Collapse" [ref=e120]:
+        - img [ref=e121]
+        - generic [ref=e123]: Collapse
+    - generic [ref=e124]:
+      - banner [ref=e125]:
+        - button "Search Ctrl+K" [ref=e126]:
+          - img
+          - generic [ref=e127]: Search
+          - generic [ref=e128]: Ctrl+K
+        - button "1" [ref=e129]:
+          - img
+          - generic [ref=e130]: "1"
+        - button [ref=e131]:
+          - img
+        - button "SM Sarah Manager" [ref=e132]:
+          - generic [ref=e134]: SM
+          - generic [ref=e135]: Sarah Manager
+      - main [ref=e136]:
+        - generic [ref=e137]:
+          - heading "Dashboard" [level=1] [ref=e138]
+          - generic [ref=e139]:
+            - generic [ref=e141]:
+              - generic [ref=e142]:
+                - paragraph [ref=e143]: Total Deals
+                - img [ref=e144]
+              - paragraph [ref=e147]: "10"
+              - paragraph [ref=e148]: 8 open
+            - generic [ref=e150]:
+              - generic [ref=e151]:
+                - paragraph [ref=e152]: Pipeline Value
+                - img [ref=e153]
+              - paragraph [ref=e155]: Rp 2.725.000.000
+              - paragraph [ref=e156]: open deals
+            - generic [ref=e158]:
+              - generic [ref=e159]:
+                - paragraph [ref=e160]: Won This Month
+                - img [ref=e161]
+              - paragraph [ref=e167]: "0"
+              - paragraph [ref=e168]: Rp 0
+            - generic [ref=e170]:
+              - generic [ref=e171]:
+                - paragraph [ref=e172]: Unread Notifications
+                - img [ref=e173]
+              - paragraph [ref=e176]: "1"
+              - paragraph [ref=e177]: notifications
+            - generic [ref=e179]:
+              - generic [ref=e180]:
+                - paragraph [ref=e181]: Time on Dialer
+                - img [ref=e182]
+              - paragraph [ref=e184]: 0s
+              - paragraph [ref=e185]: today
+            - generic [ref=e187]:
+              - generic [ref=e188]:
+                - paragraph [ref=e189]: Calls Made
+                - img [ref=e190]
+              - paragraph [ref=e194]: "0"
+              - paragraph [ref=e195]: today
+            - generic [ref=e197]:
+              - generic [ref=e198]:
+                - paragraph [ref=e199]: Pickups
+                - img [ref=e200]
+              - paragraph [ref=e204]: "0"
+              - paragraph [ref=e205]: 0% answer rate
+            - generic [ref=e207]:
+              - generic [ref=e208]:
+                - paragraph [ref=e209]: Won Value (Month)
+                - img [ref=e210]
+              - paragraph [ref=e212]: Rp 0
+              - paragraph [ref=e213]: 0 deals
+          - generic [ref=e214]:
+            - generic [ref=e215]:
+              - generic [ref=e217]: Pipeline by Stage
+              - application [ref=e221]:
+                - generic [ref=e255]:
+                  - generic [ref=e256]:
+                    - generic [ref=e258]: LEAD
+                    - generic [ref=e260]: QUALIFIED
+                    - generic [ref=e262]: PROPOSAL
+                    - generic [ref=e264]: NEGOTIATION
+                    - generic [ref=e266]: CLOSED WON
+                    - generic [ref=e268]: CLOSED LOST
+                  - generic [ref=e269]:
+                    - generic [ref=e271]: "0"
+                    - generic [ref=e273]: "0.5"
+                    - generic [ref=e275]: "1"
+                    - generic [ref=e277]: "1.5"
+                    - generic [ref=e279]: "2"
+            - generic [ref=e280]:
+              - generic [ref=e282]: Campaign Performance
+              - generic [ref=e284]:
+                - generic [ref=e285]:
+                  - generic [ref=e286]: Q2 Index Fund Push
+                  - generic [ref=e287]:
+                    - generic [ref=e288]: 4 calls
+                    - generic [ref=e289]: 3 pickups
+                    - generic [ref=e290]: 50% conv.
+                - generic [ref=e291]:
+                  - generic [ref=e292]: Healthcare & Consumer Bundle Drive
+                  - generic [ref=e293]:
+                    - generic [ref=e294]: 3 calls
+                    - generic [ref=e295]: 3 pickups
+                    - generic [ref=e296]: 0% conv.
+                - generic [ref=e297]:
+                  - generic [ref=e298]: Paket Premium – VIP Outreach
+                  - generic [ref=e299]:
+                    - generic [ref=e300]: 3 calls
+                    - generic [ref=e301]: 3 pickups
+                    - generic [ref=e302]: 33% conv.
+          - generic [ref=e303]:
+            - generic [ref=e304]:
+              - generic [ref=e306]: Recent Activities
+              - generic [ref=e308]:
+                - generic [ref=e309]:
+                  - generic [ref=e310]: CALL
+                  - generic [ref=e311]:
+                    - paragraph [ref=e312]: Call – Putri Marlina follow-up
+                    - paragraph [ref=e313]: Mike Sales · about 1 year ago
+                - generic [ref=e314]:
+                  - generic [ref=e315]: MEETING
+                  - generic [ref=e316]:
+                    - paragraph [ref=e317]: Q1 review meeting – Mitra Energi
+                    - paragraph [ref=e318]: Sarah Manager · about 1 year ago
+                - generic [ref=e319]:
+                  - generic [ref=e320]: TASK
+                  - generic [ref=e321]:
+                    - paragraph [ref=e322]: Prepare Paket Premium summary deck for Acme
+                    - paragraph [ref=e323]: Mike Sales · about 1 year ago
+                - generic [ref=e324]:
+                  - generic [ref=e325]: CALL
+                  - generic [ref=e326]:
+                    - paragraph [ref=e327]: Call – Dian Pertiwi (qualified)
+                    - paragraph [ref=e328]: Mike Sales · about 1 year ago
+                - generic [ref=e329]:
+                  - generic [ref=e330]: FOLLOW UP
+                  - generic [ref=e331]:
+                    - paragraph [ref=e332]: Follow-up – Fajar Nugroho (Mitra Energi lead)
+                    - paragraph [ref=e333]: Mike Sales · about 1 year ago
+                - generic [ref=e334]:
+                  - generic [ref=e335]: NOTE
+                  - generic [ref=e336]:
+                    - paragraph [ref=e337]: Internal note – Northstar stale deal
+                    - paragraph [ref=e338]: Sarah Manager · about 1 year ago
+                - generic [ref=e339]:
+                  - generic [ref=e340]: CALL
+                  - generic [ref=e341]:
+                    - paragraph [ref=e342]: Intro call – Nurul Hidayah
+                    - paragraph [ref=e343]: Mike Sales · about 1 year ago
+                - generic [ref=e344]:
+                  - generic [ref=e345]: CALL
+                  - generic [ref=e346]:
+                    - paragraph [ref=e347]: Call – Hendra Wijaya closing follow-up
+                    - paragraph [ref=e348]: Mike Sales · about 1 year ago
+            - generic [ref=e349]:
+              - generic [ref=e351]: Stale Deals (7+ days)
+              - generic [ref=e353]:
+                - link "NEGOTIATION Acme Corp – Paket Premium Investment Mike Sales · Rp 500.000.000 381d" [ref=e354] [cursor=pointer]:
+                  - /url: /deals/deal-1
+                  - generic [ref=e355]: NEGOTIATION
+                  - generic [ref=e356]:
+                    - paragraph [ref=e357]: Acme Corp – Paket Premium Investment
+                    - paragraph [ref=e358]: Mike Sales · Rp 500.000.000
+                  - generic [ref=e359]: 381d
+                - link "PROPOSAL Acme Corp – Index Gabungan A Mike Sales · Rp 250.000.000 389d" [ref=e360] [cursor=pointer]:
+                  - /url: /deals/deal-2
+                  - generic [ref=e361]: PROPOSAL
+                  - generic [ref=e362]:
+                    - paragraph [ref=e363]: Acme Corp – Index Gabungan A
+                    - paragraph [ref=e364]: Mike Sales · Rp 250.000.000
+                  - generic [ref=e365]: 389d
+                - link "QUALIFIED Northstar Health – Stock D Portfolio Mike Sales · Rp 150.000.000 420d" [ref=e366] [cursor=pointer]:
+                  - /url: /deals/deal-3
+                  - generic [ref=e367]: QUALIFIED
+                  - generic [ref=e368]:
+                    - paragraph [ref=e369]: Northstar Health – Stock D Portfolio
+                    - paragraph [ref=e370]: Mike Sales · Rp 150.000.000
+                  - generic [ref=e371]: 420d
+                - link "LEAD Selaras Retail – Stock A Entry Mike Sales · Rp 75.000.000 406d" [ref=e372] [cursor=pointer]:
+                  - /url: /deals/deal-5
+                  - generic [ref=e373]: LEAD
+                  - generic [ref=e374]:
+                    - paragraph [ref=e375]: Selaras Retail – Stock A Entry
+                    - paragraph [ref=e376]: Mike Sales · Rp 75.000.000
+                  - generic [ref=e377]: 406d
+                - link "PROPOSAL Mitra Energi – Index Saham B Mike Sales · Rp 300.000.000 384d" [ref=e378] [cursor=pointer]:
+                  - /url: /deals/deal-6
+                  - generic [ref=e379]: PROPOSAL
+                  - generic [ref=e380]:
+                    - paragraph [ref=e381]: Mitra Energi – Index Saham B
+                    - paragraph [ref=e382]: Mike Sales · Rp 300.000.000
+                  - generic [ref=e383]: 384d
+          - generic [ref=e384]:
+            - generic [ref=e386]: Team Activity
+            - application [ref=e390]:
+              - generic [ref=e407]:
+                - generic [ref=e410]: Mike
+                - generic [ref=e411]:
+                  - generic [ref=e413]: "0"
+                  - generic [ref=e415]: "4"
+                  - generic [ref=e417]: "8"
+                  - generic [ref=e419]: "12"
+                  - generic [ref=e421]: "16"
+  - generic [ref=e422]: "0"

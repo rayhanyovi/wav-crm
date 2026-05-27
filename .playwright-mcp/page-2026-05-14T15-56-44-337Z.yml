@@ -1,0 +1,137 @@
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - generic [ref=e6]: CRM Pro
+    - navigation [ref=e7]:
+      - link "Dashboard" [ref=e8] [cursor=pointer]:
+        - /url: /
+        - img [ref=e9]
+        - generic [ref=e14]: Dashboard
+      - link "Leads" [ref=e15] [cursor=pointer]:
+        - /url: /leads
+        - img [ref=e16]
+        - generic [ref=e21]: Leads
+      - link "Contacts" [ref=e22] [cursor=pointer]:
+        - /url: /contacts
+        - img [ref=e23]
+        - generic [ref=e27]: Contacts
+      - link "Companies" [ref=e28] [cursor=pointer]:
+        - /url: /companies
+        - img [ref=e29]
+        - generic [ref=e33]: Companies
+      - link "Deals" [ref=e34] [cursor=pointer]:
+        - /url: /deals
+        - img [ref=e35]
+        - generic [ref=e38]: Deals
+      - link "Activities" [ref=e39] [cursor=pointer]:
+        - /url: /activities
+        - img [ref=e40]
+        - generic [ref=e42]: Activities
+      - link "Campaigns" [ref=e43] [cursor=pointer]:
+        - /url: /campaigns
+        - img [ref=e44]
+        - generic [ref=e47]: Campaigns
+      - link "Team" [ref=e49] [cursor=pointer]:
+        - /url: /team
+        - img [ref=e50]
+        - generic [ref=e62]: Team
+    - button "Collapse" [ref=e64]:
+      - img [ref=e65]
+      - generic [ref=e67]: Collapse
+  - generic [ref=e68]:
+    - banner [ref=e69]:
+      - button "Search Ctrl+K" [ref=e70]:
+        - img
+        - generic [ref=e71]: Search
+        - generic [ref=e72]: Ctrl+K
+      - button "1" [ref=e73]:
+        - img
+        - generic [ref=e74]: "1"
+      - button [ref=e75]:
+        - img
+      - button "SM Sarah Manager" [ref=e76]:
+        - generic [ref=e78]: SM
+        - generic [ref=e79]: Sarah Manager
+    - main [ref=e80]:
+      - generic [ref=e81]:
+        - heading "Campaigns" [level=1] [ref=e82]
+        - generic [ref=e83]:
+          - tablist [ref=e84]:
+            - tab "Campaigns" [selected] [ref=e85]:
+              - img [ref=e86]
+              - text: Campaigns
+            - tab "Products" [ref=e89]:
+              - img [ref=e90]
+              - text: Products
+            - tab "Bundles" [ref=e94]:
+              - img [ref=e95]
+              - text: Bundles
+            - tab "Performance" [ref=e105]:
+              - img [ref=e106]
+              - text: Performance
+          - tabpanel "Campaigns" [ref=e108]:
+            - button "New Campaign" [ref=e110]:
+              - img
+              - text: New Campaign
+            - table [ref=e113]:
+              - rowgroup [ref=e114]:
+                - row "Name Type Offering Status Dates Target Progress" [ref=e115]:
+                  - columnheader "Name" [ref=e116]
+                  - columnheader "Type" [ref=e117]
+                  - columnheader "Offering" [ref=e118]
+                  - columnheader "Status" [ref=e119]
+                  - columnheader "Dates" [ref=e120]
+                  - columnheader "Target" [ref=e121]
+                  - columnheader "Progress" [ref=e122]
+              - rowgroup [ref=e123]:
+                - row "Q2 Index Fund Push BUNDLE Index Saham B ACTIVE 1 Apr 2025 – 30 Jun 2025 50 4/50" [ref=e124] [cursor=pointer]:
+                  - cell "Q2 Index Fund Push" [ref=e125]
+                  - cell "BUNDLE" [ref=e126]:
+                    - generic [ref=e127]: BUNDLE
+                  - cell "Index Saham B" [ref=e128]
+                  - cell "ACTIVE" [ref=e129]:
+                    - generic [ref=e130]: ACTIVE
+                  - cell "1 Apr 2025 – 30 Jun 2025" [ref=e131]
+                  - cell "50" [ref=e132]
+                  - cell "4/50" [ref=e133]:
+                    - generic [ref=e134]:
+                      - progressbar [ref=e135]
+                      - generic [ref=e137]: 4/50
+                - row "Healthcare & Consumer Bundle Drive BUNDLE Index Saham B ACTIVE 15 Mar 2025 – 31 May 2025 30 3/30" [ref=e138] [cursor=pointer]:
+                  - cell "Healthcare & Consumer Bundle Drive" [ref=e139]
+                  - cell "BUNDLE" [ref=e140]:
+                    - generic [ref=e141]: BUNDLE
+                  - cell "Index Saham B" [ref=e142]
+                  - cell "ACTIVE" [ref=e143]:
+                    - generic [ref=e144]: ACTIVE
+                  - cell "15 Mar 2025 – 31 May 2025" [ref=e145]
+                  - cell "30" [ref=e146]
+                  - cell "3/30" [ref=e147]:
+                    - generic [ref=e148]:
+                      - progressbar [ref=e149]
+                      - generic [ref=e151]: 3/30
+                - row "Paket Premium – VIP Outreach BUNDLE Paket Premium ACTIVE 15 Apr 2025 – 31 Jul 2025 20 3/20" [ref=e152] [cursor=pointer]:
+                  - cell "Paket Premium – VIP Outreach" [ref=e153]
+                  - cell "BUNDLE" [ref=e154]:
+                    - generic [ref=e155]: BUNDLE
+                  - cell "Paket Premium" [ref=e156]
+                  - cell "ACTIVE" [ref=e157]:
+                    - generic [ref=e158]: ACTIVE
+                  - cell "15 Apr 2025 – 31 Jul 2025" [ref=e159]
+                  - cell "20" [ref=e160]
+                  - cell "3/20" [ref=e161]:
+                    - generic [ref=e162]:
+                      - progressbar [ref=e163]
+                      - generic [ref=e165]: 3/20
+                - row "Stock A Tech Growth Campaign PRODUCT Stock A PAUSED 1 Feb 2025 – 31 Mar 2025 40 0/40" [ref=e166] [cursor=pointer]:
+                  - cell "Stock A Tech Growth Campaign" [ref=e167]
+                  - cell "PRODUCT" [ref=e168]:
+                    - generic [ref=e169]: PRODUCT
+                  - cell "Stock A" [ref=e170]
+                  - cell "PAUSED" [ref=e171]:
+                    - generic [ref=e172]: PAUSED
+                  - cell "1 Feb 2025 – 31 Mar 2025" [ref=e173]
+                  - cell "40" [ref=e174]
+                  - cell "0/40" [ref=e175]:
+                    - generic [ref=e176]:
+                      - progressbar [ref=e177]
+                      - generic [ref=e179]: 0/40
