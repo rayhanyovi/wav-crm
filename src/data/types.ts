@@ -5,7 +5,14 @@ export type UserRole = 'MASTER' | 'ADVISER' | 'TELEMARKETER';
 export type LeadStatus = 'NA' | 'APPOINTMENT' | 'NOT_INTERESTED' | 'ABANDON' | 'OTHERS';
 export type LeadSource = 'MAGNET' | 'SCOUT' | 'LENS' | 'BEACON' | 'REFERRAL' | 'MANUAL' | 'WALK_IN' | 'COLD_CALL';
 
-export type DealStage = 'LEAD' | 'QUALIFIED' | 'PROPOSAL' | 'NEGOTIATION' | 'CLOSED_WON' | 'CLOSED_LOST';
+// WAV deal pipeline:
+//   CALLING  — telemarketer is cold-calling (telemarketer-only view)
+//   APPOINTMENT — appointment set; adviser steps in from here
+//   PROPOSAL    — adviser has presented fund proposal(s)
+//   NEGOTIATION — client considering, active negotiation
+//   WON         — closed & invested
+//   LOST        — dropped / not interested
+export type DealStage = 'CALLING' | 'APPOINTMENT' | 'PROPOSAL' | 'NEGOTIATION' | 'WON' | 'LOST';
 
 export type ActivityType = 'CALL' | 'EMAIL' | 'MEETING' | 'TASK' | 'NOTE' | 'FOLLOW_UP';
 export type ActivityResult = 'COMPLETED' | 'NO_ANSWER' | 'FOLLOW_UP_NEEDED' | 'MEETING_SCHEDULED' | 'CANCELLED' | 'FAILED';
@@ -109,6 +116,8 @@ export interface Lead {
   abandoned_at?: string;
   // Others free-text (Task #6)
   other_status_note?: string;
+  // Products discussed (Task #12)
+  products_discussed?: string[];  // array of product IDs from atlas
   // Ownership
   company_id?: string;
   assigned_to_id?: string;
@@ -134,12 +143,13 @@ export interface LeadNote {
 export interface Deal {
   id: string;
   title: string;
-  value: number;
+  value: number;           // total investment value (SGD)
   stage: DealStage;
-  contact_id: string;
+  lead_id?: string;        // source lead
+  contact_id: string;      // converted contact (may be same as lead initially)
   company_id?: string;
-  lead_id?: string;
-  assigned_to_id?: string;
+  telemarketer_id?: string; // who cold-called this lead
+  assigned_to_id?: string;  // adviser handling the deal
   expected_close_date?: string;
   lost_reason?: string;
   closed_at?: string;
@@ -147,6 +157,30 @@ export interface Deal {
   created_at: string;
   updated_at: string;
   deleted_at?: string;
+}
+
+// ─── Deal Proposals (fund allocation plans per deal) ──────────────────────────
+export type DealProposalStatus = 'DRAFT' | 'PRESENTED' | 'ACCEPTED' | 'REJECTED';
+
+export interface DealProposalLine {
+  id: string;
+  fund_isin: string;
+  fund_name: string;
+  risk_rating: number;
+  allocation_pct: number; // 0–100
+}
+
+export interface DealProposal {
+  id: string;
+  deal_id: string;
+  name: string;                     // e.g. "Conservative Plan", "Growth Plan"
+  status: DealProposalStatus;
+  total_value: number;              // SGD
+  notes?: string;
+  lines: DealProposalLine[];
+  created_by: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface StageHistoryEntry {

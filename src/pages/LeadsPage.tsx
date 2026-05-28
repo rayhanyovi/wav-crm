@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ExternalLink, Plus, Users } from "lucide-react";
+import { ExternalLink, Plus, Upload, Users } from "lucide-react";
 import { useCrmStore } from "@/store/useCrmStore";
 import { useAuthStore } from "@/store/useAuthStore";
 import { Button } from "@/components/ui/button";
@@ -41,6 +41,7 @@ import { getLastContactedDate } from "@/lib/selectors";
 import { canEdit, isMaster, isAdviser, isTelemarketer } from "@/lib/permissions";
 import { Link, useNavigate } from "react-router-dom";
 import type { LeadStatus, LeadSource } from "@/data/types";
+import { LeadImportDialog } from "@/components/leads/LeadImportDialog";
 
 const STATUSES: LeadStatus[] = [
   "NA",
@@ -72,6 +73,7 @@ export function LeadsPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [showAbandoned, setShowAbandoned] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
 
   const [form, setForm] = useState({
     first_name: "",
@@ -234,10 +236,16 @@ export function LeadsPage() {
           )}
         </div>
         {canEdit(currentUser) && (
-          <Button onClick={() => setCreateOpen(true)} className="gap-1.5">
-            <Plus className="h-4 w-4" />
-            New Lead
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setImportOpen(true)} className="gap-1.5">
+              <Upload className="h-4 w-4" />
+              Import CSV
+            </Button>
+            <Button onClick={() => setCreateOpen(true)} className="gap-1.5">
+              <Plus className="h-4 w-4" />
+              New Lead
+            </Button>
+          </div>
         )}
       </div>
 
@@ -567,6 +575,9 @@ export function LeadsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Import dialog (Task #14) */}
+      <LeadImportDialog open={importOpen} onClose={() => setImportOpen(false)} />
     </div>
   );
 }

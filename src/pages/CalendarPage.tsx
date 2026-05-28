@@ -12,7 +12,7 @@ import {
   startOfWeek,
   subMonths,
 } from "date-fns";
-import { CalendarDays, ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, Plus, RefreshCw } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useCrmStore } from "@/store/useCrmStore";
 import { useAuthStore } from "@/store/useAuthStore";
@@ -83,6 +83,7 @@ export function CalendarPage() {
   );
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [gcalOpen, setGcalOpen] = useState(false);
   const [filterType, setFilterType] = useState("ALL");
   const [filterStatus, setFilterStatus] =
     useState<(typeof STATUS_FILTERS)[number]>("ALL");
@@ -231,13 +232,43 @@ export function CalendarPage() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold">Calendar</h1>
-        <p className="text-sm text-muted-foreground">
-          Track scheduled calls, meetings, follow-ups, tasks, demos, emails,
-          and notes.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">Calendar</h1>
+          <p className="text-sm text-muted-foreground">
+            Track scheduled calls, meetings, follow-ups, tasks, demos, emails,
+            and notes.
+          </p>
+        </div>
+        <Button variant="outline" size="sm" className="shrink-0 gap-2" onClick={() => setGcalOpen(true)}>
+          <RefreshCw className="h-3.5 w-3.5" />
+          Sync with Google Calendar
+        </Button>
       </div>
+
+      {/* Google Calendar sync — coming soon modal */}
+      <Dialog open={gcalOpen} onOpenChange={setGcalOpen}>
+        <DialogContent className="max-w-sm text-center">
+          <DialogHeader>
+            <DialogTitle className="flex items-center justify-center gap-2">
+              <RefreshCw className="h-5 w-5 text-primary" />
+              Google Calendar Sync
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4 space-y-3">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+              <RefreshCw className="h-7 w-7 text-primary animate-spin [animation-duration:3s]" />
+            </div>
+            <p className="font-semibold">Feature in Progress</p>
+            <p className="text-sm text-muted-foreground">
+              Google Calendar integration is currently being built. Stay tuned — two-way sync for meetings and follow-ups is coming soon.
+            </p>
+          </div>
+          <DialogFooter className="justify-center">
+            <Button onClick={() => setGcalOpen(false)}>Got it</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap gap-2">

@@ -15,6 +15,8 @@ import { CalendarPage } from "@/pages/CalendarPage";
 import { TeamPage } from "@/pages/TeamPage";
 import { AdvisorPerformancePage } from "@/pages/AdvisorPerformancePage";
 import { AuditLogsPage } from "@/pages/AuditLogsPage";
+import { ToolsPage } from "@/pages/ToolsPage";
+import { PortfolioRiskCalculatorPage } from "@/pages/PortfolioRiskCalculatorPage";
 import { NoAccessPage } from "@/pages/NoAccessPage";
 import { canManage, roleLevel } from "@/lib/permissions";
 
@@ -62,6 +64,8 @@ export default function App() {
         <Route path="activities" element={<ActivitiesPage />} />
         <Route path="activities/:id" element={<ActivityDetailPage />} />
         <Route path="calendar" element={<CalendarPage />} />
+        <Route path="tools" element={<ToolsPage />} />
+        <Route path="tools/portfolio-risk" element={<PortfolioRiskCalculatorPage />} />
         <Route path="team" element={<ProtectedRoute minRole={2}><TeamPage /></ProtectedRoute>} />
         <Route path="team/:id" element={<TeamProfileRoute />} />
         <Route path="audit-logs" element={<ProtectedRoute minRole={2}><AuditLogsPage /></ProtectedRoute>} />

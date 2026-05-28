@@ -91,7 +91,7 @@
       "phone": "+62 21 5555 0200",
       "email": "contact@northstar.example.com",
       "address": "Jl. Gatot Subroto No. 88, Jakarta",
-      "notes": "Conservative investor. Stale deal – follow up urgently.",
+      "notes": "Conservative investor. Stale deal \u2013 follow up urgently.",
       "created_by": "user-3",
       "created_at": "2026-02-15T09:00:00Z",
       "updated_at": "2026-03-01T09:00:00Z"
@@ -639,122 +639,130 @@
   "deals": [
     {
       "id": "deal-1",
-      "title": "Acme Corp – Premium Multi-Sector Alpha Investment",
+      "title": "Acme Corp \u2013 Premium Multi-Sector Alpha Investment",
       "value": 500000000,
       "stage": "NEGOTIATION",
       "contact_id": "cnt-1",
       "company_id": "co-1",
-      "lead_id": null,
+      "lead_id": "lead-1",
       "assigned_to_id": "user-3",
       "expected_close_date": "2026-05-30T00:00:00Z",
       "created_by": "user-3",
       "created_at": "2026-02-10T08:00:00Z",
-      "updated_at": "2026-04-28T14:00:00Z"
+      "updated_at": "2026-04-28T14:00:00Z",
+      "telemarketer_id": "user-3"
     },
     {
       "id": "deal-2",
-      "title": "Acme Corp – Nusantara Balanced Growth",
+      "title": "Acme Corp \u2013 Nusantara Balanced Growth",
       "value": 250000000,
       "stage": "PROPOSAL",
       "contact_id": "cnt-2",
       "company_id": "co-1",
-      "lead_id": null,
+      "lead_id": "lead-2",
       "assigned_to_id": "user-3",
       "expected_close_date": "2026-06-15T00:00:00Z",
       "created_by": "user-3",
       "created_at": "2026-03-05T09:00:00Z",
-      "updated_at": "2026-04-20T15:00:00Z"
+      "updated_at": "2026-04-20T15:00:00Z",
+      "telemarketer_id": "user-3"
     },
     {
       "id": "deal-3",
-      "title": "Northstar Health – MRRN Portfolio",
+      "title": "Northstar Health \u2013 MRRN Portfolio",
       "value": 150000000,
-      "stage": "QUALIFIED",
+      "stage": "APPOINTMENT",
       "contact_id": "cnt-3",
       "company_id": "co-2",
-      "lead_id": null,
+      "lead_id": "lead-3",
       "assigned_to_id": "user-3",
       "expected_close_date": "2026-06-30T00:00:00Z",
       "created_by": "user-3",
       "created_at": "2026-03-01T08:00:00Z",
-      "updated_at": "2026-03-20T10:00:00Z"
+      "updated_at": "2026-03-20T10:00:00Z",
+      "telemarketer_id": "user-3"
     },
     {
       "id": "deal-4",
-      "title": "BlueSky Ventures – Premium Multi-Sector Alpha",
+      "title": "BlueSky Ventures \u2013 Premium Multi-Sector Alpha",
       "value": 1000000000,
-      "stage": "CLOSED_WON",
+      "stage": "WON",
       "contact_id": "cnt-4",
       "company_id": "co-3",
-      "lead_id": null,
+      "lead_id": "lead-4",
       "assigned_to_id": "user-3",
       "expected_close_date": "2026-05-01T00:00:00Z",
       "closed_at": "2026-05-05T10:00:00Z",
       "created_by": "user-3",
       "created_at": "2026-03-15T10:00:00Z",
-      "updated_at": "2026-05-05T10:00:00Z"
+      "updated_at": "2026-05-05T10:00:00Z",
+      "telemarketer_id": "user-3"
     },
     {
       "id": "deal-5",
-      "title": "Selaras Retail – ACNA Entry",
+      "title": "Selaras Retail \u2013 ACNA Entry",
       "value": 75000000,
-      "stage": "LEAD",
+      "stage": "CALLING",
       "contact_id": "cnt-5",
       "company_id": "co-4",
-      "lead_id": null,
+      "lead_id": "lead-5",
       "assigned_to_id": "user-3",
       "expected_close_date": "2026-07-01T00:00:00Z",
       "created_by": "user-3",
       "created_at": "2026-04-03T08:30:00Z",
-      "updated_at": "2026-04-03T08:30:00Z"
+      "updated_at": "2026-04-03T08:30:00Z",
+      "telemarketer_id": "user-3"
     },
     {
       "id": "deal-6",
-      "title": "Mitra Energi – Energy Transition Alpha",
+      "title": "Mitra Energi \u2013 Energy Transition Alpha",
       "value": 300000000,
       "stage": "PROPOSAL",
       "contact_id": "cnt-6",
       "company_id": "co-5",
-      "lead_id": null,
+      "lead_id": "lead-6",
       "assigned_to_id": "user-3",
       "expected_close_date": "2026-06-20T00:00:00Z",
       "created_by": "user-2",
       "created_at": "2026-04-08T09:00:00Z",
-      "updated_at": "2026-04-25T11:00:00Z"
+      "updated_at": "2026-04-25T11:00:00Z",
+      "telemarketer_id": "user-3"
     },
     {
       "id": "deal-7",
-      "title": "BlueSky Ventures – AEVT Allocation",
+      "title": "BlueSky Ventures \u2013 AEVT Allocation",
       "value": 400000000,
-      "stage": "CLOSED_LOST",
+      "stage": "LOST",
       "contact_id": "cnt-7",
       "company_id": "co-3",
-      "lead_id": null,
+      "lead_id": "lead-7",
       "assigned_to_id": "user-3",
       "expected_close_date": "2026-04-30T00:00:00Z",
       "lost_reason": "Client chose a competitor with lower management fees.",
       "closed_at": "2026-04-29T16:00:00Z",
       "created_by": "user-3",
       "created_at": "2026-03-20T10:00:00Z",
-      "updated_at": "2026-04-29T16:00:00Z"
+      "updated_at": "2026-04-29T16:00:00Z",
+      "telemarketer_id": "user-3"
     },
     {
       "id": "deal-8",
-      "title": "Acme Corp – NUDC Growth Fund",
+      "title": "Acme Corp \u2013 NUDC Growth Fund",
       "value": 200000000,
-      "stage": "QUALIFIED",
+      "stage": "APPOINTMENT",
       "contact_id": "cnt-8",
       "company_id": "co-1",
-      "lead_id": null,
+      "lead_id": "lead-8",
       "assigned_to_id": "user-3",
       "expected_close_date": "2026-07-15T00:00:00Z",
       "created_by": "user-3",
       "created_at": "2026-04-15T09:00:00Z",
-      "updated_at": "2026-05-01T10:00:00Z"
+      "updated_at": "2026-05-01T10:00:00Z",
+      "telemarketer_id": "user-3"
     },
     {
       "id": "deal-9",
-      "title": "Mitra Energi – Premium Multi-Sector Alpha Upgrade",
+      "title": "Mitra Energi \u2013 Premium Multi-Sector Alpha Upgrade",
       "value": 750000000,
       "stage": "NEGOTIATION",
       "contact_id": "cnt-6",
@@ -768,9 +776,9 @@
     },
     {
       "id": "deal-10",
-      "title": "BlueSky Ventures – Nusantara Balanced Growth",
+      "title": "BlueSky Ventures \u2013 Nusantara Balanced Growth",
       "value": 500000000,
-      "stage": "LEAD",
+      "stage": "CALLING",
       "contact_id": "cnt-4",
       "company_id": "co-3",
       "lead_id": "lead-10",
@@ -782,9 +790,9 @@
     },
     {
       "id": "deal-11",
-      "title": "Aruna Defensive Income – Mega Wulandari",
+      "title": "Aruna Defensive Income \u2013 Mega Wulandari",
       "value": 175000000,
-      "stage": "CLOSED_WON",
+      "stage": "WON",
       "contact_id": "cnt-9",
       "company_id": "co-4",
       "lead_id": "lead-16",
@@ -797,7 +805,7 @@
     },
     {
       "id": "deal-12",
-      "title": "ACNA Core Holding – Yunita Sari",
+      "title": "ACNA Core Holding \u2013 Yunita Sari",
       "value": 250000000,
       "stage": "NEGOTIATION",
       "contact_id": "cnt-11",
@@ -811,9 +819,9 @@
     },
     {
       "id": "deal-13",
-      "title": "Energy Transition Alpha – Nadia Permata",
+      "title": "Energy Transition Alpha \u2013 Nadia Permata",
       "value": 200000000,
-      "stage": "CLOSED_WON",
+      "stage": "WON",
       "contact_id": "cnt-10",
       "company_id": "co-5",
       "lead_id": "lead-20",
@@ -826,7 +834,7 @@
     },
     {
       "id": "deal-14",
-      "title": "Energy Transition Alpha – Sandra Dewi",
+      "title": "Energy Transition Alpha \u2013 Sandra Dewi",
       "value": 320000000,
       "stage": "PROPOSAL",
       "contact_id": "cnt-12",
@@ -1041,7 +1049,7 @@
       "from_stage": "QUALIFIED",
       "to_stage": "NEGOTIATION",
       "changed_by": "user-5",
-      "note": "Skipped proposal stage – client wants direct negotiation",
+      "note": "Skipped proposal stage \u2013 client wants direct negotiation",
       "created_at": "2026-05-10T09:00:00Z"
     },
     {
@@ -1095,7 +1103,7 @@
       "from_stage": "LEAD",
       "to_stage": "QUALIFIED",
       "changed_by": "user-6",
-      "note": "Sandra confirmed budget of Rp 300–400 juta",
+      "note": "Sandra confirmed budget of Rp 300\u2013400 juta",
       "created_at": "2026-05-05T11:00:00Z"
     },
     {
@@ -1112,12 +1120,15 @@
     {
       "id": "act-1",
       "type": "CALL",
-      "subject": "Initial discovery call – Budi Santoso",
+      "subject": "Initial discovery call \u2013 Budi Santoso",
       "description": "Introduced our Premium Multi-Sector Alpha product. Budi expressed strong interest in the diversified portfolio.",
       "result": "COMPLETED",
       "scheduled_at": "2026-02-15T10:00:00Z",
       "completed_at": "2026-02-15T10:25:00Z",
-      "metadata": {"duration_seconds": 1500, "call_direction": "outbound"},
+      "metadata": {
+        "duration_seconds": 1500,
+        "call_direction": "outbound"
+      },
       "deal_id": "deal-1",
       "contact_id": "cnt-1",
       "lead_id": null,
@@ -1130,12 +1141,18 @@
     {
       "id": "act-2",
       "type": "MEETING",
-      "subject": "Product demo – Premium Multi-Sector Alpha presentation",
+      "subject": "Product demo \u2013 Premium Multi-Sector Alpha presentation",
       "description": "Full product demo at Acme Corp HQ. CFO Dewi also joined. Very positive reception.",
       "result": "COMPLETED",
       "scheduled_at": "2026-03-05T14:00:00Z",
       "completed_at": "2026-03-05T15:30:00Z",
-      "metadata": {"attendees": ["Budi Santoso", "Dewi Rahayu"], "location": "Acme Corp HQ"},
+      "metadata": {
+        "attendees": [
+          "Budi Santoso",
+          "Dewi Rahayu"
+        ],
+        "location": "Acme Corp HQ"
+      },
       "deal_id": "deal-1",
       "contact_id": "cnt-1",
       "lead_id": null,
@@ -1148,7 +1165,7 @@
     {
       "id": "act-3",
       "type": "EMAIL",
-      "subject": "Proposal follow-up – Acme Corp",
+      "subject": "Proposal follow-up \u2013 Acme Corp",
       "description": "Sent follow-up email with updated pricing and fee structure after negotiation feedback.",
       "result": "COMPLETED",
       "scheduled_at": "2026-04-20T09:00:00Z",
@@ -1166,12 +1183,14 @@
     {
       "id": "act-4",
       "type": "CALL",
-      "subject": "Follow-up call – Ahmad Fauzi (Northstar)",
+      "subject": "Follow-up call \u2013 Ahmad Fauzi (Northstar)",
       "description": "Ahmad seems hesitant. Budget constraints cited. Will need manager to assist.",
       "result": "FOLLOW_UP_NEEDED",
       "scheduled_at": "2026-03-15T11:00:00Z",
       "completed_at": "2026-03-15T11:20:00Z",
-      "metadata": {"duration_seconds": 1200},
+      "metadata": {
+        "duration_seconds": 1200
+      },
       "deal_id": "deal-3",
       "contact_id": "cnt-3",
       "lead_id": null,
@@ -1184,12 +1203,15 @@
     {
       "id": "act-5",
       "type": "CALL",
-      "subject": "Cold call – Joko Purnomo",
+      "subject": "Cold call \u2013 Joko Purnomo",
       "description": "First contact. Left voicemail and sent SMS follow-up.",
       "result": "NO_ANSWER",
       "scheduled_at": "2026-04-18T10:00:00Z",
       "completed_at": "2026-04-18T10:05:00Z",
-      "metadata": {"duration_seconds": 30, "call_direction": "outbound"},
+      "metadata": {
+        "duration_seconds": 30,
+        "call_direction": "outbound"
+      },
       "deal_id": null,
       "contact_id": null,
       "lead_id": "lead-3",
@@ -1202,12 +1224,14 @@
     {
       "id": "act-6",
       "type": "CALL",
-      "subject": "Second call – Joko Purnomo",
+      "subject": "Second call \u2013 Joko Purnomo",
       "description": "Connected this time. Interested in conservative product. Booked follow-up meeting.",
       "result": "MEETING_SCHEDULED",
       "scheduled_at": "2026-04-25T10:00:00Z",
       "completed_at": "2026-04-25T10:18:00Z",
-      "metadata": {"duration_seconds": 1080},
+      "metadata": {
+        "duration_seconds": 1080
+      },
       "deal_id": null,
       "contact_id": null,
       "lead_id": "lead-3",
@@ -1220,12 +1244,17 @@
     {
       "id": "act-7",
       "type": "MEETING",
-      "subject": "Product demo – Rina Kusuma (BlueSky)",
+      "subject": "Product demo \u2013 Rina Kusuma (BlueSky)",
       "description": "Full demo of Premium Multi-Sector Alpha. Rina loves the diversification strategy. Ready to move forward.",
       "result": "COMPLETED",
       "scheduled_at": "2026-04-15T14:00:00Z",
       "completed_at": "2026-04-15T15:00:00Z",
-      "metadata": {"attendees": ["Rina Kusuma", "Hendra Wijaya"]},
+      "metadata": {
+        "attendees": [
+          "Rina Kusuma",
+          "Hendra Wijaya"
+        ]
+      },
       "deal_id": "deal-4",
       "contact_id": "cnt-4",
       "lead_id": null,
@@ -1238,7 +1267,7 @@
     {
       "id": "act-8",
       "type": "NOTE",
-      "subject": "Internal note – Northstar stale deal",
+      "subject": "Internal note \u2013 Northstar stale deal",
       "description": "Northstar deal has been stuck at QUALIFIED for 6+ weeks. Need management escalation.",
       "result": "COMPLETED",
       "scheduled_at": null,
@@ -1256,12 +1285,14 @@
     {
       "id": "act-9",
       "type": "CALL",
-      "subject": "Call – Toni Hartono (qualified lead)",
+      "subject": "Call \u2013 Toni Hartono (qualified lead)",
       "description": "Toni ready to proceed. Requested formal investment proposal.",
       "result": "COMPLETED",
       "scheduled_at": "2026-04-28T10:00:00Z",
       "completed_at": "2026-04-28T10:22:00Z",
-      "metadata": {"duration_seconds": 1320},
+      "metadata": {
+        "duration_seconds": 1320
+      },
       "deal_id": null,
       "contact_id": null,
       "lead_id": "lead-1",
@@ -1274,7 +1305,7 @@
     {
       "id": "act-10",
       "type": "FOLLOW_UP",
-      "subject": "Follow-up – Fajar Nugroho (Mitra Energi lead)",
+      "subject": "Follow-up \u2013 Fajar Nugroho (Mitra Energi lead)",
       "description": "Scheduled follow-up after event. Confirmed interest in Energy Transition Alpha.",
       "result": "COMPLETED",
       "scheduled_at": "2026-05-02T14:00:00Z",
@@ -1292,12 +1323,14 @@
     {
       "id": "act-11",
       "type": "CALL",
-      "subject": "Call – Siti Wahyuni (Mitra Energi)",
+      "subject": "Call \u2013 Siti Wahyuni (Mitra Energi)",
       "description": "Discussed Energy Transition Alpha allocation. She needs board approval first.",
       "result": "FOLLOW_UP_NEEDED",
       "scheduled_at": "2026-04-25T09:00:00Z",
       "completed_at": "2026-04-25T09:20:00Z",
-      "metadata": {"duration_seconds": 1200},
+      "metadata": {
+        "duration_seconds": 1200
+      },
       "deal_id": "deal-6",
       "contact_id": "cnt-6",
       "lead_id": null,
@@ -1328,12 +1361,14 @@
     {
       "id": "act-13",
       "type": "CALL",
-      "subject": "Intro call – Nurul Hidayah",
+      "subject": "Intro call \u2013 Nurul Hidayah",
       "description": "Good conversation. Interested in index fund options. Will send brochure.",
       "result": "COMPLETED",
       "scheduled_at": "2026-04-30T14:00:00Z",
       "completed_at": "2026-04-30T14:15:00Z",
-      "metadata": {"duration_seconds": 900},
+      "metadata": {
+        "duration_seconds": 900
+      },
       "deal_id": null,
       "contact_id": null,
       "lead_id": "lead-6",
@@ -1346,12 +1381,14 @@
     {
       "id": "act-14",
       "type": "CALL",
-      "subject": "Call – Hendra Wijaya closing follow-up",
+      "subject": "Call \u2013 Hendra Wijaya closing follow-up",
       "description": "Called to negotiate final terms. Hendra opted for competitor. Deal lost.",
       "result": "FAILED",
       "scheduled_at": "2026-04-29T15:00:00Z",
       "completed_at": "2026-04-29T15:20:00Z",
-      "metadata": {"duration_seconds": 1200},
+      "metadata": {
+        "duration_seconds": 1200
+      },
       "deal_id": "deal-7",
       "contact_id": "cnt-7",
       "lead_id": null,
@@ -1364,12 +1401,17 @@
     {
       "id": "act-15",
       "type": "MEETING",
-      "subject": "Q1 review meeting – Mitra Energi",
+      "subject": "Q1 review meeting \u2013 Mitra Energi",
       "description": "Sarah joined this call. Upgraded discussion to Premium Multi-Sector Alpha. High chance of close.",
       "result": "COMPLETED",
       "scheduled_at": "2026-05-08T10:00:00Z",
       "completed_at": "2026-05-08T11:00:00Z",
-      "metadata": {"attendees": ["Siti Wahyuni", "Sarah Manager"]},
+      "metadata": {
+        "attendees": [
+          "Siti Wahyuni",
+          "Sarah Manager"
+        ]
+      },
       "deal_id": "deal-9",
       "contact_id": "cnt-6",
       "lead_id": null,
@@ -1382,12 +1424,14 @@
     {
       "id": "act-16",
       "type": "CALL",
-      "subject": "Call – Dian Pertiwi (qualified)",
+      "subject": "Call \u2013 Dian Pertiwi (qualified)",
       "description": "Dian very interested in ACNA and B combination. Next step: formal demo.",
       "result": "MEETING_SCHEDULED",
       "scheduled_at": "2026-05-06T15:00:00Z",
       "completed_at": "2026-05-06T15:18:00Z",
-      "metadata": {"duration_seconds": 1080},
+      "metadata": {
+        "duration_seconds": 1080
+      },
       "deal_id": null,
       "contact_id": null,
       "lead_id": "lead-10",
@@ -1400,12 +1444,14 @@
     {
       "id": "act-17",
       "type": "CALL",
-      "subject": "Call – Putri Marlina follow-up",
+      "subject": "Call \u2013 Putri Marlina follow-up",
       "description": "Putri mentioned she is comparing our offering with other brokers.",
       "result": "FOLLOW_UP_NEEDED",
       "scheduled_at": "2026-05-09T10:00:00Z",
       "completed_at": "2026-05-09T10:15:00Z",
-      "metadata": {"duration_seconds": 900},
+      "metadata": {
+        "duration_seconds": 900
+      },
       "deal_id": null,
       "contact_id": null,
       "lead_id": "lead-12",
@@ -1418,12 +1464,15 @@
     {
       "id": "act-18",
       "type": "CALL",
-      "subject": "Cold call – Arif Budiman (attempt 1)",
+      "subject": "Cold call \u2013 Arif Budiman (attempt 1)",
       "description": "No answer. Left voicemail.",
       "result": "NO_ANSWER",
       "scheduled_at": "2026-04-15T09:00:00Z",
       "completed_at": "2026-04-15T09:02:00Z",
-      "metadata": {"duration_seconds": 30, "call_direction": "outbound"},
+      "metadata": {
+        "duration_seconds": 30,
+        "call_direction": "outbound"
+      },
       "deal_id": null,
       "contact_id": null,
       "lead_id": "lead-13",
@@ -1436,12 +1485,15 @@
     {
       "id": "act-19",
       "type": "CALL",
-      "subject": "Cold call – Arif Budiman (attempt 2)",
+      "subject": "Cold call \u2013 Arif Budiman (attempt 2)",
       "description": "Connected. Arif is a small business owner open to investment. Needs more info on Aruna Defensive Income.",
       "result": "COMPLETED",
       "scheduled_at": "2026-04-20T10:00:00Z",
       "completed_at": "2026-04-20T10:12:00Z",
-      "metadata": {"duration_seconds": 720, "call_direction": "outbound"},
+      "metadata": {
+        "duration_seconds": 720,
+        "call_direction": "outbound"
+      },
       "deal_id": null,
       "contact_id": null,
       "lead_id": "lead-13",
@@ -1454,12 +1506,15 @@
     {
       "id": "act-20",
       "type": "CALL",
-      "subject": "Call – Mega Wulandari (event lead)",
+      "subject": "Call \u2013 Mega Wulandari (event lead)",
       "description": "Mega very enthusiastic. Wants to invest in Aruna Defensive Income. Scheduled product meeting.",
       "result": "MEETING_SCHEDULED",
       "scheduled_at": "2026-04-12T11:00:00Z",
       "completed_at": "2026-04-12T11:18:00Z",
-      "metadata": {"duration_seconds": 1080, "call_direction": "outbound"},
+      "metadata": {
+        "duration_seconds": 1080,
+        "call_direction": "outbound"
+      },
       "deal_id": null,
       "contact_id": null,
       "lead_id": "lead-16",
@@ -1472,12 +1527,15 @@
     {
       "id": "act-21",
       "type": "CALL",
-      "subject": "Call – Yunita Sari (website lead)",
+      "subject": "Call \u2013 Yunita Sari (website lead)",
       "description": "Yunita confirmed she wants to invest Rp 250 juta in ACNA Core Holding portfolio. Ready to proceed.",
       "result": "COMPLETED",
       "scheduled_at": "2026-04-18T14:00:00Z",
       "completed_at": "2026-04-18T14:22:00Z",
-      "metadata": {"duration_seconds": 1320, "call_direction": "outbound"},
+      "metadata": {
+        "duration_seconds": 1320,
+        "call_direction": "outbound"
+      },
       "deal_id": null,
       "contact_id": null,
       "lead_id": "lead-14",
@@ -1490,12 +1548,14 @@
     {
       "id": "act-22",
       "type": "CALL",
-      "subject": "Cold call – Andi Kurniawan",
+      "subject": "Cold call \u2013 Andi Kurniawan",
       "description": "No answer. Will retry next week.",
       "result": "NO_ANSWER",
       "scheduled_at": "2026-05-05T10:00:00Z",
       "completed_at": "2026-05-05T10:01:00Z",
-      "metadata": {"duration_seconds": 20},
+      "metadata": {
+        "duration_seconds": 20
+      },
       "deal_id": null,
       "contact_id": null,
       "lead_id": "lead-15",
@@ -1508,12 +1568,15 @@
     {
       "id": "act-23",
       "type": "CALL",
-      "subject": "Closing call – Mega Wulandari (deal-11)",
+      "subject": "Closing call \u2013 Mega Wulandari (deal-11)",
       "description": "Final terms agreed. Mega transferring funds by end of week.",
       "result": "COMPLETED",
       "scheduled_at": "2026-05-07T10:00:00Z",
       "completed_at": "2026-05-07T10:25:00Z",
-      "metadata": {"duration_seconds": 1500, "call_direction": "outbound"},
+      "metadata": {
+        "duration_seconds": 1500,
+        "call_direction": "outbound"
+      },
       "deal_id": "deal-11",
       "contact_id": "cnt-9",
       "lead_id": null,
@@ -1526,12 +1589,15 @@
     {
       "id": "act-24",
       "type": "CALL",
-      "subject": "Negotiation call – Yunita Sari (deal-12)",
+      "subject": "Negotiation call \u2013 Yunita Sari (deal-12)",
       "description": "Discussing fee structure and entry point timing. Very close to agreement.",
       "result": "FOLLOW_UP_NEEDED",
       "scheduled_at": "2026-05-10T09:00:00Z",
       "completed_at": "2026-05-10T09:20:00Z",
-      "metadata": {"duration_seconds": 1200, "call_direction": "outbound"},
+      "metadata": {
+        "duration_seconds": 1200,
+        "call_direction": "outbound"
+      },
       "deal_id": "deal-12",
       "contact_id": "cnt-11",
       "lead_id": null,
@@ -1544,12 +1610,14 @@
     {
       "id": "act-25",
       "type": "CALL",
-      "subject": "Cold call – Bimo Prakoso (attempt 1)",
+      "subject": "Cold call \u2013 Bimo Prakoso (attempt 1)",
       "description": "No answer. Sent SMS.",
       "result": "NO_ANSWER",
       "scheduled_at": "2026-04-22T09:00:00Z",
       "completed_at": "2026-04-22T09:01:00Z",
-      "metadata": {"duration_seconds": 25},
+      "metadata": {
+        "duration_seconds": 25
+      },
       "deal_id": null,
       "contact_id": null,
       "lead_id": "lead-17",
@@ -1562,12 +1630,15 @@
     {
       "id": "act-26",
       "type": "CALL",
-      "subject": "Call – Bimo Prakoso (attempt 2)",
+      "subject": "Call \u2013 Bimo Prakoso (attempt 2)",
       "description": "Bimo interested in high-return commodities portfolio. Scheduled follow-up meeting.",
       "result": "MEETING_SCHEDULED",
       "scheduled_at": "2026-04-28T10:00:00Z",
       "completed_at": "2026-04-28T10:15:00Z",
-      "metadata": {"duration_seconds": 900, "call_direction": "outbound"},
+      "metadata": {
+        "duration_seconds": 900,
+        "call_direction": "outbound"
+      },
       "deal_id": null,
       "contact_id": null,
       "lead_id": "lead-17",
@@ -1580,12 +1651,15 @@
     {
       "id": "act-27",
       "type": "CALL",
-      "subject": "Call – Sandra Dewi (referral lead)",
+      "subject": "Call \u2013 Sandra Dewi (referral lead)",
       "description": "Sandra already familiar with our products via Siti. Interested in energy sector exposure.",
       "result": "COMPLETED",
       "scheduled_at": "2026-04-20T14:00:00Z",
       "completed_at": "2026-04-20T14:18:00Z",
-      "metadata": {"duration_seconds": 1080, "call_direction": "outbound"},
+      "metadata": {
+        "duration_seconds": 1080,
+        "call_direction": "outbound"
+      },
       "deal_id": null,
       "contact_id": null,
       "lead_id": "lead-18",
@@ -1598,12 +1672,15 @@
     {
       "id": "act-28",
       "type": "CALL",
-      "subject": "Call – Nadia Permata (social media lead)",
+      "subject": "Call \u2013 Nadia Permata (social media lead)",
       "description": "Nadia is a finance manager with strong risk appetite. Wants Energy Transition Alpha allocation.",
       "result": "COMPLETED",
       "scheduled_at": "2026-04-25T11:00:00Z",
       "completed_at": "2026-04-25T11:22:00Z",
-      "metadata": {"duration_seconds": 1320, "call_direction": "outbound"},
+      "metadata": {
+        "duration_seconds": 1320,
+        "call_direction": "outbound"
+      },
       "deal_id": null,
       "contact_id": null,
       "lead_id": "lead-20",
@@ -1616,12 +1693,14 @@
     {
       "id": "act-29",
       "type": "CALL",
-      "subject": "Cold call – Irfan Hidayat",
+      "subject": "Cold call \u2013 Irfan Hidayat",
       "description": "No answer. Will retry.",
       "result": "NO_ANSWER",
       "scheduled_at": "2026-05-06T09:00:00Z",
       "completed_at": "2026-05-06T09:01:00Z",
-      "metadata": {"duration_seconds": 20},
+      "metadata": {
+        "duration_seconds": 20
+      },
       "deal_id": null,
       "contact_id": null,
       "lead_id": "lead-19",
@@ -1634,12 +1713,15 @@
     {
       "id": "act-30",
       "type": "CALL",
-      "subject": "Closing call – Nadia Permata (deal-13)",
+      "subject": "Closing call \u2013 Nadia Permata (deal-13)",
       "description": "Nadia confirmed final investment amount and signed digital agreement.",
       "result": "COMPLETED",
       "scheduled_at": "2026-05-04T10:00:00Z",
       "completed_at": "2026-05-04T10:28:00Z",
-      "metadata": {"duration_seconds": 1680, "call_direction": "outbound"},
+      "metadata": {
+        "duration_seconds": 1680,
+        "call_direction": "outbound"
+      },
       "deal_id": "deal-13",
       "contact_id": "cnt-10",
       "lead_id": null,
@@ -1652,12 +1734,15 @@
     {
       "id": "act-31",
       "type": "CALL",
-      "subject": "Follow-up – Sandra Dewi (deal-14)",
+      "subject": "Follow-up \u2013 Sandra Dewi (deal-14)",
       "description": "Sandra requested more time to review the prospectus. Will call back next week.",
       "result": "FOLLOW_UP_NEEDED",
       "scheduled_at": "2026-05-10T11:00:00Z",
       "completed_at": "2026-05-10T11:14:00Z",
-      "metadata": {"duration_seconds": 840, "call_direction": "outbound"},
+      "metadata": {
+        "duration_seconds": 840,
+        "call_direction": "outbound"
+      },
       "deal_id": "deal-14",
       "contact_id": "cnt-12",
       "lead_id": null,
@@ -1670,12 +1755,15 @@
     {
       "id": "act-32",
       "type": "CALL",
-      "subject": "Call – Lutfi Hakim (Sarah's lead)",
+      "subject": "Call \u2013 Lutfi Hakim (Sarah's lead)",
       "description": "Lutfi very interested in Premium Diversified portfolio. Confirmed budget of Rp 400 juta. Meeting next week.",
       "result": "MEETING_SCHEDULED",
       "scheduled_at": "2026-05-08T14:00:00Z",
       "completed_at": "2026-05-08T14:20:00Z",
-      "metadata": {"duration_seconds": 1200, "call_direction": "outbound"},
+      "metadata": {
+        "duration_seconds": 1200,
+        "call_direction": "outbound"
+      },
       "deal_id": null,
       "contact_id": null,
       "lead_id": "lead-21",
@@ -1688,12 +1776,15 @@
     {
       "id": "act-33",
       "type": "CALL",
-      "subject": "Intro call – Dewi Anjani",
+      "subject": "Intro call \u2013 Dewi Anjani",
       "description": "Good first call. Dewi interested in balanced growth. Will send Nusantara Balanced Growth brochure.",
       "result": "COMPLETED",
       "scheduled_at": "2026-05-09T10:00:00Z",
       "completed_at": "2026-05-09T10:14:00Z",
-      "metadata": {"duration_seconds": 840, "call_direction": "outbound"},
+      "metadata": {
+        "duration_seconds": 840,
+        "call_direction": "outbound"
+      },
       "deal_id": null,
       "contact_id": null,
       "lead_id": "lead-22",
@@ -2401,7 +2492,7 @@
       "recipient_id": "user-3",
       "type": "DEAL_STAGE_CHANGE",
       "title": "Deal advanced to Negotiation",
-      "message": "Acme Corp – Premium Multi-Sector Alpha Investment has moved to Negotiation stage.",
+      "message": "Acme Corp \u2013 Premium Multi-Sector Alpha Investment has moved to Negotiation stage.",
       "entity_type": "deal",
       "entity_id": "deal-1",
       "is_read": false,
@@ -2412,7 +2503,7 @@
       "recipient_id": "user-3",
       "type": "DEAL_CLOSED_WON",
       "title": "Deal closed! BlueSky Ventures",
-      "message": "BlueSky Ventures – Premium Multi-Sector Alpha is now CLOSED WON. Rp 1.000.000.000 secured!",
+      "message": "BlueSky Ventures \u2013 Premium Multi-Sector Alpha is now CLOSED WON. Rp 1.000.000.000 secured!",
       "entity_type": "deal",
       "entity_id": "deal-4",
       "is_read": false,
@@ -2434,7 +2525,7 @@
       "recipient_id": "user-3",
       "type": "COMMENT",
       "title": "New comment on your activity",
-      "message": "Sarah Manager commented on 'Product demo – Premium Multi-Sector Alpha presentation'.",
+      "message": "Sarah Manager commented on 'Product demo \u2013 Premium Multi-Sector Alpha presentation'.",
       "entity_type": "activity",
       "entity_id": "act-2",
       "is_read": true,
@@ -2446,7 +2537,7 @@
       "recipient_id": "user-2",
       "type": "DEAL_STAGE_CHANGE",
       "title": "Deal stage updated",
-      "message": "Mitra Energi – Premium Multi-Sector Alpha Upgrade is now in Negotiation.",
+      "message": "Mitra Energi \u2013 Premium Multi-Sector Alpha Upgrade is now in Negotiation.",
       "entity_type": "deal",
       "entity_id": "deal-9",
       "is_read": false,
@@ -2467,8 +2558,8 @@
       "id": "notif-7",
       "recipient_id": "user-1",
       "type": "DEAL_CLOSED_LOST",
-      "title": "Deal lost – BlueSky AEVT",
-      "message": "BlueSky Ventures – AEVT Allocation has been marked CLOSED LOST.",
+      "title": "Deal lost \u2013 BlueSky AEVT",
+      "message": "BlueSky Ventures \u2013 AEVT Allocation has been marked CLOSED LOST.",
       "entity_type": "deal",
       "entity_id": "deal-7",
       "is_read": true,
@@ -2480,7 +2571,7 @@
       "recipient_id": "user-5",
       "type": "DEAL_CLOSED_WON",
       "title": "Deal closed! Mega Wulandari",
-      "message": "Aruna Defensive Income – Mega Wulandari is now CLOSED WON. Rp 175.000.000 secured!",
+      "message": "Aruna Defensive Income \u2013 Mega Wulandari is now CLOSED WON. Rp 175.000.000 secured!",
       "entity_type": "deal",
       "entity_id": "deal-11",
       "is_read": false,
@@ -2490,8 +2581,8 @@
       "id": "notif-9",
       "recipient_id": "user-2",
       "type": "DEAL_CLOSED_WON",
-      "title": "Team win – Reza closed a deal",
-      "message": "Reza Firmansyah closed Aruna Defensive Income – Mega Wulandari for Rp 175.000.000.",
+      "title": "Team win \u2013 Reza closed a deal",
+      "message": "Reza Firmansyah closed Aruna Defensive Income \u2013 Mega Wulandari for Rp 175.000.000.",
       "entity_type": "deal",
       "entity_id": "deal-11",
       "is_read": false,
@@ -2502,7 +2593,7 @@
       "recipient_id": "user-6",
       "type": "DEAL_CLOSED_WON",
       "title": "Deal closed! Nadia Permata",
-      "message": "Energy Transition Alpha – Nadia Permata is now CLOSED WON. Rp 200.000.000 secured!",
+      "message": "Energy Transition Alpha \u2013 Nadia Permata is now CLOSED WON. Rp 200.000.000 secured!",
       "entity_type": "deal",
       "entity_id": "deal-13",
       "is_read": false,
@@ -2512,8 +2603,8 @@
       "id": "notif-11",
       "recipient_id": "user-2",
       "type": "DEAL_CLOSED_WON",
-      "title": "Team win – Putri closed a deal",
-      "message": "Putri Handayani closed Energy Transition Alpha – Nadia Permata for Rp 200.000.000.",
+      "title": "Team win \u2013 Putri closed a deal",
+      "message": "Putri Handayani closed Energy Transition Alpha \u2013 Nadia Permata for Rp 200.000.000.",
       "entity_type": "deal",
       "entity_id": "deal-13",
       "is_read": false,
@@ -2551,7 +2642,10 @@
       "action": "CREATE",
       "entity_type": "deal",
       "entity_id": "deal-1",
-      "metadata": {"title": "Acme Corp – Premium Multi-Sector Alpha Investment", "value": 500000000},
+      "metadata": {
+        "title": "Acme Corp \u2013 Premium Multi-Sector Alpha Investment",
+        "value": 500000000
+      },
       "created_at": "2026-02-10T08:00:00Z"
     },
     {
@@ -2560,7 +2654,10 @@
       "action": "STAGE_CHANGE",
       "entity_type": "deal",
       "entity_id": "deal-1",
-      "metadata": {"from": "LEAD", "to": "QUALIFIED"},
+      "metadata": {
+        "from": "LEAD",
+        "to": "QUALIFIED"
+      },
       "created_at": "2026-02-20T10:00:00Z"
     },
     {
@@ -2569,7 +2666,9 @@
       "action": "CONVERSION",
       "entity_type": "lead",
       "entity_id": "lead-9",
-      "metadata": {"contact_id": "cnt-1"},
+      "metadata": {
+        "contact_id": "cnt-1"
+      },
       "created_at": "2026-03-15T10:00:00Z"
     },
     {
@@ -2578,7 +2677,10 @@
       "action": "STAGE_CHANGE",
       "entity_type": "deal",
       "entity_id": "deal-4",
-      "metadata": {"from": "NEGOTIATION", "to": "CLOSED_WON"},
+      "metadata": {
+        "from": "NEGOTIATION",
+        "to": "CLOSED_WON"
+      },
       "created_at": "2026-05-05T10:00:00Z"
     },
     {
@@ -2587,7 +2689,11 @@
       "action": "STAGE_CHANGE",
       "entity_type": "deal",
       "entity_id": "deal-7",
-      "metadata": {"from": "QUALIFIED", "to": "CLOSED_LOST", "reason": "Client chose competitor with lower fees"},
+      "metadata": {
+        "from": "QUALIFIED",
+        "to": "CLOSED_LOST",
+        "reason": "Client chose competitor with lower fees"
+      },
       "created_at": "2026-04-29T16:00:00Z"
     },
     {
@@ -2596,7 +2702,10 @@
       "action": "ASSIGNMENT_CHANGE",
       "entity_type": "deal",
       "entity_id": "deal-9",
-      "metadata": {"from": "user-3", "to": "user-2"},
+      "metadata": {
+        "from": "user-3",
+        "to": "user-2"
+      },
       "created_at": "2026-04-10T10:00:00Z"
     },
     {
@@ -2605,7 +2714,9 @@
       "action": "CREATE",
       "entity_type": "campaign",
       "entity_id": "camp-3",
-      "metadata": {"name": "Premium Multi-Sector Alpha – VIP Outreach"},
+      "metadata": {
+        "name": "Premium Multi-Sector Alpha \u2013 VIP Outreach"
+      },
       "created_at": "2026-04-10T00:00:00Z"
     },
     {
@@ -2614,7 +2725,10 @@
       "action": "STATUS_CHANGE",
       "entity_type": "lead",
       "entity_id": "lead-7",
-      "metadata": {"from": "CONTACTED", "to": "LOST"},
+      "metadata": {
+        "from": "CONTACTED",
+        "to": "LOST"
+      },
       "created_at": "2026-03-20T09:00:00Z"
     },
     {
@@ -2623,7 +2737,9 @@
       "action": "CREATE",
       "entity_type": "contact",
       "entity_id": "cnt-5",
-      "metadata": {"name": "Eko Prasetyo"},
+      "metadata": {
+        "name": "Eko Prasetyo"
+      },
       "created_at": "2026-04-02T08:30:00Z"
     },
     {
@@ -2632,7 +2748,11 @@
       "action": "UPDATE",
       "entity_type": "product",
       "entity_id": "prod-6",
-      "metadata": {"field": "is_active", "from": true, "to": false},
+      "metadata": {
+        "field": "is_active",
+        "from": true,
+        "to": false
+      },
       "created_at": "2026-04-01T09:00:00Z"
     },
     {
@@ -2641,7 +2761,10 @@
       "action": "CREATE",
       "entity_type": "activity",
       "entity_id": "act-15",
-      "metadata": {"type": "MEETING", "subject": "Q1 review meeting – Mitra Energi"},
+      "metadata": {
+        "type": "MEETING",
+        "subject": "Q1 review meeting \u2013 Mitra Energi"
+      },
       "created_at": "2026-05-08T11:00:00Z"
     },
     {
@@ -2650,7 +2773,10 @@
       "action": "ARCHIVE",
       "entity_type": "campaign",
       "entity_id": "camp-4",
-      "metadata": {"name": "Kampanye ACNA – Blue Chip Focus", "status_change": "ACTIVE -> PAUSED"},
+      "metadata": {
+        "name": "Kampanye ACNA \u2013 Blue Chip Focus",
+        "status_change": "ACTIVE -> PAUSED"
+      },
       "created_at": "2026-04-01T00:00:00Z"
     },
     {
@@ -2659,7 +2785,10 @@
       "action": "CREATE",
       "entity_type": "user",
       "entity_id": "user-5",
-      "metadata": {"name": "Reza Firmansyah", "role": "ADVISER"},
+      "metadata": {
+        "name": "Reza Firmansyah",
+        "role": "ADVISER"
+      },
       "created_at": "2026-01-15T08:00:00Z"
     },
     {
@@ -2668,7 +2797,10 @@
       "action": "CREATE",
       "entity_type": "user",
       "entity_id": "user-6",
-      "metadata": {"name": "Putri Handayani", "role": "ADVISER"},
+      "metadata": {
+        "name": "Putri Handayani",
+        "role": "ADVISER"
+      },
       "created_at": "2026-02-01T08:00:00Z"
     },
     {
@@ -2677,7 +2809,10 @@
       "action": "CREATE",
       "entity_type": "deal",
       "entity_id": "deal-11",
-      "metadata": {"title": "Aruna Defensive Income – Mega Wulandari", "value": 175000000},
+      "metadata": {
+        "title": "Aruna Defensive Income \u2013 Mega Wulandari",
+        "value": 175000000
+      },
       "created_at": "2026-04-18T10:00:00Z"
     },
     {
@@ -2686,7 +2821,10 @@
       "action": "STAGE_CHANGE",
       "entity_type": "deal",
       "entity_id": "deal-11",
-      "metadata": {"from": "NEGOTIATION", "to": "CLOSED_WON"},
+      "metadata": {
+        "from": "NEGOTIATION",
+        "to": "CLOSED_WON"
+      },
       "created_at": "2026-05-12T11:00:00Z"
     },
     {
@@ -2695,7 +2833,10 @@
       "action": "CREATE",
       "entity_type": "deal",
       "entity_id": "deal-13",
-      "metadata": {"title": "Energy Transition Alpha – Nadia Permata", "value": 200000000},
+      "metadata": {
+        "title": "Energy Transition Alpha \u2013 Nadia Permata",
+        "value": 200000000
+      },
       "created_at": "2026-04-26T09:00:00Z"
     },
     {
@@ -2704,7 +2845,10 @@
       "action": "STAGE_CHANGE",
       "entity_type": "deal",
       "entity_id": "deal-13",
-      "metadata": {"from": "PROPOSAL", "to": "CLOSED_WON"},
+      "metadata": {
+        "from": "PROPOSAL",
+        "to": "CLOSED_WON"
+      },
       "created_at": "2026-05-08T15:00:00Z"
     },
     {
@@ -2713,7 +2857,9 @@
       "action": "CONVERSION",
       "entity_type": "lead",
       "entity_id": "lead-16",
-      "metadata": {"contact_id": "cnt-9"},
+      "metadata": {
+        "contact_id": "cnt-9"
+      },
       "created_at": "2026-04-18T10:00:00Z"
     },
     {
@@ -2722,9 +2868,115 @@
       "action": "CONVERSION",
       "entity_type": "lead",
       "entity_id": "lead-20",
-      "metadata": {"contact_id": "cnt-10"},
+      "metadata": {
+        "contact_id": "cnt-10"
+      },
       "created_at": "2026-04-26T09:00:00Z"
     }
   ],
-  "call_sessions": []
+  "call_sessions": [],
+  "deal_proposals": [
+    {
+      "id": "prop-1",
+      "deal_id": "deal-1",
+      "name": "Conservative Income Plan",
+      "status": "PRESENTED",
+      "total_value": 50000,
+      "notes": "Focused on capital preservation with steady income via bond and mixed funds.",
+      "lines": [
+        {
+          "id": "pl-1",
+          "fund_isin": "LU1564328141",
+          "fund_name": "BGF Asian High Yield Bond A2 USD",
+          "risk_rating": 3,
+          "allocation_pct": 40
+        },
+        {
+          "id": "pl-2",
+          "fund_isin": "LU1373035580",
+          "fund_name": "Eastspring Investments-Asian Hgh Yld Bd MYR Hdg MI Acc",
+          "risk_rating": 4,
+          "allocation_pct": 35
+        },
+        {
+          "id": "pl-3",
+          "fund_isin": "LU2088747998",
+          "fund_name": "Eastspring Investments-Asia RE Mlt Asset Inc ADM",
+          "risk_rating": 5,
+          "allocation_pct": 25
+        }
+      ],
+      "created_by": "u2",
+      "created_at": "2026-05-10T09:00:00.000Z",
+      "updated_at": "2026-05-10T09:00:00.000Z"
+    },
+    {
+      "id": "prop-2",
+      "deal_id": "deal-1",
+      "name": "Balanced Growth Plan",
+      "status": "DRAFT",
+      "total_value": 80000,
+      "notes": "Mix of income and growth across asset classes.",
+      "lines": [
+        {
+          "id": "pl-4",
+          "fund_isin": "LU2088747998",
+          "fund_name": "Eastspring Investments-Asia RE Mlt Asset Inc ADM",
+          "risk_rating": 5,
+          "allocation_pct": 30
+        },
+        {
+          "id": "pl-5",
+          "fund_isin": "LU1599482652",
+          "fund_name": "MS INVF Global Brands A USD",
+          "risk_rating": 9,
+          "allocation_pct": 40
+        },
+        {
+          "id": "pl-6",
+          "fund_isin": "LU0231483743",
+          "fund_name": "AS SICAV I - All China Sust Equity A Acc USD",
+          "risk_rating": 11,
+          "allocation_pct": 30
+        }
+      ],
+      "created_by": "u2",
+      "created_at": "2026-05-12T14:00:00.000Z",
+      "updated_at": "2026-05-12T14:00:00.000Z"
+    },
+    {
+      "id": "prop-3",
+      "deal_id": "deal-3",
+      "name": "Retirement Income Strategy",
+      "status": "DRAFT",
+      "total_value": 120000,
+      "notes": "Long-term retirement focus. Lower risk.",
+      "lines": [
+        {
+          "id": "pl-7",
+          "fund_isin": "LU1564328141",
+          "fund_name": "BGF Asian High Yield Bond A2 USD",
+          "risk_rating": 3,
+          "allocation_pct": 50
+        },
+        {
+          "id": "pl-8",
+          "fund_isin": "LU2088747998",
+          "fund_name": "Eastspring Investments-Asia RE Mlt Asset Inc ADM",
+          "risk_rating": 5,
+          "allocation_pct": 30
+        },
+        {
+          "id": "pl-9",
+          "fund_isin": "LU1599482652",
+          "fund_name": "MS INVF Global Brands A USD",
+          "risk_rating": 9,
+          "allocation_pct": 20
+        }
+      ],
+      "created_by": "u3",
+      "created_at": "2026-05-15T10:00:00.000Z",
+      "updated_at": "2026-05-15T10:00:00.000Z"
+    }
+  ]
 }

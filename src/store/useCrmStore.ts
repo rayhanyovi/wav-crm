@@ -3,9 +3,9 @@ import { persist } from "zustand/middleware";
 import { nanoid } from "nanoid";
 import seedData from "@/data/seed.json";
 import type {
-  User, Company, Contact, Lead, Deal, StageHistoryEntry,
+  User, Company, Contact, Lead, LeadNote, Deal, DealProposal, StageHistoryEntry,
   Activity, Comment, Product, Bundle, Campaign, Notification,
-  AuditLog, DealStage, AuditAction, CallSession, LeadStatus
+  AuditLog, DealStage, AuditAction, CallSession, LeadStatus, CreditTransaction
 } from "@/data/types";
 
 function now() {
@@ -33,7 +33,9 @@ interface CrmState {
   companies: Company[];
   contacts: Contact[];
   leads: Lead[];
+  lead_notes: LeadNote[];
   deals: Deal[];
+  deal_proposals: DealProposal[];
   stage_history: StageHistoryEntry[];
   activities: Activity[];
   comments: Comment[];
@@ -73,11 +75,29 @@ interface CrmState {
   deleteDeal: (id: string, userId: string) => void;
   moveDealStage: (dealId: string, toStage: DealStage, note: string | undefined, userId: string, lostReason?: string) => void;
 
+  // ─── Deal Proposals ────────────────────────────────────────────────────
+  createDealProposal: (data: Omit<DealProposal, "id" | "created_at" | "updated_at">, userId: string) => DealProposal;
+  updateDealProposal: (id: string, data: Partial<Omit<DealProposal, "id" | "deal_id" | "created_by" | "created_at">>, userId: string) => void;
+  deleteDealProposal: (id: string, userId: string) => void;
+
   // ─── Activities ────────────────────────────────────────────────────────
   createActivity: (data: Omit<Activity, "id" | "created_at" | "updated_at">, userId: string) => Activity;
   updateActivity: (id: string, data: Partial<Activity>, userId: string) => void;
   deleteActivity: (id: string, userId: string) => void;
   completeActivity: (id: string, result: string, userId: string) => void;
+
+  // ─── Lead Notes (running log) ───────────────────────────────────────────
+  addLeadNote: (leadId: string, content: string, userId: string) => LeadNote;
+  deleteLeadNote: (id: string) => void;
+
+  // ─── Users ─────────────────────────────────────────────────────────────
+  updateUser: (id: string, data: Partial<User>) => void;
+
+  // ─── Credits (lead buy-back system) ────────────────────────────────────
+  credit_transactions: CreditTransaction[];
+  assignCredits: (userId: string, amount: number, adminId: string) => void;
+  claimLead: (leadId: string, claimantId: string) => boolean;
+  returnLead: (leadId: string, userId: string) => void;
 
   // ─── Comments ──────────────────────────────────────────────────────────
   addComment: (activityId: string, text: string, userId: string) => Comment;
@@ -111,7 +131,9 @@ export const useCrmStore = create<CrmState>()(
       companies: seedData.companies as Company[],
       contacts: seedData.contacts as Contact[],
       leads: seedData.leads as Lead[],
+      lead_notes: [],
       deals: seedData.deals as Deal[],
+      deal_proposals: (seedData as any).deal_proposals as DealProposal[] ?? [],
       stage_history: seedData.stage_history as StageHistoryEntry[],
       activities: seedData.activities as unknown as Activity[],
       comments: seedData.comments as Comment[],
@@ -121,6 +143,7 @@ export const useCrmStore = create<CrmState>()(
       notifications: seedData.notifications as Notification[],
       audit_logs: seedData.audit_logs as AuditLog[],
       call_sessions: [],
+      credit_transactions: [],
 
       resetToSeed: () =>
         set({
@@ -128,7 +151,9 @@ export const useCrmStore = create<CrmState>()(
           companies: seedData.companies as Company[],
           contacts: seedData.contacts as Contact[],
           leads: seedData.leads as Lead[],
+          lead_notes: [],
           deals: seedData.deals as Deal[],
+          deal_proposals: (seedData as any).deal_proposals as DealProposal[] ?? [],
           stage_history: seedData.stage_history as StageHistoryEntry[],
           activities: seedData.activities as unknown as Activity[],
           comments: seedData.comments as Comment[],
@@ -138,6 +163,7 @@ export const useCrmStore = create<CrmState>()(
           notifications: seedData.notifications as Notification[],
           audit_logs: seedData.audit_logs as AuditLog[],
           call_sessions: [],
+          credit_transactions: [],
         }),
 
       addAuditLog: (userId, action, entityType, entityId, metadata) =>
@@ -321,6 +347,26 @@ export const useCrmStore = create<CrmState>()(
         }
       },
 
+      // Deal Proposals
+      createDealProposal: (data, userId) => {
+        const proposal: DealProposal = { ...data, id: `prop-${nanoid(6)}`, created_at: now(), updated_at: now() };
+        set((s) => ({ deal_proposals: [...s.deal_proposals, proposal] }));
+        get().addAuditLog(userId, "CREATE", "deal_proposal", proposal.id, { deal_id: proposal.deal_id, name: proposal.name });
+        return proposal;
+      },
+      updateDealProposal: (id, data, userId) => {
+        set((s) => ({
+          deal_proposals: s.deal_proposals.map((p) =>
+            p.id === id ? { ...p, ...data, updated_at: now() } : p
+          ),
+        }));
+        get().addAuditLog(userId, "UPDATE", "deal_proposal", id);
+      },
+      deleteDealProposal: (id, userId) => {
+        set((s) => ({ deal_proposals: s.deal_proposals.filter((p) => p.id !== id) }));
+        get().addAuditLog(userId, "DELETE", "deal_proposal", id);
+      },
+
       // Activities
       createActivity: (data, userId) => {
         const activity: Activity = { ...data, id: `act-${nanoid(6)}`, created_at: now(), updated_at: now() };
@@ -343,6 +389,27 @@ export const useCrmStore = create<CrmState>()(
           ),
         }));
         get().addAuditLog(userId, "UPDATE", "activity", id, { action: "complete", result });
+      },
+
+      // Lead Notes (running log — Task #11)
+      addLeadNote: (leadId, content, userId) => {
+        const note: LeadNote = {
+          id: `ln-${nanoid(8)}`,
+          lead_id: leadId,
+          content,
+          created_by: userId,
+          created_at: now(),
+        };
+        set((s) => ({ lead_notes: [...s.lead_notes, note] }));
+        return note;
+      },
+      deleteLeadNote: (id) => {
+        set((s) => ({ lead_notes: s.lead_notes.filter((n) => n.id !== id) }));
+      },
+
+      // Users — allow Master to update user settings (Task #9)
+      updateUser: (id, data) => {
+        set((s) => ({ users: s.users.map((u) => u.id === id ? { ...u, ...data } : u) }));
       },
 
       // Comments
@@ -428,6 +495,74 @@ export const useCrmStore = create<CrmState>()(
           ),
         })),
 
+      // Credits
+      assignCredits: (userId, amount, adminId) => {
+        const user = get().users.find((u) => u.id === userId);
+        if (!user) return;
+        const balanceBefore = user.credit_balance ?? 0;
+        const balanceAfter = Math.max(0, balanceBefore + amount);
+        const tx: CreditTransaction = {
+          id: `ctx-${nanoid(6)}`,
+          user_id: userId,
+          action: "ADMIN_ASSIGN",
+          balance_before: balanceBefore,
+          balance_after: balanceAfter,
+          created_at: now(),
+        };
+        set((s) => ({
+          users: s.users.map((u) => u.id === userId ? { ...u, credit_balance: balanceAfter } : u),
+          credit_transactions: [...s.credit_transactions, tx],
+        }));
+        get().addAuditLog(adminId, "UPDATE", "user_credit", userId, { amount, balanceBefore, balanceAfter });
+      },
+
+      claimLead: (leadId, claimantId) => {
+        const state = get();
+        const user = state.users.find((u) => u.id === claimantId);
+        if (!user || (user.credit_balance ?? 0) < 1) return false;
+        const balanceBefore = user.credit_balance ?? 0;
+        const balanceAfter = balanceBefore - 1;
+        const tx: CreditTransaction = {
+          id: `ctx-${nanoid(6)}`,
+          user_id: claimantId,
+          lead_id: leadId,
+          action: "CLAIM",
+          balance_before: balanceBefore,
+          balance_after: balanceAfter,
+          created_at: now(),
+        };
+        set((s) => ({
+          users: s.users.map((u) => u.id === claimantId ? { ...u, credit_balance: balanceAfter } : u),
+          leads: s.leads.map((l) => l.id === leadId ? { ...l, assigned_to_id: claimantId, updated_at: now() } : l),
+          credit_transactions: [...s.credit_transactions, tx],
+        }));
+        get().addAuditLog(claimantId, "UPDATE", "lead", leadId, { action: "CLAIM", balanceBefore, balanceAfter });
+        return true;
+      },
+
+      returnLead: (leadId, userId) => {
+        const state = get();
+        const user = state.users.find((u) => u.id === userId);
+        if (!user) return;
+        const balanceBefore = user.credit_balance ?? 0;
+        const balanceAfter = balanceBefore + 1;
+        const tx: CreditTransaction = {
+          id: `ctx-${nanoid(6)}`,
+          user_id: userId,
+          lead_id: leadId,
+          action: "RETURN",
+          balance_before: balanceBefore,
+          balance_after: balanceAfter,
+          created_at: now(),
+        };
+        set((s) => ({
+          users: s.users.map((u) => u.id === userId ? { ...u, credit_balance: balanceAfter } : u),
+          leads: s.leads.map((l) => l.id === leadId ? { ...l, assigned_to_id: undefined, updated_at: now() } : l),
+          credit_transactions: [...s.credit_transactions, tx],
+        }));
+        get().addAuditLog(userId, "UPDATE", "lead", leadId, { action: "RETURN", balanceBefore, balanceAfter });
+      },
+
       // Call Sessions
       saveCallSession: (session) => {
         const cs: CallSession = { ...session, id: `cs-${nanoid(6)}` };
@@ -441,7 +576,9 @@ export const useCrmStore = create<CrmState>()(
         companies: state.companies,
         contacts: state.contacts,
         leads: state.leads,
+        lead_notes: state.lead_notes,
         deals: state.deals,
+        deal_proposals: state.deal_proposals,
         stage_history: state.stage_history,
         activities: state.activities,
         comments: state.comments,
@@ -451,6 +588,7 @@ export const useCrmStore = create<CrmState>()(
         notifications: state.notifications,
         audit_logs: state.audit_logs,
         call_sessions: state.call_sessions,
+        credit_transactions: state.credit_transactions,
       }),
     }
   )

@@ -1,8 +1,20 @@
+import { useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, UserCog } from "lucide-react";
 import { useCrmStore } from "@/store/useCrmStore";
+import { useAuthStore } from "@/store/useAuthStore";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   DealStageBadge,
   ActivityTypeBadge,
@@ -10,6 +22,7 @@ import {
   RoleBadge,
 } from "@/components/common/StatusBadge";
 import { formatDateTime, formatDuration } from "@/lib/format";
+import { isMaster } from "@/lib/permissions";
 import {
   PieChart,
   Pie,
@@ -36,7 +49,9 @@ const RESULT_COLORS: Record<string, string> = {
 export function AdvisorPerformancePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { users, activities, deals, campaigns } = useCrmStore();
+  const { users, activities, deals, campaigns, updateUser, assignCredits } = useCrmStore();
+  const { currentUser } = useAuthStore();
+  const [creditAdjust, setCreditAdjust] = useState(0);
 
   const advisor = users.find((u) => u.id === id);
   if (!advisor)
@@ -246,6 +261,135 @@ export function AdvisorPerformancePage() {
                 />
               </BarChart>
             </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Telemarketer access panel — MASTER only, ADVISER profiles only (Task #9) */}
+      {isMaster(currentUser) && advisor.role === "ADVISER" && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <UserCog className="h-4 w-4 text-muted-foreground" />
+              Telemarketer Access
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="tele-toggle" className="text-sm font-medium">
+                  Enable Telemarketer Support
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Allow a telemarketer to call on behalf of this adviser.
+                </p>
+              </div>
+              <Switch
+                id="tele-toggle"
+                checked={!!advisor.telemarketer_access}
+                onCheckedChange={(checked) => {
+                  updateUser(advisor.id, {
+                    telemarketer_access: checked,
+                    telemarketer_id: checked ? advisor.telemarketer_id : undefined,
+                  });
+                }}
+              />
+            </div>
+
+            {advisor.telemarketer_access && (
+              <div className="space-y-1.5">
+                <Label className="text-sm">Assigned Telemarketer</Label>
+                <Select
+                  value={advisor.telemarketer_id ?? ""}
+                  onValueChange={(v) =>
+                    updateUser(advisor.id, { telemarketer_id: v || undefined })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select telemarketer…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {users
+                      .filter((u) => u.role === "TELEMARKETER" && u.is_active)
+                      .map((u) => (
+                        <SelectItem key={u.id} value={u.id}>
+                          {u.name}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+                {advisor.telemarketer_id && (
+                  <p className="text-xs text-muted-foreground">
+                    {users.find((u) => u.id === advisor.telemarketer_id)?.name ?? "Unknown"} can see and call{" "}
+                    {advisor.name}'s leads.
+                  </p>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Credit balance — shown for ADVISER profiles */}
+      {advisor.role === "ADVISER" && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Lead Credits</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-3xl font-bold">{advisor.credit_balance ?? 0}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Available credits (1 credit = claim 1 unassigned lead)
+                </p>
+              </div>
+            </div>
+
+            {/* MASTER only: adjust credits */}
+            {isMaster(currentUser) && (
+              <div className="border-t pt-3 space-y-2">
+                <Label className="text-sm font-medium">Adjust Credits</Label>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-8 px-0"
+                    onClick={() => setCreditAdjust((v) => v - 1)}
+                  >
+                    −
+                  </Button>
+                  <Input
+                    type="number"
+                    value={creditAdjust}
+                    onChange={(e) => setCreditAdjust(parseInt(e.target.value) || 0)}
+                    className="w-20 text-center"
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-8 px-0"
+                    onClick={() => setCreditAdjust((v) => v + 1)}
+                  >
+                    +
+                  </Button>
+                  <Button
+                    size="sm"
+                    disabled={creditAdjust === 0 || !currentUser}
+                    onClick={() => {
+                      if (!currentUser) return;
+                      assignCredits(advisor.id, creditAdjust, currentUser.id);
+                      setCreditAdjust(0);
+                    }}
+                  >
+                    Apply
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  New balance after apply: {Math.max(0, (advisor.credit_balance ?? 0) + creditAdjust)}
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

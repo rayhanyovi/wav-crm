@@ -19,7 +19,6 @@ export function Sidebar() {
   const { currentUser } = useAuthStore();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
-  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const initials =
     currentUser?.name
       .split(" ")
@@ -27,9 +26,22 @@ export function Sidebar() {
       .join("")
       .slice(0, 2)
       .toUpperCase() || "CP";
-  const getChildren = (_label: string): NavigationItem[] | null => {
-    return null;
+
+  const getChildren = (item: NavigationItem): NavigationItem[] | null => {
+    return item.children?.length ? item.children : null;
   };
+
+  // Auto-expand groups that contain the active route
+  const getInitialExpanded = () => {
+    const expanded: Record<string, boolean> = {};
+    navItems.forEach((item) => {
+      if (item.children?.some((c) => location.pathname.startsWith(c.href))) {
+        expanded[item.label] = true;
+      }
+    });
+    return expanded;
+  };
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(getInitialExpanded);
 
   const isChildActive = (item: NavigationItem) => {
     const path = item.href.split("?")[0];
@@ -88,13 +100,32 @@ export function Sidebar() {
         )}
         {navItems.map((item) => {
           if (!can(currentUser, item.minRole)) return null;
-          const children = getChildren(item.label)?.filter((child) =>
+          const children = getChildren(item)?.filter((child) =>
             can(currentUser, child.minRole),
           );
           const active = children?.length
             ? isGroupActive(item.label, children)
             : location.pathname === item.href ||
               (item.href !== "/" && location.pathname.startsWith(item.href));
+
+          // Collapsed sidebar: show parent icon, highlight if a child is active
+          if (children?.length && collapsed) {
+            return (
+              <Link
+                key={item.href}
+                to={children[0].href}
+                className={cn(
+                  "flex items-center justify-center rounded-md border-l-2 px-0 py-2 text-sm transition-all duration-150",
+                  active
+                    ? "border-sidebar-primary bg-sidebar-accent text-sidebar-accent-foreground shadow-sm"
+                    : "border-transparent text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                )}
+                title={item.label}
+              >
+                <item.icon className="h-4 w-4 shrink-0" />
+              </Link>
+            );
+          }
 
           if (children?.length && !collapsed) {
             const expanded = expandedGroups[item.label] ?? false;

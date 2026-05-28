@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { ArrowLeft, UserCheck, Plus } from "lucide-react";
+import { ArrowLeft, UserCheck, Plus, Trash2, MessageSquare, CalendarPlus, Download } from "lucide-react";
 import { useCrmStore } from "@/store/useCrmStore";
 import { useAuthStore } from "@/store/useAuthStore";
 import { Button } from "@/components/ui/button";
@@ -29,8 +29,9 @@ import {
 } from "@/components/ui/dialog";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { getLeadActivities } from "@/lib/selectors";
-import { canEdit, canManage } from "@/lib/permissions";
-import type { LeadStatus, LeadSource, DealStage, Lead } from "@/data/types";
+import { canEdit, canManage, isAdviser } from "@/lib/permissions";
+import { buildGoogleCalendarUrl, downloadIcs } from "@/lib/calendar";
+import type { LeadStatus, LeadSource, DealStage, Lead, AppointmentResult } from "@/data/types";
 
 const SOURCES: LeadSource[] = [
   "COLD_CALL",
@@ -58,9 +59,15 @@ export function LeadDetailPage() {
     users,
     activities,
     contacts,
+    products,
+    lead_notes,
     updateLead,
     convertLead,
     createActivity,
+    addLeadNote,
+    deleteLeadNote,
+    claimLead,
+    returnLead,
   } = useCrmStore();
   const { currentUser } = useAuthStore();
 
@@ -74,6 +81,9 @@ export function LeadDetailPage() {
     dealValue: "",
     dealStage: "LEAD" as DealStage,
   });
+  const [noteText, setNoteText] = useState("");
+  const [outcomeOpen, setOutcomeOpen] = useState(false);
+  const [outcomeResult, setOutcomeResult] = useState<AppointmentResult>("MET");
   const [activityOpen, setActivityOpen] = useState(false);
   const [actForm, setActForm] = useState({
     type: "CALL" as const,
@@ -91,6 +101,9 @@ export function LeadDetailPage() {
     (c) => c.id === lead.converted_contact_id,
   );
   const leadActivities = getLeadActivities(lead.id, activities);
+  const thisLeadNotes = lead_notes
+    .filter((n) => n.lead_id === lead.id)
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   const isConverted = lead.status === "OTHERS" && !!lead.converted_contact_id;
 
   const handleSave = () => {
@@ -127,6 +140,24 @@ export function LeadDetailPage() {
     );
     setConvertOpen(false);
     navigate(`/leads/${lead.id}`);
+  };
+
+  const handleAppointmentOutcome = () => {
+    if (!currentUser) return;
+    const base: Partial<Lead> = { appointment_result: outcomeResult };
+    if (outcomeResult === "NO_SHOW") {
+      // Bounce back: reset to NA, clear appointment, increment bounce count
+      base.status = "NA";
+      base.appointment_date = undefined;
+      base.appointment_time = undefined;
+      base.bounce_count = (lead.bounce_count ?? 0) + 1;
+    } else if (outcomeResult === "RESCHEDULED") {
+      // Keep APPOINTMENT status but clear the date so adviser can set a new one
+      base.appointment_date = undefined;
+      base.appointment_time = undefined;
+    }
+    updateLead(lead.id, base, currentUser.id);
+    setOutcomeOpen(false);
   };
 
   const handleAddActivity = () => {
@@ -171,14 +202,23 @@ export function LeadDetailPage() {
         {!isConverted && canEdit(currentUser) && (
           <div className="flex gap-2">
             {lead.status === "APPOINTMENT" && (
-              <Button
-                variant="secondary"
-                className="gap-1.5"
-                onClick={() => setConvertOpen(true)}
-              >
-                <UserCheck className="h-4 w-4" />
-                Convert to Client
-              </Button>
+              <>
+                <Button
+                  variant="outline"
+                  className="gap-1.5"
+                  onClick={() => setOutcomeOpen(true)}
+                >
+                  Record Outcome
+                </Button>
+                <Button
+                  variant="secondary"
+                  className="gap-1.5"
+                  onClick={() => setConvertOpen(true)}
+                >
+                  <UserCheck className="h-4 w-4" />
+                  Convert to Client
+                </Button>
+              </>
             )}
             {editing ? (
               <>
@@ -376,10 +416,32 @@ export function LeadDetailPage() {
                 <InfoRow label="Created" value={formatDate(lead.created_at)} />
                 {/* Appointment details (Task #4) */}
                 {lead.status === "APPOINTMENT" && lead.appointment_date && (
-                  <InfoRow
-                    label="Appointment"
-                    value={`${new Date(lead.appointment_date).toLocaleDateString("en-SG", { day: "2-digit", month: "short", year: "numeric" })}${lead.appointment_time ? ` at ${lead.appointment_time}` : ""}`}
-                  />
+                  <>
+                    <InfoRow
+                      label="Appointment"
+                      value={`${new Date(lead.appointment_date).toLocaleDateString("en-SG", { day: "2-digit", month: "short", year: "numeric" })}${lead.appointment_time ? ` at ${lead.appointment_time}` : ""}`}
+                    />
+                    {/* Calendar actions (Task #17) */}
+                    <div className="flex gap-1.5 pt-0.5">
+                      <a
+                        href={buildGoogleCalendarUrl(lead, assignee ?? undefined)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                      >
+                        <CalendarPlus className="h-3 w-3" />
+                        Add to Google Calendar
+                      </a>
+                      <span className="text-muted-foreground text-xs">·</span>
+                      <button
+                        onClick={() => downloadIcs(lead, assignee ?? undefined)}
+                        className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground hover:underline"
+                      >
+                        <Download className="h-3 w-3" />
+                        Download .ics
+                      </button>
+                    </div>
+                  </>
                 )}
                 {/* Others note (Task #6) */}
                 {lead.status === "OTHERS" && lead.other_status_note && (
@@ -459,6 +521,56 @@ export function LeadDetailPage() {
                     )
                   }
                 />
+                {lead.appointment_result && (
+                  <InfoRow
+                    label="Appt. Outcome"
+                    value={lead.appointment_result.replace("_", " ")}
+                  />
+                )}
+                {(lead.bounce_count ?? 0) > 0 && (
+                  <InfoRow
+                    label="Bounces"
+                    value={
+                      <span className="inline-flex items-center gap-1 text-orange-600 dark:text-orange-400 font-semibold">
+                        ↩ {lead.bounce_count}× no-show
+                      </span>
+                    }
+                  />
+                )}
+                {/* Claim / Return (Task #16) */}
+                {isAdviser(currentUser) && !lead.assigned_to_id && (
+                  <div className="pt-1">
+                    <Button
+                      size="sm"
+                      className="w-full gap-1.5"
+                      disabled={(currentUser?.credit_balance ?? 0) < 1}
+                      onClick={() => {
+                        if (!currentUser) return;
+                        claimLead(lead.id, currentUser.id);
+                      }}
+                    >
+                      Claim Lead (1 credit)
+                    </Button>
+                    <p className="text-center text-xs text-muted-foreground mt-1">
+                      Your credits: {currentUser?.credit_balance ?? 0}
+                    </p>
+                  </div>
+                )}
+                {isAdviser(currentUser) && lead.assigned_to_id === currentUser?.id && (
+                  <div className="pt-1">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full text-muted-foreground gap-1.5"
+                      onClick={() => {
+                        if (!currentUser) return;
+                        returnLead(lead.id, currentUser.id);
+                      }}
+                    >
+                      Return Lead (+1 credit)
+                    </Button>
+                  </div>
+                )}
                 {canManage(currentUser) && editing && (
                   <div className="space-y-1">
                     <Label>Reassign To</Label>
@@ -514,6 +626,150 @@ export function LeadDetailPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Products discussed (Task #12) */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm">Products Discussed</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {products.filter((p) => p.is_active).length === 0 ? (
+            <p className="text-sm text-muted-foreground">No products in catalog.</p>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex flex-wrap gap-1.5">
+                {products
+                  .filter((p) => p.is_active)
+                  .map((p) => {
+                    const discussed = (lead.products_discussed ?? []).includes(p.id);
+                    const canToggle = canEdit(currentUser) && !isConverted;
+                    return (
+                      <button
+                        key={p.id}
+                        disabled={!canToggle}
+                        onClick={() => {
+                          if (!canToggle || !currentUser) return;
+                          const current = lead.products_discussed ?? [];
+                          const next = discussed
+                            ? current.filter((id) => id !== p.id)
+                            : [...current, p.id];
+                          updateLead(lead.id, { products_discussed: next }, currentUser.id);
+                        }}
+                        title={p.name}
+                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium border transition-colors ${
+                          discussed
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "bg-background text-muted-foreground border-border hover:bg-muted"
+                        } ${!canToggle ? "cursor-default" : "cursor-pointer"}`}
+                      >
+                        <span
+                          className={`h-1.5 w-1.5 rounded-full ${
+                            discussed ? "bg-primary-foreground" : "bg-current opacity-50"
+                          }`}
+                        />
+                        {p.ticker || p.name}
+                      </button>
+                    );
+                  })}
+              </div>
+              {(lead.products_discussed ?? []).length > 0 && (
+                <div className="text-xs text-muted-foreground">
+                  {lead.products_discussed!.length} product{lead.products_discussed!.length !== 1 ? "s" : ""} discussed:{" "}
+                  {lead.products_discussed!
+                    .map((id) => products.find((p) => p.id === id)?.name ?? id)
+                    .join(", ")}
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Notes log (Task #11) */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <MessageSquare className="h-4 w-4 text-muted-foreground" />
+            Notes Log
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {/* Add note input */}
+          {canEdit(currentUser) && !isConverted && (
+            <div className="flex gap-2">
+              <Textarea
+                placeholder="Add a note..."
+                value={noteText}
+                onChange={(e) => setNoteText(e.target.value)}
+                rows={2}
+                className="flex-1 resize-none text-sm"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && noteText.trim() && currentUser) {
+                    addLeadNote(lead.id, noteText.trim(), currentUser.id);
+                    setNoteText("");
+                  }
+                }}
+              />
+              <Button
+                size="sm"
+                className="self-end"
+                disabled={!noteText.trim()}
+                onClick={() => {
+                  if (!noteText.trim() || !currentUser) return;
+                  addLeadNote(lead.id, noteText.trim(), currentUser.id);
+                  setNoteText("");
+                }}
+              >
+                <Plus className="h-3.5 w-3.5 mr-1" />
+                Add
+              </Button>
+            </div>
+          )}
+
+          {/* Note list */}
+          {thisLeadNotes.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No notes yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {thisLeadNotes.map((note) => {
+                const author = users.find((u) => u.id === note.created_by);
+                const canDelete =
+                  currentUser?.id === note.created_by ||
+                  currentUser?.role === "MASTER";
+                return (
+                  <div
+                    key={note.id}
+                    className="group flex items-start gap-3 rounded-lg bg-muted/40 px-3 py-2 text-sm"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm leading-snug whitespace-pre-wrap">{note.content}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {author?.name ?? "Unknown"} ·{" "}
+                        {new Date(note.created_at).toLocaleString("en-SG", {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </p>
+                    </div>
+                    {canDelete && (
+                      <button
+                        onClick={() => deleteLeadNote(note.id)}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive p-0.5 rounded"
+                        title="Delete note"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Activity timeline */}
       <Card>
@@ -578,6 +834,59 @@ export function LeadDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Appointment outcome dialog (Task #10) */}
+      <Dialog open={outcomeOpen} onOpenChange={setOutcomeOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Record Appointment Outcome</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            <p className="text-muted-foreground">
+              What happened at the appointment with{" "}
+              <strong>{lead.first_name} {lead.last_name}</strong>?
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {(["MET", "NO_SHOW", "RESCHEDULED", "CANCELLED"] as AppointmentResult[]).map((opt) => (
+                <button
+                  key={opt}
+                  onClick={() => setOutcomeResult(opt)}
+                  className={`rounded-lg border px-3 py-2.5 text-left text-sm font-medium transition-colors ${
+                    outcomeResult === opt
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-border bg-background hover:bg-muted"
+                  }`}
+                >
+                  <span className="block">
+                    {opt === "MET" && "✅ Met"}
+                    {opt === "NO_SHOW" && "🚫 No-Show"}
+                    {opt === "RESCHEDULED" && "🔄 Rescheduled"}
+                    {opt === "CANCELLED" && "❌ Cancelled"}
+                  </span>
+                  <span className="block text-xs text-muted-foreground font-normal mt-0.5">
+                    {opt === "MET" && "Appointment held"}
+                    {opt === "NO_SHOW" && "Lead bounces back to NA"}
+                    {opt === "RESCHEDULED" && "Clears date for rebooking"}
+                    {opt === "CANCELLED" && "Appointment cancelled"}
+                  </span>
+                </button>
+              ))}
+            </div>
+            {outcomeResult === "NO_SHOW" && (
+              <div className="rounded-md bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800 p-2.5 text-xs text-orange-700 dark:text-orange-400">
+                ↩ This lead will be bounced back to <strong>NA</strong> status for recalling.
+                Bounce count: {(lead.bounce_count ?? 0) + 1}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOutcomeOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleAppointmentOutcome}>Confirm</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Convert dialog */}
       <Dialog open={convertOpen} onOpenChange={setConvertOpen}>
@@ -685,7 +994,6 @@ export function LeadDetailPage() {
                     "MEETING",
                     "TASK",
                     "NOTE",
-                    "DEMO",
                     "FOLLOW_UP",
                   ].map((t) => (
                     <SelectItem key={t} value={t}>
@@ -731,7 +1039,6 @@ export function LeadDetailPage() {
                     "NO_ANSWER",
                     "FOLLOW_UP_NEEDED",
                     "MEETING_SCHEDULED",
-                    "DEAL_ADVANCED",
                     "CANCELLED",
                     "FAILED",
                   ].map((r) => (

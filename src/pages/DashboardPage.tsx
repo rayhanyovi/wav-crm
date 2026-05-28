@@ -1,5 +1,5 @@
 import { useMemo, type ReactNode } from "react";
-import { Phone, PhoneCall, PhoneIncoming, Users, CalendarDays, Bell, TrendingUp } from "lucide-react";
+import { Phone, PhoneCall, PhoneIncoming, Users, CalendarDays, Bell, TrendingUp, CalendarPlus } from "lucide-react";
 import { useCrmStore } from "@/store/useCrmStore";
 import { useAuthStore } from "@/store/useAuthStore";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +8,7 @@ import { formatDuration, formatRelative } from "@/lib/format";
 import { getTodayCallStats } from "@/lib/selectors";
 import { canManage, isAdviser, isTelemarketer } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
+import { buildGoogleCalendarUrl } from "@/lib/calendar";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
 } from "recharts";
@@ -207,9 +208,21 @@ export function DashboardPage() {
                       <p className="font-medium">{lead.first_name} {lead.last_name}</p>
                       <p className="text-xs text-muted-foreground">{lead.phone}</p>
                     </div>
-                    <div className="text-right shrink-0">
+                    <div className="text-right shrink-0 space-y-0.5">
                       <p className="text-xs font-medium">{lead.appointment_date ? new Date(lead.appointment_date).toLocaleDateString("en-SG", { day: "2-digit", month: "short" }) : "—"}</p>
                       {lead.appointment_time && <p className="text-xs text-muted-foreground">{lead.appointment_time}</p>}
+                      {lead.appointment_date && (
+                        <a
+                          href={buildGoogleCalendarUrl(lead)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-0.5 text-[10px] text-blue-600 dark:text-blue-400 hover:underline"
+                          title="Add to Google Calendar"
+                        >
+                          <CalendarPlus className="h-2.5 w-2.5" />
+                          GCal
+                        </a>
+                      )}
                     </div>
                   </div>
                 ))}

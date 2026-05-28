@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run *)",
+      "Bash(mkdir -p \"C:\\\\Projects\\\\crm-demo\\\\.claude\")",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(powershell -Command \"\\(Get-Content 'C:\\\\Projects\\\\crm-demo\\\\src\\\\data\\\\seed.json' -Raw\\) -replace '2025-', '2026-' | Set-Content 'C:\\\\Projects\\\\crm-demo\\\\src\\\\data\\\\seed.json' -Encoding UTF8\")"
+    ]
+  }
+}
