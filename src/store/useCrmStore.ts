@@ -238,7 +238,7 @@ export const useCrmStore = create<CrmState>()(
         if (dealData) {
           deal = get().createDeal({ ...dealData, contact_id: contact.id, lead_id: leadId }, userId);
         }
-        const status: LeadStatus = "CONVERTED";
+        const status: LeadStatus = "OTHERS"; // lead converted to client — mark as OTHERS (no CONVERTED in new status model)
         set((s) => ({
           leads: s.leads.map((l) =>
             l.id === leadId

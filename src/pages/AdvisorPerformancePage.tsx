@@ -29,7 +29,6 @@ const RESULT_COLORS: Record<string, string> = {
   NO_ANSWER: "#94a3b8",
   FOLLOW_UP_NEEDED: "#f59e0b",
   MEETING_SCHEDULED: "#3b82f6",
-  DEAL_ADVANCED: "#8b5cf6",
   CANCELLED: "#ef4444",
   FAILED: "#dc2626",
 };
@@ -55,7 +54,7 @@ export function AdvisorPerformancePage() {
     0,
   );
   const conversions = userActivities.filter(
-    (a) => a.result === "DEAL_ADVANCED" || a.result === "MEETING_SCHEDULED",
+    (a) => a.result === "MEETING_SCHEDULED" || a.result === "COMPLETED",
   );
   const conversionRate =
     pickups.length > 0

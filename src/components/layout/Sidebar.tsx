@@ -10,9 +10,7 @@ import { useAuthStore } from "@/store/useAuthStore";
 import { can } from "@/lib/permissions";
 import { useState } from "react";
 import {
-  accountItems,
   adminItems,
-  campaignItems,
   navItems,
   type NavigationItem,
 } from "./navigationItems";
@@ -21,12 +19,7 @@ export function Sidebar() {
   const { currentUser } = useAuthStore();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
-  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(
-    {
-      Accounts: true,
-      Campaigns: true,
-    },
-  );
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const initials =
     currentUser?.name
       .split(" ")
@@ -34,36 +27,18 @@ export function Sidebar() {
       .join("")
       .slice(0, 2)
       .toUpperCase() || "CP";
-  const activeCampaignTab =
-    new URLSearchParams(location.search).get("tab") || "campaigns";
-
-  const getChildren = (label: string) => {
-    if (label === "Accounts") return accountItems;
-    if (label === "Campaigns") return campaignItems;
+  const getChildren = (_label: string): NavigationItem[] | null => {
     return null;
   };
 
   const isChildActive = (item: NavigationItem) => {
-    if (item.label === "Products" && location.pathname.startsWith("/products"))
-      return true;
-    if (item.label === "Bundles" && location.pathname.startsWith("/bundles"))
-      return true;
-    const [path, query] = item.href.split("?");
-    if (query) {
-      const tab = new URLSearchParams(query).get("tab");
-      return location.pathname === path && activeCampaignTab === tab;
-    }
+    const path = item.href.split("?")[0];
     return (
       location.pathname === path || location.pathname.startsWith(`${path}/`)
     );
   };
 
-  const isGroupActive = (label: string, children: NavigationItem[]) => {
-    if (label === "Campaigns") {
-      return ["/campaigns", "/products", "/bundles"].some((path) =>
-        location.pathname.startsWith(path),
-      );
-    }
+  const isGroupActive = (_label: string, children: NavigationItem[]) => {
     return children.some(isChildActive);
   };
 

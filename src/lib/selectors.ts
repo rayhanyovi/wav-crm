@@ -58,8 +58,8 @@ export function getLeadsForCampaign(
     (l) =>
       l.assigned_to_id === userId &&
       !l.deleted_at &&
-      l.status !== "CONVERTED" &&
-      l.status !== "LOST" &&
+      l.status !== "ABANDON" &&
+      !l.is_abandoned &&
       !contactedLeadIds.has(l.id)
   );
 }

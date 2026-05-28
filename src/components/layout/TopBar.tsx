@@ -49,9 +49,7 @@ import {
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { getHelpContent } from "../../../help";
 import {
-  accountItems,
   adminItems,
-  campaignItems,
   navItems,
   type NavigationItem,
 } from "./navigationItems";
@@ -90,9 +88,7 @@ function isPathActive(pathname: string, href: string) {
   );
 }
 
-function getDropdownChildren(label: string) {
-  if (label === "Accounts") return accountItems;
-  if (label === "Campaigns") return campaignItems;
+function getDropdownChildren(_label: string): NavigationItem[] | null {
   return null;
 }
 
@@ -271,7 +267,7 @@ export function TopBar({
   );
 
   const startCallingButton =
-    can(currentUser, "SALES") && !can(currentUser, "ADMIN") ? (
+    can(currentUser, "ADVISER") && !can(currentUser, "MASTER") ? (
       <Button
         size="sm"
         onClick={onStartCalling}

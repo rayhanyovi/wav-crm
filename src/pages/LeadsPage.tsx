@@ -43,20 +43,21 @@ import { Link, useNavigate } from "react-router-dom";
 import type { LeadStatus, LeadSource } from "@/data/types";
 
 const STATUSES: LeadStatus[] = [
-  "NEW",
-  "CONTACTED",
-  "QUALIFIED",
-  "CONVERTED",
-  "LOST",
+  "NA",
+  "APPOINTMENT",
+  "NOT_INTERESTED",
+  "ABANDON",
+  "OTHERS",
 ];
 const SOURCES: LeadSource[] = [
-  "WEBSITE",
-  "REFERRAL",
   "COLD_CALL",
-  "SOCIAL_MEDIA",
-  "EVENT",
-  "ADVERTISEMENT",
-  "OTHER",
+  "REFERRAL",
+  "MAGNET",
+  "SCOUT",
+  "LENS",
+  "BEACON",
+  "MANUAL",
+  "WALK_IN",
 ];
 
 export function LeadsPage() {
@@ -77,7 +78,7 @@ export function LeadsPage() {
     email: "",
     phone: "",
     source: "COLD_CALL" as LeadSource,
-    status: "NEW" as LeadStatus,
+    status: "NA" as LeadStatus,
     notes: "",
   });
 
@@ -111,7 +112,7 @@ export function LeadsPage() {
       email: "",
       phone: "",
       source: "COLD_CALL",
-      status: "NEW",
+      status: "NA",
       notes: "",
     });
   };
@@ -182,7 +183,7 @@ export function LeadsPage() {
             <SelectContent>
               <SelectItem value="ALL">All Assignees</SelectItem>
               {users
-                .filter((u) => u.role === "SALES")
+                .filter((u) => u.role === "ADVISER")
                 .map((u) => (
                   <SelectItem key={u.id} value={u.id}>
                     {u.name}
@@ -495,9 +496,9 @@ export function LeadsPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {["NEW", "CONTACTED", "QUALIFIED"].map((s) => (
+                  {STATUSES.map((s) => (
                     <SelectItem key={s} value={s}>
-                      {s}
+                      {s.replace("_", " ")}
                     </SelectItem>
                   ))}
                 </SelectContent>

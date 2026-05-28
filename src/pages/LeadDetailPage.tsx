@@ -33,13 +33,14 @@ import { canEdit, canManage } from "@/lib/permissions";
 import type { LeadStatus, LeadSource, DealStage, Lead } from "@/data/types";
 
 const SOURCES: LeadSource[] = [
-  "WEBSITE",
-  "REFERRAL",
   "COLD_CALL",
-  "SOCIAL_MEDIA",
-  "EVENT",
-  "ADVERTISEMENT",
-  "OTHER",
+  "REFERRAL",
+  "MAGNET",
+  "SCOUT",
+  "LENS",
+  "BEACON",
+  "MANUAL",
+  "WALK_IN",
 ];
 const DEAL_STAGES: DealStage[] = [
   "LEAD",
@@ -90,7 +91,7 @@ export function LeadDetailPage() {
     (c) => c.id === lead.converted_contact_id,
   );
   const leadActivities = getLeadActivities(lead.id, activities);
-  const isConverted = lead.status === "CONVERTED";
+  const isConverted = lead.status === "OTHERS" && !!lead.converted_contact_id;
 
   const handleSave = () => {
     if (!currentUser) return;
@@ -169,14 +170,14 @@ export function LeadDetailPage() {
         </div>
         {!isConverted && canEdit(currentUser) && (
           <div className="flex gap-2">
-            {lead.status === "QUALIFIED" && (
+            {lead.status === "APPOINTMENT" && (
               <Button
                 variant="secondary"
                 className="gap-1.5"
                 onClick={() => setConvertOpen(true)}
               >
                 <UserCheck className="h-4 w-4" />
-                Convert
+                Convert to Client
               </Button>
             )}
             {editing ? (
@@ -260,9 +261,9 @@ export function LeadDetailPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {["NEW", "CONTACTED", "QUALIFIED", "LOST"].map((s) => (
+                      {(["NA", "APPOINTMENT", "NOT_INTERESTED", "ABANDON", "OTHERS"] as LeadStatus[]).map((s) => (
                         <SelectItem key={s} value={s}>
-                          {s}
+                          {s.replace("_", " ")}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -409,7 +410,7 @@ export function LeadDetailPage() {
                       </SelectTrigger>
                       <SelectContent>
                         {users
-                          .filter((u) => u.role === "SALES")
+                          .filter((u) => u.role === "ADVISER")
                           .map((u) => (
                             <SelectItem key={u.id} value={u.id}>
                               {u.name}

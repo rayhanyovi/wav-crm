@@ -1,10 +1,9 @@
 import type { User, UserRole } from "@/data/types";
 
 const roleLevels: Record<UserRole, number> = {
-  ADMIN: 3,
-  MANAGER: 2,
-  SALES: 1,
-  VIEWER: 0,
+  MASTER:      2,
+  ADVISER:     1,
+  TELEMARKETER: 0,
 };
 
 export function roleLevel(role: UserRole): number {
@@ -16,20 +15,39 @@ export function can(user: User | null, minRole: UserRole): boolean {
   return roleLevels[user.role] >= roleLevels[minRole];
 }
 
+/** Can create / edit leads and log activities */
 export function canEdit(user: User | null): boolean {
-  return can(user, "SALES");
+  return can(user, "ADVISER");
 }
 
+/** Can see all advisers' leads, manage team */
 export function canManage(user: User | null): boolean {
-  return can(user, "MANAGER");
+  return can(user, "MASTER");
 }
 
+/** Alias for canManage — kept for call-site compatibility */
 export function canAdmin(user: User | null): boolean {
-  return can(user, "ADMIN");
+  return can(user, "MASTER");
 }
 
+/** True if user owns the record OR is a Master account */
 export function isOwner(user: User | null, ownerId: string | undefined): boolean {
   if (!user) return false;
-  if (user.role === "ADMIN" || user.role === "MANAGER") return true;
+  if (user.role === "MASTER") return true;
   return user.id === ownerId;
+}
+
+/** True if user is a Master account */
+export function isMaster(user: User | null): boolean {
+  return user?.role === "MASTER";
+}
+
+/** True if user is an Adviser */
+export function isAdviser(user: User | null): boolean {
+  return user?.role === "ADVISER";
+}
+
+/** True if user is a Telemarketer */
+export function isTelemarketer(user: User | null): boolean {
+  return user?.role === "TELEMARKETER";
 }

@@ -1,37 +1,30 @@
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useCrmStore } from "@/store/useCrmStore";
-import { Shield, TrendingUp, Users, Eye } from "lucide-react";
+import { Phone, TrendingUp, Users } from "lucide-react";
 import type { User } from "@/data/types";
 
 const roleConfig = {
-  ADMIN: {
-    icon: Shield,
+  MASTER: {
+    icon: TrendingUp,
     color: "text-violet-700 dark:text-violet-300",
     bg: "bg-violet-100 dark:bg-violet-950/40",
     border: "border-violet-200 dark:border-violet-800",
-    desc: "Full access. Manage users, audit logs, products, campaigns.",
+    desc: "Full access. See all advisers' leads, manage team, view audit logs.",
   },
-  MANAGER: {
+  ADVISER: {
     icon: Users,
     color: "text-primary",
     bg: "bg-primary/10",
     border: "border-primary/25",
-    desc: "Run calling sessions, manage leads & deals, view team performance dashboards.",
+    desc: "See own leads, log calls, set appointments, run calling sessions.",
   },
-  SALES: {
-    icon: TrendingUp,
+  TELEMARKETER: {
+    icon: Phone,
     color: "text-emerald-700 dark:text-emerald-300",
     bg: "bg-emerald-100 dark:bg-emerald-950/40",
     border: "border-emerald-200 dark:border-emerald-800",
-    desc: "Create leads & deals, log calls, run calling sessions.",
-  },
-  VIEWER: {
-    icon: Eye,
-    color: "text-slate-700 dark:text-slate-300",
-    bg: "bg-slate-100 dark:bg-slate-800",
-    border: "border-slate-200 dark:border-slate-700",
-    desc: "Read-only access to all data. Cannot create or edit anything.",
+    desc: "Cold call prospects, qualify leads, hand off to assigned adviser.",
   },
 };
 
@@ -53,14 +46,14 @@ export function LoginPage() {
           <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-lg shadow-primary/25">
             <TrendingUp className="h-6 w-6" />
           </div>
-          <span className="text-3xl font-bold tracking-tight text-foreground">CRM Pro</span>
+          <span className="text-3xl font-bold tracking-tight text-foreground">Dealflow</span>
         </div>
-        <p className="text-lg font-medium text-foreground/80">Telemarketing &amp; Advisory CRM</p>
+        <p className="text-lg font-medium text-foreground/80">WAV Telemarketing &amp; Advisory CRM</p>
         <p className="mt-1 text-sm text-muted-foreground">Select a role to explore the prototype</p>
       </div>
 
       {/* Role cards */}
-      <div className="grid w-full max-w-5xl grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid w-full max-w-4xl grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {users.map((user) => {
           const cfg = roleConfig[user.role];
           if (!cfg) return null;
@@ -94,7 +87,7 @@ export function LoginPage() {
         })}
       </div>
 
-      <p className="mt-8 text-xs text-muted-foreground">Prototype demo - no passwords required</p>
+      <p className="mt-8 text-xs text-muted-foreground">Prototype demo — no passwords required</p>
     </div>
   );
 }

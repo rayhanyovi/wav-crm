@@ -11,10 +11,10 @@ import type { ActivityResult, Lead } from "@/data/types";
 import { ChevronRight, PhoneOff } from "lucide-react";
 
 const RESULTS: ActivityResult[] = [
-  "COMPLETED", "NO_ANSWER", "FOLLOW_UP_NEEDED", "MEETING_SCHEDULED", "DEAL_ADVANCED", "CANCELLED", "FAILED"
+  "COMPLETED", "NO_ANSWER", "FOLLOW_UP_NEEDED", "MEETING_SCHEDULED", "CANCELLED", "FAILED"
 ];
-const POSITIVE_RESULTS: ActivityResult[] = ["COMPLETED", "MEETING_SCHEDULED", "DEAL_ADVANCED"];
-const PROSPECT_VALUE_RESULTS: ActivityResult[] = ["COMPLETED", "DEAL_ADVANCED"];
+const POSITIVE_RESULTS: ActivityResult[] = ["COMPLETED", "MEETING_SCHEDULED"];
+const PROSPECT_VALUE_RESULTS: ActivityResult[] = ["COMPLETED", "MEETING_SCHEDULED"];
 const FOLLOW_UP_RESULTS: ActivityResult[] = ["NO_ANSWER", "FOLLOW_UP_NEEDED"];
 
 interface CallOutcomeFormProps {
@@ -85,9 +85,8 @@ export function CallOutcomeForm({ lead }: CallOutcomeFormProps) {
       currentUser.id
     );
 
-    if (lead.status === "NEW") {
-      updateLead(lead.id, { status: "CONTACTED" }, currentUser.id);
-    }
+    // Status stays as NA unless explicitly changed by the adviser after a call
+    // (auto-status logic will be added in Task #2/#3)
 
     if (showMeetingDate && meetingDate) {
       createActivity(

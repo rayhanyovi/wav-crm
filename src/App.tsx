@@ -9,15 +9,9 @@ import { ContactsPage } from "@/pages/ContactsPage";
 import { ContactDetailPage } from "@/pages/ContactDetailPage";
 import { CompaniesPage } from "@/pages/CompaniesPage";
 import { CompanyDetailPage } from "@/pages/CompanyDetailPage";
-import { DealsPage } from "@/pages/DealsPage";
-import { DealDetailPage } from "@/pages/DealDetailPage";
 import { ActivitiesPage } from "@/pages/ActivitiesPage";
 import { ActivityDetailPage } from "@/pages/ActivityDetailPage";
 import { CalendarPage } from "@/pages/CalendarPage";
-import { CampaignsPage } from "@/pages/CampaignsPage";
-import { CampaignDetailPage } from "@/pages/CampaignDetailPage";
-import { ProductDetailPage } from "@/pages/ProductDetailPage";
-import { BundleDetailPage } from "@/pages/BundleDetailPage";
 import { TeamPage } from "@/pages/TeamPage";
 import { AdvisorPerformancePage } from "@/pages/AdvisorPerformancePage";
 import { AuditLogsPage } from "@/pages/AuditLogsPage";
@@ -65,18 +59,12 @@ export default function App() {
         <Route path="contacts/:id" element={<ContactDetailPage />} />
         <Route path="companies" element={<CompaniesPage />} />
         <Route path="companies/:id" element={<CompanyDetailPage />} />
-        <Route path="deals" element={<DealsPage />} />
-        <Route path="deals/:id" element={<DealDetailPage />} />
         <Route path="activities" element={<ActivitiesPage />} />
         <Route path="activities/:id" element={<ActivityDetailPage />} />
         <Route path="calendar" element={<CalendarPage />} />
-        <Route path="campaigns" element={<CampaignsPage />} />
-        <Route path="campaigns/:id" element={<CampaignDetailPage />} />
-        <Route path="products/:id" element={<ProductDetailPage />} />
-        <Route path="bundles/:id" element={<BundleDetailPage />} />
         <Route path="team" element={<ProtectedRoute minRole={2}><TeamPage /></ProtectedRoute>} />
         <Route path="team/:id" element={<TeamProfileRoute />} />
-        <Route path="audit-logs" element={<ProtectedRoute minRole={3}><AuditLogsPage /></ProtectedRoute>} />
+        <Route path="audit-logs" element={<ProtectedRoute minRole={2}><AuditLogsPage /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

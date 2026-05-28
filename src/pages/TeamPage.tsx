@@ -9,7 +9,7 @@ export function TeamPage() {
   const { users, activities, deals } = useCrmStore();
   const navigate = useNavigate();
 
-  const teamMembers = users.filter((u) => u.role !== "VIEWER");
+  const teamMembers = users.filter((u) => u.is_active);
 
   return (
     <div className="space-y-4">

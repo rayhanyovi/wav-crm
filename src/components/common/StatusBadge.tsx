@@ -2,11 +2,11 @@ import { cn } from "@/lib/utils";
 import type { LeadStatus, DealStage, ActivityType, ActivityResult, CampaignStatus } from "@/data/types";
 
 const leadStatusColors: Record<LeadStatus, string> = {
-  NEW: "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400",
-  CONTACTED: "bg-yellow-100 text-yellow-700 dark:bg-yellow-950/40 dark:text-yellow-400",
-  QUALIFIED: "bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-400",
-  CONVERTED: "bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:text-purple-400",
-  LOST: "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400",
+  NA:             "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
+  APPOINTMENT:    "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400",
+  NOT_INTERESTED: "bg-yellow-100 text-yellow-700 dark:bg-yellow-950/40 dark:text-yellow-400",
+  ABANDON:        "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400",
+  OTHERS:         "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
 };
 
 const dealStageColors: Record<DealStage, string> = {
@@ -29,13 +29,12 @@ const activityTypeColors: Record<ActivityType, string> = {
 };
 
 const activityResultColors: Record<ActivityResult, string> = {
-  COMPLETED: "bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-400",
-  NO_ANSWER: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
+  COMPLETED:        "bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-400",
+  NO_ANSWER:        "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
   FOLLOW_UP_NEEDED: "bg-yellow-100 text-yellow-700 dark:bg-yellow-950/40 dark:text-yellow-400",
-  MEETING_SCHEDULED: "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400",
-  DEAL_ADVANCED: "bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-400",
-  CANCELLED: "bg-red-100 text-red-600 dark:bg-red-950/40 dark:text-red-400",
-  FAILED: "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400",
+  MEETING_SCHEDULED:"bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400",
+  CANCELLED:        "bg-red-100 text-red-600 dark:bg-red-950/40 dark:text-red-400",
+  FAILED:           "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400",
 };
 
 const campaignStatusColors: Record<CampaignStatus, string> = {
@@ -104,10 +103,9 @@ export function CampaignStatusBadge({ status, className }: { status: CampaignSta
 
 export function RoleBadge({ role, className }: { role: string } & BadgeProps) {
   const colors: Record<string, string> = {
-    ADMIN: "bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:text-purple-400",
-    MANAGER: "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400",
-    SALES: "bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-400",
-    VIEWER: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
+    MASTER:       "bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-400",
+    ADVISER:      "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400",
+    TELEMARKETER: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400",
   };
   return (
     <span className={cn(badgeClassName, colors[role] || "bg-gray-100 text-gray-700", className)}>

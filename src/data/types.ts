@@ -1,20 +1,24 @@
 // ─── Enums ────────────────────────────────────────────────────────────────────
 
-export type UserRole = 'ADMIN' | 'MANAGER' | 'SALES' | 'VIEWER';
+export type UserRole = 'MASTER' | 'ADVISER' | 'TELEMARKETER';
 
-export type LeadStatus = 'NEW' | 'CONTACTED' | 'QUALIFIED' | 'CONVERTED' | 'LOST';
-export type LeadSource = 'WEBSITE' | 'REFERRAL' | 'COLD_CALL' | 'SOCIAL_MEDIA' | 'EVENT' | 'ADVERTISEMENT' | 'OTHER';
+export type LeadStatus = 'NA' | 'APPOINTMENT' | 'NOT_INTERESTED' | 'ABANDON' | 'OTHERS';
+export type LeadSource = 'MAGNET' | 'SCOUT' | 'LENS' | 'BEACON' | 'REFERRAL' | 'MANUAL' | 'WALK_IN' | 'COLD_CALL';
 
 export type DealStage = 'LEAD' | 'QUALIFIED' | 'PROPOSAL' | 'NEGOTIATION' | 'CLOSED_WON' | 'CLOSED_LOST';
 
 export type ActivityType = 'CALL' | 'EMAIL' | 'MEETING' | 'TASK' | 'NOTE' | 'DEMO' | 'FOLLOW_UP';
-export type ActivityResult = 'COMPLETED' | 'NO_ANSWER' | 'FOLLOW_UP_NEEDED' | 'MEETING_SCHEDULED' | 'DEAL_ADVANCED' | 'CANCELLED' | 'FAILED';
+export type ActivityResult = 'COMPLETED' | 'NO_ANSWER' | 'FOLLOW_UP_NEEDED' | 'MEETING_SCHEDULED' | 'CANCELLED' | 'FAILED';
+
+export type AppointmentResult = 'MET' | 'NO_SHOW' | 'RESCHEDULED' | 'CANCELLED';
 
 export type CampaignStatus = 'ACTIVE' | 'PAUSED' | 'COMPLETED';
 export type CampaignType = 'PRODUCT' | 'BUNDLE' | 'MIXED';
 export type CampaignOfferKind = 'PRODUCT' | 'BUNDLE';
 
 export type AuditAction = 'CREATE' | 'UPDATE' | 'DELETE' | 'STAGE_CHANGE' | 'ASSIGNMENT_CHANGE' | 'STATUS_CHANGE' | 'CONVERSION' | 'ARCHIVE';
+
+export type CreditAction = 'RETURN' | 'CLAIM' | 'ADMIN_ASSIGN';
 
 // ─── Models ───────────────────────────────────────────────────────────────────
 
@@ -25,6 +29,11 @@ export interface User {
   role: UserRole;
   avatar?: string;
   is_active: boolean;
+  // Lead buy-back credit system
+  credit_balance?: number;
+  // Telemarketer access toggle
+  telemarketer_access?: boolean;
+  telemarketer_id?: string;
   created_at: string;
 }
 
@@ -58,23 +67,68 @@ export interface Contact {
   deleted_at?: string;
 }
 
+export interface StatusHistoryEntry {
+  status: LeadStatus;
+  changed_at: string;
+  changed_by: string;
+  note?: string;
+}
+
 export interface Lead {
   id: string;
+  // Name
+  salutation?: string;
   first_name: string;
   last_name: string;
+  // Contact
   email?: string;
   phone?: string;
+  // Demographics (from Excel migration)
+  age?: number;
+  gender?: string;
+  residential_status?: string;
+  income_range?: string;
+  zipcode?: string;
+  // Classification
   source: LeadSource;
   status: LeadStatus;
+  // Client profile (Task #13)
+  personality?: string;
+  preferred_contact_method?: string;
+  best_time_to_call?: string;
+  // Notes — legacy single field + running log via LeadNote
+  notes?: string;
+  // Appointment fields (Task #4)
+  appointment_date?: string;
+  appointment_time?: string;
+  appointment_result?: AppointmentResult;
+  // Status history auto-timestamps (Task #3)
+  status_history?: StatusHistoryEntry[];
+  // Abandon (Task #5)
+  is_abandoned?: boolean;
+  abandoned_at?: string;
+  // Others free-text (Task #6)
+  other_status_note?: string;
+  // Ownership
   company_id?: string;
   assigned_to_id?: string;
+  telemarketer_owner_id?: string;
+  adviser_owner_id?: string;
+  bounce_count?: number;
   converted_contact_id?: string;
   converted_at?: string;
-  notes?: string;
   created_by: string;
   created_at: string;
   updated_at: string;
   deleted_at?: string;
+}
+
+export interface LeadNote {
+  id: string;
+  lead_id: string;
+  content: string;
+  created_by: string;
+  created_at: string;
 }
 
 export interface Deal {
@@ -140,9 +194,9 @@ export interface Product {
   ticker: string;
   description?: string;
   category: string;
-  risk_score: number; // 1–10: 1=very low, 10=very high
-  annual_return?: number; // % e.g. 18.5
-  market_cap?: string; // e.g. "Large Cap"
+  risk_score: number;
+  annual_return?: number;
+  market_cap?: string;
   is_active: boolean;
   created_at: string;
 }
@@ -152,8 +206,8 @@ export interface Bundle {
   name: string;
   description?: string;
   product_ids: string[];
-  allocations?: Record<string, number>; // product_id → weight % (must sum to 100)
-  risk_score: number; // weighted avg of component risk_scores
+  allocations?: Record<string, number>;
+  risk_score: number;
   is_active: boolean;
   created_at: string;
 }
@@ -179,6 +233,16 @@ export interface Campaign {
 export interface CampaignOfferItem {
   kind: CampaignOfferKind;
   id: string;
+}
+
+export interface CreditTransaction {
+  id: string;
+  user_id: string;
+  lead_id?: string;
+  action: CreditAction;
+  balance_before: number;
+  balance_after: number;
+  created_at: string;
 }
 
 export interface Notification {
@@ -207,7 +271,7 @@ export interface AuditLog {
 export interface CallSession {
   id: string;
   user_id: string;
-  campaign_id: string;
+  campaign_id?: string;
   started_at: string;
   ended_at?: string;
   total_duration_seconds: number;
