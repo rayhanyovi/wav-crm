@@ -289,6 +289,45 @@ export function LeadDetailPage() {
                     </SelectContent>
                   </Select>
                 </div>
+                {/* Appointment fields — shown only when status=APPOINTMENT (Task #4) */}
+                {form.status === "APPOINTMENT" && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <Label>Appointment Date</Label>
+                      <Input
+                        type="date"
+                        value={form.appointment_date?.slice(0, 10) || ""}
+                        onChange={(e) =>
+                          setForm({ ...form, appointment_date: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Appointment Time</Label>
+                      <Input
+                        type="time"
+                        value={form.appointment_time || ""}
+                        onChange={(e) =>
+                          setForm({ ...form, appointment_time: e.target.value })
+                        }
+                      />
+                    </div>
+                  </div>
+                )}
+                {/* Others free-text (Task #6) */}
+                {form.status === "OTHERS" && (
+                  <div className="space-y-1">
+                    <Label>Outcome Note</Label>
+                    <Textarea
+                      placeholder="Describe the outcome..."
+                      value={form.other_status_note || ""}
+                      onChange={(e) =>
+                        setForm({ ...form, other_status_note: e.target.value })
+                      }
+                      rows={2}
+                    />
+                  </div>
+                )}
                 <div className="space-y-1">
                   <Label>Notes</Label>
                   <Textarea
@@ -335,6 +374,20 @@ export function LeadDetailPage() {
                   }
                 />
                 <InfoRow label="Created" value={formatDate(lead.created_at)} />
+                {/* Appointment details (Task #4) */}
+                {lead.status === "APPOINTMENT" && lead.appointment_date && (
+                  <InfoRow
+                    label="Appointment"
+                    value={`${new Date(lead.appointment_date).toLocaleDateString("en-SG", { day: "2-digit", month: "short", year: "numeric" })}${lead.appointment_time ? ` at ${lead.appointment_time}` : ""}`}
+                  />
+                )}
+                {/* Others note (Task #6) */}
+                {lead.status === "OTHERS" && lead.other_status_note && (
+                  <div className="pt-1">
+                    <p className="text-xs text-muted-foreground mb-0.5">Outcome Note</p>
+                    <p className="text-sm">{lead.other_status_note}</p>
+                  </div>
+                )}
                 {lead.notes && (
                   <div className="pt-1">
                     <p className="text-xs text-muted-foreground mb-0.5">
@@ -354,10 +407,20 @@ export function LeadDetailPage() {
             <CardTitle className="text-sm">Status & Assignment</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
+            {/* Abandon banner (Task #5) */}
+            {lead.is_abandoned && (
+              <div className="rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 p-3 text-sm">
+                <p className="font-semibold text-red-800 dark:text-red-300">⛔ Do Not Contact</p>
+                <p className="text-red-700 dark:text-red-400 text-xs mt-0.5">
+                  This lead has been marked as Abandoned and flagged as do-not-redistribute.
+                  {lead.abandoned_at && ` Abandoned on ${new Date(lead.abandoned_at).toLocaleDateString("en-SG")}.`}
+                </p>
+              </div>
+            )}
             {isConverted && convertedContact && (
               <div className="rounded-lg bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800 p-3 text-sm">
                 <p className="font-medium text-purple-800 dark:text-purple-300">
-                  Converted
+                  Converted to Client
                 </p>
                 <p className="text-purple-700 dark:text-purple-400 text-xs mt-0.5">
                   Contact:{" "}
@@ -425,6 +488,32 @@ export function LeadDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Status history (Task #3) */}
+      {lead.status_history && lead.status_history.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Status History</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-1.5">
+              {[...lead.status_history].reverse().map((entry, i) => {
+                const changer = users.find((u) => u.id === entry.changed_by);
+                return (
+                  <div key={i} className="flex items-center gap-3 text-sm">
+                    <LeadStatusBadge status={entry.status} className="shrink-0" />
+                    <span className="text-muted-foreground text-xs">
+                      {new Date(entry.changed_at).toLocaleString("en-SG", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                      {changer && ` · ${changer.name}`}
+                    </span>
+                    {entry.note && <span className="text-xs text-muted-foreground">— {entry.note}</span>}
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Activity timeline */}
       <Card>

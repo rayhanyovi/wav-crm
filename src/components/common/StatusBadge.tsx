@@ -19,12 +19,11 @@ const dealStageColors: Record<DealStage, string> = {
 };
 
 const activityTypeColors: Record<ActivityType, string> = {
-  CALL: "bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-400",
-  EMAIL: "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400",
-  MEETING: "bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:text-purple-400",
-  TASK: "bg-orange-100 text-orange-700 dark:bg-orange-950/40 dark:text-orange-400",
-  NOTE: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
-  DEMO: "bg-indigo-100 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-400",
+  CALL:      "bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-400",
+  EMAIL:     "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400",
+  MEETING:   "bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:text-purple-400",
+  TASK:      "bg-orange-100 text-orange-700 dark:bg-orange-950/40 dark:text-orange-400",
+  NOTE:      "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
   FOLLOW_UP: "bg-yellow-100 text-yellow-700 dark:bg-yellow-950/40 dark:text-yellow-400",
 };
 

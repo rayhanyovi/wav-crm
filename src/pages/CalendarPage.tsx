@@ -56,7 +56,6 @@ const ACTIVITY_TYPES: ActivityType[] = [
   "MEETING",
   "TASK",
   "NOTE",
-  "DEMO",
   "FOLLOW_UP",
 ];
 const STATUS_FILTERS = ["ALL", "SCHEDULED", "COMPLETED"] as const;

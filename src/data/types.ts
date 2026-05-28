@@ -7,7 +7,7 @@ export type LeadSource = 'MAGNET' | 'SCOUT' | 'LENS' | 'BEACON' | 'REFERRAL' | '
 
 export type DealStage = 'LEAD' | 'QUALIFIED' | 'PROPOSAL' | 'NEGOTIATION' | 'CLOSED_WON' | 'CLOSED_LOST';
 
-export type ActivityType = 'CALL' | 'EMAIL' | 'MEETING' | 'TASK' | 'NOTE' | 'DEMO' | 'FOLLOW_UP';
+export type ActivityType = 'CALL' | 'EMAIL' | 'MEETING' | 'TASK' | 'NOTE' | 'FOLLOW_UP';
 export type ActivityResult = 'COMPLETED' | 'NO_ANSWER' | 'FOLLOW_UP_NEEDED' | 'MEETING_SCHEDULED' | 'CANCELLED' | 'FAILED';
 
 export type AppointmentResult = 'MET' | 'NO_SHOW' | 'RESCHEDULED' | 'CANCELLED';

@@ -38,7 +38,7 @@ import {
 } from "@/components/ui/sheet";
 import { formatDate } from "@/lib/format";
 import { getLastContactedDate } from "@/lib/selectors";
-import { canEdit } from "@/lib/permissions";
+import { canEdit, isMaster, isAdviser, isTelemarketer } from "@/lib/permissions";
 import { Link, useNavigate } from "react-router-dom";
 import type { LeadStatus, LeadSource } from "@/data/types";
 
@@ -71,6 +71,7 @@ export function LeadsPage() {
   const [filterAssignee, setFilterAssignee] = useState("ALL");
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  const [showAbandoned, setShowAbandoned] = useState(false);
 
   const [form, setForm] = useState({
     first_name: "",
@@ -82,14 +83,42 @@ export function LeadsPage() {
     notes: "",
   });
 
-  const liveLeads = leads.filter((l) => !l.deleted_at);
+  // Role-based lead scoping (Task #7)
+  const scopedLeads = leads.filter((l) => {
+    if (l.deleted_at) return false;
+    if (isMaster(currentUser)) return true;
+    if (isAdviser(currentUser)) {
+      return (
+        l.assigned_to_id === currentUser?.id ||
+        l.adviser_owner_id === currentUser?.id
+      );
+    }
+    if (isTelemarketer(currentUser)) {
+      // Telemarketer sees leads where they are the telemarketer owner
+      // OR where their linked adviser has telemarketer_access enabled and lists this user as telemarketerId
+      const linkedAdviser = users.find(
+        (u) => u.telemarketer_access && u.telemarketer_id === currentUser?.id
+      );
+      return (
+        l.telemarketer_owner_id === currentUser?.id ||
+        (linkedAdviser != null && l.assigned_to_id === linkedAdviser.id)
+      );
+    }
+    return false;
+  });
+
+  // Abandon filter — hide abandoned leads by default (Task #5)
+  const liveLeads = scopedLeads.filter((l) =>
+    showAbandoned ? true : !l.is_abandoned
+  );
 
   const filtered = liveLeads.filter((l) => {
     const name = `${l.first_name} ${l.last_name}`.toLowerCase();
     if (
       search &&
       !name.includes(search.toLowerCase()) &&
-      !l.email?.includes(search.toLowerCase())
+      !l.email?.includes(search.toLowerCase()) &&
+      !l.phone?.includes(search)
     )
       return false;
     if (filterStatus !== "ALL" && l.status !== filterStatus) return false;
@@ -98,6 +127,8 @@ export function LeadsPage() {
       return false;
     return true;
   });
+
+  const abandonedCount = scopedLeads.filter((l) => l.is_abandoned).length;
 
   const handleCreate = () => {
     if (!form.first_name || !form.last_name || !currentUser) return;
@@ -191,6 +222,16 @@ export function LeadsPage() {
                 ))}
             </SelectContent>
           </Select>
+          {abandonedCount > 0 && (
+            <Button
+              variant={showAbandoned ? "destructive" : "outline"}
+              size="sm"
+              onClick={() => setShowAbandoned(!showAbandoned)}
+              className="gap-1.5 text-xs"
+            >
+              {showAbandoned ? "Hide Abandoned" : `Show Abandoned (${abandonedCount})`}
+            </Button>
+          )}
         </div>
         {canEdit(currentUser) && (
           <Button onClick={() => setCreateOpen(true)} className="gap-1.5">

@@ -218,7 +218,30 @@ export const useCrmStore = create<CrmState>()(
       },
       updateLead: (id, data, userId) => {
         const old = get().leads.find((l) => l.id === id);
-        set((s) => ({ leads: s.leads.map((l) => l.id === id ? { ...l, ...data, updated_at: now() } : l) }));
+
+        // Auto-timestamp on status change (Task #3)
+        const extraUpdates: Partial<Lead> = {};
+        if (data.status && old?.status !== data.status) {
+          const newEntry: import("@/data/types").StatusHistoryEntry = {
+            status: data.status,
+            changed_at: now(),
+            changed_by: userId,
+          };
+          extraUpdates.status_history = [...(old?.status_history || []), newEntry];
+
+          // Abandon soft-delete (Task #5)
+          if (data.status === "ABANDON") {
+            extraUpdates.is_abandoned = true;
+            extraUpdates.abandoned_at = now();
+          }
+        }
+
+        set((s) => ({
+          leads: s.leads.map((l) =>
+            l.id === id ? { ...l, ...data, ...extraUpdates, updated_at: now() } : l
+          ),
+        }));
+
         if (data.status && old?.status !== data.status) {
           get().addAuditLog(userId, "STATUS_CHANGE", "lead", id, { from: old?.status, to: data.status });
         } else {
