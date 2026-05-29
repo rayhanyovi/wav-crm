@@ -55,7 +55,7 @@ const COL_ALIASES: Record<string, string> = {
   residential: "residential_status",
   "income range": "income_range", income_range: "income_range", income: "income_range",
   zipcode: "zipcode", "zip code": "zipcode", postal: "zipcode", postcode: "zipcode",
-  // site/campaign → stored in notes
+  // site → stored in notes
   site: "site", campaign: "site", "campaign name": "site",
   // notes
   notes: "notes", note: "notes", remarks: "notes", remark: "notes", comments: "notes",
@@ -200,7 +200,7 @@ function buildRows(rows: string[][]): ParsedRow[] {
       lastName = parts.slice(1).join(" ");
     }
 
-    // Merge site/campaign into notes
+    // Merge site into notes
     const sitePart = raw.site ? `[${raw.site.trim()}]` : "";
     const notesBase = raw.notes ? raw.notes.trim() : "";
     const mergedNotes = [sitePart, notesBase].filter(Boolean).join(" ") || undefined;

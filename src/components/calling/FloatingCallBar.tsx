@@ -7,11 +7,11 @@ import { formatDuration } from "@/lib/format";
 
 export function FloatingCallBar() {
   const {
-    campaign, queue, currentIndex, callsMade, pickups,
+    queue, currentIndex, callsMade, pickups,
     totalDurationSeconds, openPanel, stopSession,
   } = useCallSessionStore();
   const { currentUser } = useAuthStore();
-  const sessionLabel = campaign?.name ?? (isTelemarketer(currentUser) ? "TM Call Queue" : "Follow-up Queue");
+  const sessionLabel = isTelemarketer(currentUser) ? "TM Call Queue" : "Follow-up Queue";
 
   return (
     <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50">

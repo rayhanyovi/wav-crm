@@ -1,9 +1,8 @@
 import { create } from "zustand";
-import type { Campaign, Lead } from "@/data/types";
+import type { Lead } from "@/data/types";
 
 interface CallSessionState {
   active: boolean;
-  campaign: Campaign | null;
   queue: Lead[];
   currentIndex: number;
   sessionStartedAt: string | null;
@@ -16,7 +15,7 @@ interface CallSessionState {
   panelOpen: boolean;
   phase: "sheet" | "calling" | "outcome" | "done";
 
-  startSession: (campaign: Campaign | null, queue: Lead[]) => void;
+  startSession: (queue: Lead[]) => void;
   stopSession: () => void;
   openPanel: () => void;
   closePanel: () => void;
@@ -31,7 +30,6 @@ interface CallSessionState {
 
 export const useCallSessionStore = create<CallSessionState>((set, get) => ({
   active: false,
-  campaign: null,
   queue: [],
   currentIndex: 0,
   sessionStartedAt: null,
@@ -44,10 +42,9 @@ export const useCallSessionStore = create<CallSessionState>((set, get) => ({
   panelOpen: false,
   phase: "sheet",
 
-  startSession: (campaign, queue) =>
+  startSession: (queue) =>
     set({
       active: true,
-      campaign,
       queue,
       currentIndex: 0,
       sessionStartedAt: new Date().toISOString(),
@@ -64,7 +61,6 @@ export const useCallSessionStore = create<CallSessionState>((set, get) => ({
   stopSession: () =>
     set({
       active: false,
-      campaign: null,
       queue: [],
       panelOpen: false,
       phase: "sheet",

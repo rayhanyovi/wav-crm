@@ -50,7 +50,7 @@ export function CallOutcomeForm({ lead }: CallOutcomeFormProps) {
   // Adviser-only
   const [prospectValue, setProspectValue] = useState("");
 
-  const { submitOutcome, nextLead, campaign, liveNotes, callDurationSeconds } = useCallSessionStore();
+  const { submitOutcome, nextLead, liveNotes, callDurationSeconds } = useCallSessionStore();
   const { createActivity, updateLead } = useCrmStore();
 
   // ── Derived flags ──────────────────────────────────────────────────────────
@@ -101,7 +101,6 @@ export function CallOutcomeForm({ lead }: CallOutcomeFormProps) {
         completed_at: new Date().toISOString(),
         metadata,
         lead_id: lead.id,
-        ...(campaign ? { campaign_id: campaign.id } : {}),
         assigned_to_id: currentUser.id,
         created_by: currentUser.id,
       },
@@ -117,8 +116,7 @@ export function CallOutcomeForm({ lead }: CallOutcomeFormProps) {
           result: "MEETING_SCHEDULED",
           scheduled_at: new Date(meetingDate).toISOString(),
           lead_id: lead.id,
-          ...(campaign ? { campaign_id: campaign.id } : {}),
-          assigned_to_id: currentUser.id,
+            assigned_to_id: currentUser.id,
           created_by: currentUser.id,
         },
         currentUser.id
@@ -133,8 +131,7 @@ export function CallOutcomeForm({ lead }: CallOutcomeFormProps) {
           description: finalNotes || undefined,
           scheduled_at: new Date(followUpDate).toISOString(),
           lead_id: lead.id,
-          ...(campaign ? { campaign_id: campaign.id } : {}),
-          assigned_to_id: currentUser.id,
+            assigned_to_id: currentUser.id,
           created_by: currentUser.id,
         },
         currentUser.id

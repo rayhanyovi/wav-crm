@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Search, UserCheck, Users, TrendingUp, Megaphone } from "lucide-react";
+import { Search, UserCheck, Users, TrendingUp } from "lucide-react";
 import { useCrmStore } from "@/store/useCrmStore";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -22,7 +22,7 @@ interface SearchResult {
 
 export function CommandPalette({ open, onClose }: CommandPaletteProps) {
   const [query, setQuery] = useState("");
-  const { contacts, leads, deals, campaigns } = useCrmStore();
+  const { contacts, leads, deals } = useCrmStore();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -42,9 +42,6 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
     deals.filter((d) => !d.deleted_at && d.title.toLowerCase().includes(q)).slice(0, 3).forEach((d) => {
       results.push({ id: d.id, label: d.title, sub: d.stage, type: "Deal", href: `/deals/${d.id}`, icon: TrendingUp });
     });
-    campaigns.filter((c) => c.name.toLowerCase().includes(q)).slice(0, 2).forEach((c) => {
-      results.push({ id: c.id, label: c.name, sub: c.status, type: "Campaign", href: `/campaigns`, icon: Megaphone });
-    });
   }
 
   const handleSelect = (href: string) => {
@@ -61,7 +58,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
             autoFocus
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search companies, contacts, leads, deals..."
+            placeholder="Search contacts, leads, deals..."
             className="border-0 shadow-none focus-visible:ring-0 h-12 text-sm"
           />
         </div>

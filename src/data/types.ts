@@ -24,10 +24,6 @@ export type ActivityResult = 'COMPLETED' | 'NO_ANSWER' | 'FOLLOW_UP_NEEDED' | 'M
 
 export type AppointmentResult = 'MET' | 'NO_SHOW' | 'RESCHEDULED' | 'CANCELLED';
 
-export type CampaignStatus = 'ACTIVE' | 'PAUSED' | 'COMPLETED';
-export type CampaignType = 'PRODUCT' | 'BUNDLE' | 'MIXED';
-export type CampaignOfferKind = 'PRODUCT' | 'BUNDLE';
-
 export type AuditAction = 'CREATE' | 'UPDATE' | 'DELETE' | 'STAGE_CHANGE' | 'ASSIGNMENT_CHANGE' | 'STATUS_CHANGE' | 'CONVERSION' | 'ARCHIVE';
 
 export type CreditAction = 'RETURN' | 'CLAIM' | 'ADMIN_ASSIGN';
@@ -214,7 +210,6 @@ export interface Activity {
   deal_id?: string;
   contact_id?: string;
   lead_id?: string;
-  campaign_id?: string;
   assigned_to_id?: string;
   created_by: string;
   created_at: string;
@@ -255,29 +250,6 @@ export interface Bundle {
   created_at: string;
 }
 
-export interface Campaign {
-  id: string;
-  name: string;
-  description?: string;
-  type: CampaignType;
-  product_id?: string;
-  bundle_id?: string;
-  offer_items?: CampaignOfferItem[];
-  status: CampaignStatus;
-  start_date?: string;
-  end_date?: string;
-  target_count?: number;
-  script?: string;
-  created_by: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface CampaignOfferItem {
-  kind: CampaignOfferKind;
-  id: string;
-}
-
 export interface CreditTransaction {
   id: string;
   user_id: string;
@@ -314,7 +286,6 @@ export interface AuditLog {
 export interface CallSession {
   id: string;
   user_id: string;
-  campaign_id?: string;
   started_at: string;
   ended_at?: string;
   total_duration_seconds: number;

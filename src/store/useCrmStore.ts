@@ -4,7 +4,7 @@ import { nanoid } from "nanoid";
 import seedData from "@/data/seed.json";
 import type {
   User, Contact, Lead, LeadNote, ContactNote, Deal, DealProposal, StageHistoryEntry,
-  Activity, Comment, Product, Bundle, Campaign, Notification,
+  Activity, Comment, Product, Bundle, Notification,
   AuditLog, DealStage, AuditAction, CallSession, LeadStatus, CreditTransaction
 } from "@/data/types";
 
@@ -41,7 +41,6 @@ interface CrmState {
   comments: Comment[];
   products: Product[];
   bundles: Bundle[];
-  campaigns: Campaign[];
   notifications: Notification[];
   audit_logs: AuditLog[];
   call_sessions: CallSession[];
@@ -112,10 +111,6 @@ interface CrmState {
   createBundle: (data: Omit<Bundle, "id" | "created_at">, userId: string) => Bundle;
   updateBundle: (id: string, data: Partial<Bundle>, userId: string) => void;
 
-  // ─── Campaigns ─────────────────────────────────────────────────────────
-  createCampaign: (data: Omit<Campaign, "id" | "created_at" | "updated_at">, userId: string) => Campaign;
-  updateCampaign: (id: string, data: Partial<Campaign>, userId: string) => void;
-
   // ─── Notifications ─────────────────────────────────────────────────────
   markNotificationRead: (id: string) => void;
   markAllNotificationsRead: (userId: string) => void;
@@ -139,7 +134,6 @@ export const useCrmStore = create<CrmState>()(
       comments: seedData.comments as Comment[],
       products: seedData.products as Product[],
       bundles: seedData.bundles as unknown as Bundle[],
-      campaigns: seedData.campaigns as Campaign[],
       notifications: seedData.notifications as Notification[],
       audit_logs: seedData.audit_logs as AuditLog[],
       call_sessions: [],
@@ -159,8 +153,7 @@ export const useCrmStore = create<CrmState>()(
           comments: seedData.comments as Comment[],
           products: seedData.products as Product[],
           bundles: seedData.bundles as unknown as Bundle[],
-          campaigns: seedData.campaigns as Campaign[],
-          notifications: seedData.notifications as Notification[],
+              notifications: seedData.notifications as Notification[],
           audit_logs: seedData.audit_logs as AuditLog[],
           call_sessions: [],
           credit_transactions: [],
@@ -528,17 +521,6 @@ export const useCrmStore = create<CrmState>()(
         get().addAuditLog(userId, "UPDATE", "bundle", id);
       },
 
-      // Campaigns
-      createCampaign: (data, userId) => {
-        const campaign: Campaign = { ...data, id: `camp-${nanoid(6)}`, created_at: now(), updated_at: now() };
-        set((s) => ({ campaigns: [...s.campaigns, campaign] }));
-        get().addAuditLog(userId, "CREATE", "campaign", campaign.id, { name: campaign.name });
-        return campaign;
-      },
-      updateCampaign: (id, data, userId) => {
-        set((s) => ({ campaigns: s.campaigns.map((c) => c.id === id ? { ...c, ...data, updated_at: now() } : c) }));
-        get().addAuditLog(userId, "UPDATE", "campaign", id);
-      },
 
       // Notifications
       markNotificationRead: (id) =>
@@ -643,7 +625,6 @@ export const useCrmStore = create<CrmState>()(
         comments: state.comments,
         products: state.products,
         bundles: state.bundles,
-        campaigns: state.campaigns,
         notifications: state.notifications,
         audit_logs: state.audit_logs,
         call_sessions: state.call_sessions,

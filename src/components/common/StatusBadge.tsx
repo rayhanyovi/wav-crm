@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import type { LeadStatus, DealStage, ActivityType, ActivityResult, CampaignStatus } from "@/data/types";
+import type { LeadStatus, DealStage, ActivityType, ActivityResult } from "@/data/types";
 
 const leadStatusColors: Record<LeadStatus, string> = {
   NA:             "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
@@ -34,12 +34,6 @@ const activityResultColors: Record<ActivityResult, string> = {
   MEETING_SCHEDULED:"bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400",
   CANCELLED:        "bg-red-100 text-red-600 dark:bg-red-950/40 dark:text-red-400",
   FAILED:           "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400",
-};
-
-const campaignStatusColors: Record<CampaignStatus, string> = {
-  ACTIVE: "bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-400",
-  PAUSED: "bg-yellow-100 text-yellow-700 dark:bg-yellow-950/40 dark:text-yellow-400",
-  COMPLETED: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
 };
 
 interface BadgeProps {
@@ -87,15 +81,6 @@ export function ActivityResultBadge({ result, className }: { result: ActivityRes
     <span className={cn(badgeClassName, activityResultColors[result], className)}>
       <BadgeDot />
       {result.replace(/_/g, " ")}
-    </span>
-  );
-}
-
-export function CampaignStatusBadge({ status, className }: { status: CampaignStatus } & BadgeProps) {
-  return (
-    <span className={cn(badgeClassName, campaignStatusColors[status], className)}>
-      <BadgeDot />
-      {status}
     </span>
   );
 }

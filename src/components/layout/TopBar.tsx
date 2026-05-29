@@ -92,10 +92,6 @@ function getDropdownChildren(_label: string): NavigationItem[] | null {
   return null;
 }
 
-function getCampaignTab(href: string) {
-  return new URLSearchParams(href.split("?")[1] || "").get("tab");
-}
-
 function NavDropdown({
   item,
   items,
@@ -109,28 +105,9 @@ function NavDropdown({
 }) {
   const [open, setOpen] = useState(false);
   const closeTimer = useRef<number | null>(null);
-  const activeTab = new URLSearchParams(search).get("tab") || "campaigns";
-  const isCampaignChildActive = (child: NavigationItem) => {
-    const campaignTab = getCampaignTab(child.href);
-    if (!campaignTab) return false;
-    return (
-      (pathname === "/campaigns" && activeTab === campaignTab) ||
-      (campaignTab === "products" && pathname.startsWith("/products")) ||
-      (campaignTab === "bundles" && pathname.startsWith("/bundles"))
-    );
-  };
-  const selectedChild = items.find((child) =>
-    item.label === "Campaigns"
-      ? isCampaignChildActive(child)
-      : isPathActive(pathname, child.href),
-  );
+  const selectedChild = items.find((child) => isPathActive(pathname, child.href));
   const TriggerIcon = selectedChild?.icon ?? item.icon;
-  const active =
-    item.label === "Accounts"
-      ? items.some((child) => isPathActive(pathname, child.href))
-      : pathname.startsWith("/campaigns") ||
-        pathname.startsWith("/products") ||
-        pathname.startsWith("/bundles");
+  const active = items.some((child) => isPathActive(pathname, child.href));
 
   const openMenu = () => {
     if (closeTimer.current) window.clearTimeout(closeTimer.current);
@@ -183,10 +160,7 @@ function NavDropdown({
         onCloseAutoFocus={(event) => event.preventDefault()}
       >
         {items.map((child) => {
-          const childActive =
-            item.label === "Campaigns"
-              ? isCampaignChildActive(child)
-              : isPathActive(pathname, child.href);
+          const childActive = isPathActive(pathname, child.href);
 
           return (
             <DropdownMenuItem key={child.href} asChild>
@@ -225,10 +199,7 @@ export function TopBar({
   const [helpOpen, setHelpOpen] = useState(false);
   const [selectedHelpOptionId, setSelectedHelpOptionId] = useState("");
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(
-    {
-      Accounts: true,
-      Campaigns: true,
-    },
+    { Accounts: true },
   );
   const helpContent = getHelpContent(location.pathname);
   const selectedHelpOption =

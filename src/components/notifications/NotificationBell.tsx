@@ -12,7 +12,6 @@ const entityRoutes: Record<string, (id: string) => string> = {
   lead: (id) => `/leads/${id}`,
   contact: (id) => `/contacts/${id}`,
   activity: (id) => `/activities/${id}`,
-  campaign: (id) => `/campaigns/${id}`,
   product: (id) => `/products/${id}`,
   bundle: (id) => `/bundles/${id}`,
 };

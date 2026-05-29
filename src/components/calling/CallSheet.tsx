@@ -19,7 +19,6 @@ import { LeadStatusBadge } from "@/components/common/StatusBadge";
 import { formatCurrency, formatDate } from "@/lib/format";
 import type { Lead, FinancialGoal, RiskTolerance, InvestmentHorizon } from "@/data/types";
 import { getLeadActivities } from "@/lib/selectors";
-import { getCampaignOfferItems } from "@/lib/campaignOfferings";
 import { Link } from "react-router-dom";
 import { useAuthStore } from "@/store/useAuthStore";
 
@@ -40,9 +39,9 @@ interface CallSheetProps {
 }
 
 export function CallSheet({ lead }: CallSheetProps) {
-  const { campaign, startCall, endCall, liveNotes, setLiveNotes, phase } =
+  const { startCall, endCall, liveNotes, setLiveNotes, phase } =
     useCallSessionStore();
-  const { activities, products, bundles, contacts, deals, updateDeal } = useCrmStore();
+  const { activities, contacts, deals, updateDeal } = useCrmStore();
   const { currentUser } = useAuthStore();
   const [editingFF, setEditingFF] = useState(false);
   const [ffForm, setFfForm] = useState({
@@ -58,9 +57,6 @@ export function CallSheet({ lead }: CallSheetProps) {
     return <div className="p-6 text-muted-foreground">No lead selected.</div>;
 
   const leadActivities = getLeadActivities(lead.id, activities).slice(0, 3);
-  const offerItems = campaign
-    ? getCampaignOfferItems(campaign, products, bundles)
-    : [];
   const convertedContact = lead.converted_contact_id
     ? contacts.find((contact) => contact.id === lead.converted_contact_id)
     : undefined;
@@ -159,42 +155,6 @@ export function CallSheet({ lead }: CallSheetProps) {
         </TabsList>
 
         <TabsContent value="toolkit" className="mt-0 space-y-3">
-          {campaign && (
-            <div className="rounded-lg border bg-muted/30 p-3 text-sm">
-              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-1">
-                Campaign Offering
-              </p>
-              <p className="font-semibold">{campaign.name}</p>
-              {offerItems.length > 0 && (
-                <div className="mt-2 space-y-1">
-                  {offerItems.map((item) => (
-                    <div
-                      key={`${item.kind}-${item.id}`}
-                      className="flex items-center justify-between gap-2 rounded-md bg-background px-2 py-1.5"
-                    >
-                      <span className="font-medium">{item.name}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {item.kind === "PRODUCT"
-                          ? item.ticker || "Product"
-                          : "Bundle"}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          <div className="rounded-lg border p-3 text-sm space-y-1.5">
-            <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-              <FileText className="h-3.5 w-3.5" />
-              Call Script
-            </div>
-            <p className="text-foreground leading-relaxed whitespace-pre-wrap">
-              {campaign?.script || "No script is configured for this campaign."}
-            </p>
-          </div>
-
           <div className="rounded-lg border p-3 text-sm space-y-2">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
               Dialer Tools

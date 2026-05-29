@@ -29,11 +29,6 @@ import {
   Cell,
   Tooltip,
   ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
 } from "recharts";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
@@ -49,7 +44,7 @@ const RESULT_COLORS: Record<string, string> = {
 export function AdvisorPerformancePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { users, activities, deals, campaigns, updateUser, assignCredits } = useCrmStore();
+  const { users, activities, deals, updateUser, assignCredits } = useCrmStore();
   const { currentUser } = useAuthStore();
   const [creditAdjust, setCreditAdjust] = useState(0);
 
@@ -103,20 +98,6 @@ export function AdvisorPerformancePage() {
       count: userDeals.filter((d) => d.stage === stage).length,
     }))
     .filter((d) => d.count > 0);
-
-  const campaignBreakdown = campaigns
-    .map((campaign) => {
-      const campCalls = calls.filter((a) => a.campaign_id === campaign.id);
-      const campPickups = campCalls.filter(
-        (a) => a.result !== "NO_ANSWER" && a.result !== "CANCELLED",
-      );
-      return {
-        name: campaign.name,
-        calls: campCalls.length,
-        pickups: campPickups.length,
-      };
-    })
-    .filter((c) => c.calls > 0);
 
   const recentActivities = [...userActivities]
     .sort(
@@ -228,42 +209,6 @@ export function AdvisorPerformancePage() {
           </Card>
         )}
       </div>
-
-      {campaignBreakdown.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Campaign Performance</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={180}>
-              <BarChart
-                data={campaignBreakdown}
-                margin={{ top: 4, right: 8, bottom: 4, left: 0 }}
-              >
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  className="stroke-border"
-                />
-                <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip />
-                <Bar
-                  dataKey="calls"
-                  name="Calls"
-                  fill="#3b82f6"
-                  radius={[3, 3, 0, 0]}
-                />
-                <Bar
-                  dataKey="pickups"
-                  name="Pickups"
-                  fill="#22c55e"
-                  radius={[3, 3, 0, 0]}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Telemarketer access panel — MASTER can manage anyone; ADVISER can manage their own */}
       {advisor.role === "ADVISER" && (isMaster(currentUser) || currentUser?.id === advisor.id) && (

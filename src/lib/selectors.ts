@@ -1,4 +1,4 @@
-import type { Activity, Deal, Lead } from "@/data/types";
+import type { Activity, Deal } from "@/data/types";
 
 export function getLastContactedDate(leadId: string, activities: Activity[]): string | null {
   const leadActivities = activities.filter(
@@ -42,28 +42,6 @@ export function getDaysSince(dateStr: string): number {
   return Math.floor((Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24));
 }
 
-export function getLeadsForCampaign(
-  leads: Lead[],
-  campaignId: string,
-  userId: string,
-  activities: Activity[]
-): Lead[] {
-  const contactedLeadIds = new Set(
-    activities
-      .filter((a) => a.campaign_id === campaignId && a.type === "CALL" && !a.deleted_at)
-      .map((a) => a.lead_id)
-      .filter(Boolean) as string[]
-  );
-  return leads.filter(
-    (l) =>
-      l.assigned_to_id === userId &&
-      !l.deleted_at &&
-      l.status !== "ABANDON" &&
-      !l.is_abandoned &&
-      !contactedLeadIds.has(l.id)
-  );
-}
-
 export function getTodayCallStats(activities: Activity[], userId: string, callSessions: import("@/data/types").CallSession[]) {
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
@@ -85,26 +63,3 @@ export function getTodayCallStats(activities: Activity[], userId: string, callSe
   return { callsMade, pickups, totalDurationSeconds };
 }
 
-export function getCampaignDealConversions(
-  activities: Activity[],
-  deals: Deal[],
-  campaignIds: Set<string>
-): Deal[] {
-  const convertedDealIds = new Set(
-    activities
-      .filter((activity) =>
-        activity.campaign_id &&
-        campaignIds.has(activity.campaign_id) &&
-        activity.deal_id &&
-        !activity.deleted_at
-      )
-      .map((activity) => activity.deal_id as string)
-  );
-
-  return deals.filter(
-    (deal) =>
-      convertedDealIds.has(deal.id) &&
-      !deal.deleted_at &&
-      deal.stage !== "LOST"
-  );
-}

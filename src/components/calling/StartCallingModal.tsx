@@ -87,8 +87,7 @@ export function StartCallingModal({ open, onClose }: StartCallingModalProps) {
 
   const handleStart = () => {
     if (queue.length === 0) return;
-    // No campaign — pass null
-    startSession(null, queue);
+    startSession(queue);
     onClose();
   };
 
