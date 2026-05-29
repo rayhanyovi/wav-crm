@@ -267,7 +267,7 @@ export function TopBar({
   );
 
   const startCallingButton =
-    can(currentUser, "ADVISER") && !can(currentUser, "MASTER") ? (
+    can(currentUser, "TELEMARKETER") && !can(currentUser, "MASTER") ? (
       <Button
         size="sm"
         onClick={onStartCalling}
