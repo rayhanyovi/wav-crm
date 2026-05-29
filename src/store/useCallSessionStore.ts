@@ -16,7 +16,7 @@ interface CallSessionState {
   panelOpen: boolean;
   phase: "sheet" | "calling" | "outcome" | "done";
 
-  startSession: (campaign: Campaign, queue: Lead[]) => void;
+  startSession: (campaign: Campaign | null, queue: Lead[]) => void;
   stopSession: () => void;
   openPanel: () => void;
   closePanel: () => void;
