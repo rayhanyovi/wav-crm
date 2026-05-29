@@ -51,3 +51,8 @@ export function isAdviser(user: User | null): boolean {
 export function isTelemarketer(user: User | null): boolean {
   return user?.role === "TELEMARKETER";
 }
+
+/** Can log call/meeting activities (TM, Adviser, and Master) */
+export function canLogActivity(user: User | null): boolean {
+  return can(user, "TELEMARKETER");
+}

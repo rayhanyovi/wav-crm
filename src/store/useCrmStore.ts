@@ -3,7 +3,7 @@ import { persist } from "zustand/middleware";
 import { nanoid } from "nanoid";
 import seedData from "@/data/seed.json";
 import type {
-  User, Company, Contact, Lead, LeadNote, Deal, DealProposal, StageHistoryEntry,
+  User, Company, Contact, Lead, LeadNote, ContactNote, Deal, DealProposal, StageHistoryEntry,
   Activity, Comment, Product, Bundle, Campaign, Notification,
   AuditLog, DealStage, AuditAction, CallSession, LeadStatus, CreditTransaction
 } from "@/data/types";
@@ -34,6 +34,7 @@ interface CrmState {
   contacts: Contact[];
   leads: Lead[];
   lead_notes: LeadNote[];
+  contact_notes: ContactNote[];
   deals: Deal[];
   deal_proposals: DealProposal[];
   stage_history: StageHistoryEntry[];
@@ -90,6 +91,10 @@ interface CrmState {
   addLeadNote: (leadId: string, content: string, userId: string) => LeadNote;
   deleteLeadNote: (id: string) => void;
 
+  // ─── Contact Notes (running log) ────────────────────────────────────────
+  addContactNote: (contactId: string, content: string, userId: string) => ContactNote;
+  deleteContactNote: (id: string) => void;
+
   // ─── Users ─────────────────────────────────────────────────────────────
   updateUser: (id: string, data: Partial<User>) => void;
 
@@ -132,6 +137,7 @@ export const useCrmStore = create<CrmState>()(
       contacts: seedData.contacts as Contact[],
       leads: seedData.leads as Lead[],
       lead_notes: [],
+      contact_notes: [],
       deals: seedData.deals as Deal[],
       deal_proposals: (seedData as any).deal_proposals as DealProposal[] ?? [],
       stage_history: seedData.stage_history as StageHistoryEntry[],
@@ -152,6 +158,7 @@ export const useCrmStore = create<CrmState>()(
           contacts: seedData.contacts as Contact[],
           leads: seedData.leads as Lead[],
           lead_notes: [],
+          contact_notes: [],
           deals: seedData.deals as Deal[],
           deal_proposals: (seedData as any).deal_proposals as DealProposal[] ?? [],
           stage_history: seedData.stage_history as StageHistoryEntry[],
@@ -262,6 +269,12 @@ export const useCrmStore = create<CrmState>()(
           }
         }
 
+        // Detect NO_SHOW bounce: bounce_count increasing
+        const isBounce = data.bounce_count != null && data.bounce_count > (old?.bounce_count ?? 0);
+        if (isBounce) {
+          extraUpdates.last_bounced_at = now();
+        }
+
         set((s) => ({
           leads: s.leads.map((l) =>
             l.id === id ? { ...l, ...data, ...extraUpdates, updated_at: now() } : l
@@ -275,6 +288,17 @@ export const useCrmStore = create<CrmState>()(
         }
         if (data.assigned_to_id && data.assigned_to_id !== old?.assigned_to_id) {
           get().addNotification(data.assigned_to_id, "LEAD_ASSIGNED", "Lead assigned to you", `${old?.first_name} ${old?.last_name} has been re-assigned to you.`, "lead", id);
+        }
+        // Notify the TM when their lead bounces back from a no-show
+        if (isBounce && old?.telemarketer_owner_id) {
+          get().addNotification(
+            old.telemarketer_owner_id,
+            "LEAD_BOUNCED",
+            "Lead back in your queue",
+            `${old.first_name} ${old.last_name} was a no-show. They've been moved back to your call queue.`,
+            "lead",
+            id
+          );
         }
       },
       deleteLead: (id, userId) => {
@@ -330,8 +354,9 @@ export const useCrmStore = create<CrmState>()(
         const updates: Partial<Deal> = {
           stage: toStage,
           updated_at: now(),
-          ...(toStage === "LOST" ? { lost_reason: lostReason, closed_at: now() } : {}),
-          ...(toStage === "WON" ? { closed_at: now() } : {}),
+          ...(toStage === "LOST"      ? { lost_reason: lostReason, closed_at: now() } : {}),
+          ...(toStage === "WON"       ? { closed_at: now() } : {}),
+          ...(toStage === "SUBMITTED" ? { submitted_at: now() } : {}),
         };
         set((s) => ({
           deals: s.deals.map((d) => d.id === dealId ? { ...d, ...updates } : d),
@@ -405,6 +430,22 @@ export const useCrmStore = create<CrmState>()(
       },
       deleteLeadNote: (id) => {
         set((s) => ({ lead_notes: s.lead_notes.filter((n) => n.id !== id) }));
+      },
+
+      // Contact Notes (running client log)
+      addContactNote: (contactId, content, userId) => {
+        const note: ContactNote = {
+          id: `cn-${nanoid(8)}`,
+          contact_id: contactId,
+          content,
+          created_by: userId,
+          created_at: now(),
+        };
+        set((s) => ({ contact_notes: [...s.contact_notes, note] }));
+        return note;
+      },
+      deleteContactNote: (id) => {
+        set((s) => ({ contact_notes: s.contact_notes.filter((n) => n.id !== id) }));
       },
 
       // Users — allow Master to update user settings (Task #9)
@@ -577,6 +618,7 @@ export const useCrmStore = create<CrmState>()(
         contacts: state.contacts,
         leads: state.leads,
         lead_notes: state.lead_notes,
+        contact_notes: state.contact_notes,
         deals: state.deals,
         deal_proposals: state.deal_proposals,
         stage_history: state.stage_history,

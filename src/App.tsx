@@ -66,8 +66,8 @@ export default function App() {
         <Route path="activities" element={<ActivitiesPage />} />
         <Route path="activities/:id" element={<ActivityDetailPage />} />
         <Route path="calendar" element={<CalendarPage />} />
-        <Route path="deals" element={<DealsPage />} />
-        <Route path="deals/:id" element={<DealDetailPage />} />
+        <Route path="deals" element={<ProtectedRoute minRole={1}><DealsPage /></ProtectedRoute>} />
+        <Route path="deals/:id" element={<ProtectedRoute minRole={1}><DealDetailPage /></ProtectedRoute>} />
         <Route path="tools" element={<ToolsPage />} />
         <Route path="tools/portfolio-risk" element={<PortfolioRiskCalculatorPage />} />
         <Route path="team" element={<ProtectedRoute minRole={2}><TeamPage /></ProtectedRoute>} />

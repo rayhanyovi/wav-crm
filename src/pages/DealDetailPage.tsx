@@ -27,14 +27,26 @@ import {
 import { DealStageBadge, ActivityTypeBadge, ActivityResultBadge } from "@/components/common/StatusBadge";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/format";
 import { can } from "@/lib/permissions";
-import type { DealStage, DealProposal, DealProposalStatus, DealProposalLine } from "@/data/types";
+import type { DealStage, DealProposal, DealProposalStatus, DealProposalLine, FinancialGoal, RiskTolerance, InvestmentHorizon } from "@/data/types";
 import { SGA_FUNDS, getRiskCategory, RISK_CATEGORY_COLOR } from "@/data/sgaFunds";
 import { nanoid } from "nanoid";
 
-const DEAL_STAGES: DealStage[] = ["CALLING", "APPOINTMENT", "PROPOSAL", "NEGOTIATION", "WON", "LOST"];
+const DEAL_STAGES: DealStage[] = ["CALLING", "APPOINTMENT", "PROPOSAL", "SUBMITTED", "WON", "LOST"];
 const STAGE_LABELS: Record<DealStage, string> = {
   CALLING: "Calling", APPOINTMENT: "Appointment", PROPOSAL: "Proposal",
-  NEGOTIATION: "Negotiation", WON: "Won", LOST: "Lost",
+  SUBMITTED: "Submitted", WON: "Won", LOST: "Lost",
+};
+
+const GOAL_LABELS: Record<FinancialGoal, string> = {
+  RETIREMENT: "Retirement", EDUCATION: "Education Fund", WEALTH_GROWTH: "Wealth Growth",
+  INCOME: "Passive Income", EMERGENCY_FUND: "Emergency Fund", OTHER: "Other",
+};
+const TOLERANCE_LABELS: Record<RiskTolerance, string> = {
+  CONSERVATIVE: "Conservative", MODERATE: "Moderate", BALANCED: "Balanced",
+  GROWTH: "Growth", AGGRESSIVE: "Aggressive",
+};
+const HORIZON_LABELS: Record<InvestmentHorizon, string> = {
+  SHORT: "Short-term (< 3 yrs)", MEDIUM: "Medium-term (3–7 yrs)", LONG: "Long-term (7+ yrs)",
 };
 const PROPOSAL_STATUS_LABELS: Record<DealProposalStatus, string> = {
   DRAFT: "Draft", PRESENTED: "Presented", ACCEPTED: "Accepted", REJECTED: "Rejected",
@@ -254,7 +266,20 @@ export function DealDetailPage() {
   const [newStage, setNewStage] = useState<DealStage | "">("");
   const [stageNote, setStageNote] = useState("");
   const [lostReason, setLostReason] = useState("");
+  const [stageInsurer, setStageInsurer] = useState("");
+  const [stageInsurerRef, setStageInsurerRef] = useState("");
+  const [stagePolicyNumber, setStagePolicyNumber] = useState("");
+  const [stageAssignAdviser, setStageAssignAdviser] = useState("");
   const [editingProposalId, setEditingProposalId] = useState<string | "new" | null>(null);
+  const [editingFactFind, setEditingFactFind] = useState(false);
+  const [factFindForm, setFactFindForm] = useState({
+    financial_goal: "" as FinancialGoal | "",
+    risk_tolerance: "" as RiskTolerance | "",
+    investment_horizon: "" as InvestmentHorizon | "",
+    monthly_investable: "",
+    existing_investments: "",
+    fact_find_notes: "",
+  });
 
   const deal = deals.find((d) => d.id === id);
   if (!deal) return (
@@ -286,12 +311,50 @@ export function DealDetailPage() {
     : deal.title;
 
   const canEdit = can(currentUser, "ADVISER") || currentUser?.role === "MASTER";
+  const advisers = users.filter((u) => u.is_active && can(u, "ADVISER") && !can(u, "MASTER"));
 
   const handleMoveStage = () => {
     if (!newStage || !currentUser) return;
+    const extras: Record<string, unknown> = {};
+    if (newStage === "SUBMITTED") {
+      if (stageInsurer) extras.insurer = stageInsurer;
+      if (stageInsurerRef) extras.insurer_ref = stageInsurerRef;
+    }
+    if (newStage === "WON" && stagePolicyNumber) extras.policy_number = stagePolicyNumber;
+    if (newStage === "APPOINTMENT" && stageAssignAdviser && !deal.assigned_to_id) {
+      extras.assigned_to_id = stageAssignAdviser;
+    }
+    if (Object.keys(extras).length > 0) updateDeal(id!, extras, currentUser.id);
     moveDealStage(id!, newStage as DealStage, stageNote || undefined, currentUser.id, lostReason || undefined);
     setStageModalOpen(false);
     setNewStage(""); setStageNote(""); setLostReason("");
+    setStageInsurer(""); setStageInsurerRef(""); setStagePolicyNumber(""); setStageAssignAdviser("");
+  };
+
+  const openFactFind = () => {
+    setFactFindForm({
+      financial_goal: deal.financial_goal ?? "",
+      risk_tolerance: deal.risk_tolerance ?? "",
+      investment_horizon: deal.investment_horizon ?? "",
+      monthly_investable: deal.monthly_investable != null ? String(deal.monthly_investable) : "",
+      existing_investments: deal.existing_investments ?? "",
+      fact_find_notes: deal.fact_find_notes ?? "",
+    });
+    setEditingFactFind(true);
+  };
+
+  const handleSaveFactFind = () => {
+    if (!currentUser) return;
+    updateDeal(id!, {
+      financial_goal: factFindForm.financial_goal || undefined,
+      risk_tolerance: factFindForm.risk_tolerance || undefined,
+      investment_horizon: factFindForm.investment_horizon || undefined,
+      monthly_investable: factFindForm.monthly_investable ? parseFloat(factFindForm.monthly_investable) : undefined,
+      existing_investments: factFindForm.existing_investments || undefined,
+      fact_find_notes: factFindForm.fact_find_notes || undefined,
+      fact_find_done: !!(factFindForm.financial_goal && factFindForm.risk_tolerance && factFindForm.investment_horizon),
+    }, currentUser.id);
+    setEditingFactFind(false);
   };
 
   return (
@@ -391,6 +454,24 @@ export function DealDetailPage() {
                   <span>{telemarketer.name}</span>
                 </div>
               )}
+              {deal.insurer && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Insurer</span>
+                  <span>{deal.insurer}</span>
+                </div>
+              )}
+              {deal.insurer_ref && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Submission Ref</span>
+                  <span className="font-mono text-xs">{deal.insurer_ref}</span>
+                </div>
+              )}
+              {deal.policy_number && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Policy No.</span>
+                  <span className="font-mono text-xs font-semibold">{deal.policy_number}</span>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Created</span>
                 <span>{formatDate(deal.created_at)}</span>
@@ -432,6 +513,82 @@ export function DealDetailPage() {
                   </p>
                 ))}
               </div>
+            )}
+          </div>
+
+          {/* ── Fact Find ── */}
+          <div className="rounded-lg border overflow-hidden">
+            <div className="px-3 py-2.5 bg-muted/50 border-b flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium">Client Fact Find</span>
+                {deal.fact_find_done && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400 font-medium">Complete</span>
+                )}
+              </div>
+              {canEdit && !editingFactFind && (
+                <button onClick={openFactFind} className="text-[11px] text-primary hover:underline flex items-center gap-1">
+                  <Pencil className="h-3 w-3" />{deal.fact_find_done ? "Edit" : "Fill In"}
+                </button>
+              )}
+            </div>
+
+            {editingFactFind ? (
+              <div className="p-3 space-y-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1 col-span-2 sm:col-span-1">
+                    <label className="text-[11px] text-muted-foreground font-medium">Financial Goal</label>
+                    <Select value={factFindForm.financial_goal} onValueChange={(v) => setFactFindForm((f) => ({ ...f, financial_goal: v as FinancialGoal }))}>
+                      <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Select goal" /></SelectTrigger>
+                      <SelectContent>{(Object.keys(GOAL_LABELS) as FinancialGoal[]).map((g) => <SelectItem key={g} value={g}>{GOAL_LABELS[g]}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[11px] text-muted-foreground font-medium">Risk Tolerance</label>
+                    <Select value={factFindForm.risk_tolerance} onValueChange={(v) => setFactFindForm((f) => ({ ...f, risk_tolerance: v as RiskTolerance }))}>
+                      <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Select risk" /></SelectTrigger>
+                      <SelectContent>{(Object.keys(TOLERANCE_LABELS) as RiskTolerance[]).map((r) => <SelectItem key={r} value={r}>{TOLERANCE_LABELS[r]}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[11px] text-muted-foreground font-medium">Investment Horizon</label>
+                    <Select value={factFindForm.investment_horizon} onValueChange={(v) => setFactFindForm((f) => ({ ...f, investment_horizon: v as InvestmentHorizon }))}>
+                      <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Select horizon" /></SelectTrigger>
+                      <SelectContent>{(Object.keys(HORIZON_LABELS) as InvestmentHorizon[]).map((h) => <SelectItem key={h} value={h}>{HORIZON_LABELS[h]}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[11px] text-muted-foreground font-medium">Monthly Investable (SGD)</label>
+                    <Input type="number" className="h-7 text-xs" value={factFindForm.monthly_investable} onChange={(e) => setFactFindForm((f) => ({ ...f, monthly_investable: e.target.value }))} placeholder="e.g. 1000" />
+                  </div>
+                  <div className="space-y-1 col-span-2">
+                    <label className="text-[11px] text-muted-foreground font-medium">Existing Investments</label>
+                    <Input className="h-7 text-xs" value={factFindForm.existing_investments} onChange={(e) => setFactFindForm((f) => ({ ...f, existing_investments: e.target.value }))} placeholder="e.g. CPF, some unit trusts, endowment plan" />
+                  </div>
+                  <div className="space-y-1 col-span-2">
+                    <label className="text-[11px] text-muted-foreground font-medium">Notes from Fact Find</label>
+                    <Textarea rows={2} className="text-xs" value={factFindForm.fact_find_notes} onChange={(e) => setFactFindForm((f) => ({ ...f, fact_find_notes: e.target.value }))} placeholder="Client concerns, preferences, anything notable from the meeting…" />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setEditingFactFind(false)}>Cancel</Button>
+                  <Button size="sm" className="h-7 text-xs" onClick={handleSaveFactFind}><Check className="h-3 w-3 mr-1" />Save</Button>
+                </div>
+              </div>
+            ) : deal.financial_goal ? (
+              <div className="p-3 space-y-2 text-xs">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+                  <div><span className="text-muted-foreground">Goal: </span><span className="font-medium">{GOAL_LABELS[deal.financial_goal]}</span></div>
+                  {deal.risk_tolerance && <div><span className="text-muted-foreground">Risk: </span><span className="font-medium">{TOLERANCE_LABELS[deal.risk_tolerance]}</span></div>}
+                  {deal.investment_horizon && <div><span className="text-muted-foreground">Horizon: </span><span className="font-medium">{HORIZON_LABELS[deal.investment_horizon]}</span></div>}
+                  {deal.monthly_investable && <div><span className="text-muted-foreground">Monthly: </span><span className="font-medium">{formatCurrency(deal.monthly_investable)}</span></div>}
+                  {deal.existing_investments && <div className="col-span-2"><span className="text-muted-foreground">Existing: </span><span>{deal.existing_investments}</span></div>}
+                </div>
+                {deal.fact_find_notes && <p className="text-muted-foreground italic border-t pt-2 mt-1">{deal.fact_find_notes}</p>}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground text-center py-4">
+                {canEdit ? "No fact find yet — fill in after first meeting with client." : "Fact find not completed yet."}
+              </p>
             )}
           </div>
 
@@ -649,6 +806,43 @@ export function DealDetailPage() {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Adviser assignment — shown when moving to APPOINTMENT and no adviser yet */}
+            {newStage === "APPOINTMENT" && !deal.assigned_to_id && (
+              <div className="space-y-1.5">
+                <Label>Assign Adviser <span className="text-muted-foreground font-normal">(recommended)</span></Label>
+                <Select value={stageAssignAdviser || "none"} onValueChange={(v) => setStageAssignAdviser(v === "none" ? "" : v)}>
+                  <SelectTrigger><SelectValue placeholder="Select adviser" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">— Skip for now —</SelectItem>
+                    {advisers.map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {/* Insurer details — shown when moving to SUBMITTED */}
+            {newStage === "SUBMITTED" && (
+              <>
+                <div className="space-y-1.5">
+                  <Label>Insurer <span className="text-muted-foreground font-normal">(e.g. Singlife, AIA, Prudential)</span></Label>
+                  <Input value={stageInsurer} onChange={(e) => setStageInsurer(e.target.value)} placeholder="Insurer name" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Submission Reference <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                  <Input value={stageInsurerRef} onChange={(e) => setStageInsurerRef(e.target.value)} placeholder="Reference / case number" />
+                </div>
+              </>
+            )}
+
+            {/* Policy number — shown when moving to WON */}
+            {newStage === "WON" && (
+              <div className="space-y-1.5">
+                <Label>Policy Number <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                <Input value={stagePolicyNumber} onChange={(e) => setStagePolicyNumber(e.target.value)} placeholder="e.g. SLF-20260001" />
+              </div>
+            )}
+
             {newStage === "LOST" && (
               <div className="space-y-1.5">
                 <Label>Lost Reason</Label>
@@ -656,7 +850,7 @@ export function DealDetailPage() {
               </div>
             )}
             <div className="space-y-1.5">
-              <Label>Note (optional)</Label>
+              <Label>Note <span className="text-muted-foreground font-normal">(optional)</span></Label>
               <Textarea value={stageNote} onChange={(e) => setStageNote(e.target.value)} rows={2} placeholder="Add a note about this stage change…" />
             </div>
           </div>

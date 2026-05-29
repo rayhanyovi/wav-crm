@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import * as XLSX from "xlsx";
-import { Upload, AlertCircle, CheckCircle2, X } from "lucide-react";
+import { Upload, AlertCircle, CheckCircle2, X, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/table";
 import { useCrmStore } from "@/store/useCrmStore";
 import { useAuthStore } from "@/store/useAuthStore";
+import { isTelemarketer } from "@/lib/permissions";
 import type { LeadStatus, LeadSource } from "@/data/types";
 
 // ─── Column aliases ───────────────────────────────────────────────────────────
@@ -126,10 +127,7 @@ function parseRows(text: string): string[][] {
 }
 
 // ─── Excel parser ─────────────────────────────────────────────────────────────
-function parseXlsx(buffer: ArrayBuffer): string[][] {
-  const wb = XLSX.read(buffer, { type: "array", cellText: false, cellDates: true });
-  const ws = wb.Sheets[wb.SheetNames[0]];
-  // raw: true keeps numbers as numbers; we'll convert to string manually
+function sheetToRows(ws: XLSX.WorkSheet): string[][] {
   const rows: unknown[][] = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: "" });
   return rows
     .filter((r) => (r as unknown[]).some((c) => c !== ""))
@@ -141,6 +139,13 @@ function parseXlsx(buffer: ArrayBuffer): string[][] {
         return String(cell).trim();
       }),
     );
+}
+
+function parseXlsx(buffer: ArrayBuffer, sheetIndex = 0): { rows: string[][]; sheetNames: string[] } {
+  const wb = XLSX.read(buffer, { type: "array", cellText: false, cellDates: true });
+  const sheetNames = wb.SheetNames;
+  const ws = wb.Sheets[sheetNames[Math.min(sheetIndex, sheetNames.length - 1)]];
+  return { rows: sheetToRows(ws), sheetNames };
 }
 
 // Normalise phone: Excel stores numbers in scientific notation (8.4E+07 → "84000000")
@@ -243,6 +248,10 @@ export function LeadImportDialog({ open, onClose }: Props) {
   const [done, setDone] = useState<{ ok: number; skipped: number } | null>(null);
   const [defaultSource, setDefaultSource] = useState<LeadSource>("COLD_CALL");
   const [fileName, setFileName] = useState<string | null>(null);
+  // Multi-sheet support
+  const [sheetNames, setSheetNames] = useState<string[]>([]);
+  const [selectedSheet, setSelectedSheet] = useState(0);
+  const [xlsxBuffer, setXlsxBuffer] = useState<ArrayBuffer | null>(null);
 
   const applyDefaultSource = (rows: ParsedRow[]): ParsedRow[] =>
     rows.map((r) =>
@@ -256,23 +265,41 @@ export function LeadImportDialog({ open, onClose }: Props) {
     setDone(null);
   };
 
+  const loadSheet = (buffer: ArrayBuffer, sheetIdx: number, source: LeadSource) => {
+    const { rows, sheetNames: names } = parseXlsx(buffer, sheetIdx);
+    setSheetNames(names);
+    setParsed(applyDefaultSource(buildRows(rows)).map((r) =>
+      r._raw.source ? r : { ...r, source }
+    ));
+    setText("");
+    setDone(null);
+  };
+
   const handleFile = (file: File) => {
     setFileName(file.name);
     const isExcel = /\.(xlsx|xls)$/i.test(file.name);
     if (isExcel) {
       const reader = new FileReader();
       reader.onload = (e) => {
-        const rows = parseXlsx(e.target?.result as ArrayBuffer);
-        setParsed(applyDefaultSource(buildRows(rows)));
-        setText("");
-        setDone(null);
+        const buffer = e.target?.result as ArrayBuffer;
+        setXlsxBuffer(buffer);
+        setSelectedSheet(0);
+        loadSheet(buffer, 0, defaultSource);
       };
       reader.readAsArrayBuffer(file);
     } else {
+      setSheetNames([]);
+      setXlsxBuffer(null);
       const reader = new FileReader();
       reader.onload = (e) => handleParse(e.target?.result as string ?? "");
       reader.readAsText(file);
     }
+  };
+
+  const handleSheetChange = (idx: number) => {
+    if (!xlsxBuffer) return;
+    setSelectedSheet(idx);
+    loadSheet(xlsxBuffer, idx, defaultSource);
   };
 
   const handleImport = () => {
@@ -280,6 +307,7 @@ export function LeadImportDialog({ open, onClose }: Props) {
     setImporting(true);
     let ok = 0;
     let skipped = 0;
+    const isTm = isTelemarketer(currentUser);
     for (const row of parsed) {
       if (!row._valid) { skipped++; continue; }
       createLead(
@@ -297,7 +325,9 @@ export function LeadImportDialog({ open, onClose }: Props) {
           income_range: row.income_range,
           zipcode: row.zipcode,
           notes: row.notes,
-          assigned_to_id: currentUser.id,
+          // TM importing → they own the lead as telemarketer; adviser importing → assigned to them
+          telemarketer_owner_id: isTm ? currentUser.id : undefined,
+          assigned_to_id: isTm ? undefined : currentUser.id,
           created_by: currentUser.id,
           deleted_at: undefined,
         },
@@ -314,6 +344,9 @@ export function LeadImportDialog({ open, onClose }: Props) {
     setParsed([]);
     setDone(null);
     setFileName(null);
+    setSheetNames([]);
+    setSelectedSheet(0);
+    setXlsxBuffer(null);
     onClose();
   };
 
@@ -389,6 +422,29 @@ export function LeadImportDialog({ open, onClose }: Props) {
                   onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
                 />
               </div>
+
+              {/* Sheet selector — shown when Excel has multiple sheets */}
+              {sheetNames.length > 1 && (
+                <div className="flex items-center gap-2">
+                  <Layers className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  <span className="text-sm text-muted-foreground shrink-0">Sheet:</span>
+                  <div className="flex flex-wrap gap-1">
+                    {sheetNames.map((name, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => handleSheetChange(idx)}
+                        className={`rounded px-2 py-0.5 text-xs border transition-colors ${
+                          selectedSheet === idx
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "bg-background border-border hover:bg-muted"
+                        }`}
+                      >
+                        {name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <div className="flex-1 h-px bg-border" />

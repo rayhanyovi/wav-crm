@@ -114,21 +114,31 @@ export function LeadsPage() {
     showAbandoned ? true : !l.is_abandoned
   );
 
-  const filtered = liveLeads.filter((l) => {
-    const name = `${l.first_name} ${l.last_name}`.toLowerCase();
-    if (
-      search &&
-      !name.includes(search.toLowerCase()) &&
-      !l.email?.includes(search.toLowerCase()) &&
-      !l.phone?.includes(search)
-    )
-      return false;
-    if (filterStatus !== "ALL" && l.status !== filterStatus) return false;
-    if (filterSource !== "ALL" && l.source !== filterSource) return false;
-    if (filterAssignee !== "ALL" && l.assigned_to_id !== filterAssignee)
-      return false;
-    return true;
-  });
+  const filtered = liveLeads
+    .filter((l) => {
+      const name = `${l.first_name} ${l.last_name}`.toLowerCase();
+      if (
+        search &&
+        !name.includes(search.toLowerCase()) &&
+        !l.email?.includes(search.toLowerCase()) &&
+        !l.phone?.includes(search)
+      )
+        return false;
+      if (filterStatus !== "ALL" && l.status !== filterStatus) return false;
+      if (filterSource !== "ALL" && l.source !== filterSource) return false;
+      if (filterAssignee !== "ALL" && l.assigned_to_id !== filterAssignee)
+        return false;
+      return true;
+    })
+    .sort((a, b) => {
+      // For TM: recently bounced (no-show) leads float to the top so they can recall first
+      if (isTelemarketer(currentUser)) {
+        const aBounced = a.last_bounced_at && a.status === "NA" ? new Date(a.last_bounced_at).getTime() : 0;
+        const bBounced = b.last_bounced_at && b.status === "NA" ? new Date(b.last_bounced_at).getTime() : 0;
+        if (aBounced !== bBounced) return bBounced - aBounced;
+      }
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
 
   const abandonedCount = scopedLeads.filter((l) => l.is_abandoned).length;
 

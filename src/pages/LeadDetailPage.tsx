@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/dialog";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { getLeadActivities } from "@/lib/selectors";
-import { canEdit, canManage, isAdviser } from "@/lib/permissions";
+import { canEdit, canLogActivity, canManage, isAdviser } from "@/lib/permissions";
 import { buildGoogleCalendarUrl, downloadIcs } from "@/lib/calendar";
 import type { LeadStatus, LeadSource, DealStage, Lead, AppointmentResult } from "@/data/types";
 
@@ -47,7 +47,7 @@ const DEAL_STAGES: DealStage[] = [
   "CALLING",
   "APPOINTMENT",
   "PROPOSAL",
-  "NEGOTIATION",
+  "SUBMITTED",
 ];
 
 export function LeadDetailPage() {
@@ -694,8 +694,8 @@ export function LeadDetailPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          {/* Add note input */}
-          {canEdit(currentUser) && !isConverted && (
+          {/* Add note input — any authenticated user (TM, Adviser, Master) */}
+          {canLogActivity(currentUser) && !isConverted && (
             <div className="flex gap-2">
               <Textarea
                 placeholder="Add a note..."
@@ -775,7 +775,7 @@ export function LeadDetailPage() {
       <Card>
         <CardHeader className="pb-2 flex flex-row items-center justify-between">
           <CardTitle className="text-sm">Activity Timeline</CardTitle>
-          {canEdit(currentUser) && !isConverted && (
+          {canLogActivity(currentUser) && !isConverted && (
             <Button
               size="sm"
               variant="outline"

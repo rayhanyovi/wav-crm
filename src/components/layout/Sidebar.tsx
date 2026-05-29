@@ -4,10 +4,11 @@ import {
   ChevronLeft,
   ChevronRight,
   TrendingUp,
+  Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/useAuthStore";
-import { can } from "@/lib/permissions";
+import { can, isTelemarketer } from "@/lib/permissions";
 import { useState } from "react";
 import {
   adminItems,
@@ -245,17 +246,19 @@ export function Sidebar() {
             collapsed && "px-2",
           )}
         >
-          <div
-            className={cn(
-              "flex items-center gap-3 rounded-lg bg-sidebar-accent/70 p-2",
-              collapsed && "justify-center",
-            )}
-          >
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sidebar-primary text-xs font-bold text-sidebar-primary-foreground">
-              {initials}
-            </div>
-            {!collapsed && (
-              <div className="min-w-0">
+          {/* ADVISER can click their card to open their own profile/settings */}
+          {!isTelemarketer(currentUser) && can(currentUser, "ADVISER") && !collapsed ? (
+            <Link
+              to={`/team/${currentUser.id}`}
+              className={cn(
+                "flex items-center gap-3 rounded-lg bg-sidebar-accent/70 p-2 transition-colors hover:bg-sidebar-accent group",
+              )}
+              title="My Profile & Settings"
+            >
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sidebar-primary text-xs font-bold text-sidebar-primary-foreground">
+                {initials}
+              </div>
+              <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-sidebar-foreground">
                   {currentUser.name}
                 </p>
@@ -263,8 +266,30 @@ export function Sidebar() {
                   {currentUser.role}
                 </p>
               </div>
-            )}
-          </div>
+              <Settings className="h-3.5 w-3.5 shrink-0 text-sidebar-foreground/40 group-hover:text-sidebar-foreground/70 transition-colors" />
+            </Link>
+          ) : (
+            <div
+              className={cn(
+                "flex items-center gap-3 rounded-lg bg-sidebar-accent/70 p-2",
+                collapsed && "justify-center",
+              )}
+            >
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sidebar-primary text-xs font-bold text-sidebar-primary-foreground">
+                {initials}
+              </div>
+              {!collapsed && (
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-sidebar-foreground">
+                    {currentUser.name}
+                  </p>
+                  <p className="truncate text-xs text-sidebar-foreground/55">
+                    {currentUser.role}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </aside>

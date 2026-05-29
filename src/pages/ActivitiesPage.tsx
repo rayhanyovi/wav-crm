@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Activity } from "lucide-react";
 import { useCrmStore } from "@/store/useCrmStore";
+import { useAuthStore } from "@/store/useAuthStore";
+import { isTelemarketer, isAdviser, isMaster } from "@/lib/permissions";
 import {
   Table,
   TableBody,
@@ -29,13 +31,66 @@ const TYPES = ["CALL", "EMAIL", "MEETING", "TASK", "NOTE", "DEMO", "FOLLOW_UP"];
 
 export function ActivitiesPage() {
   const { activities, contacts, deals, leads, users } = useCrmStore();
+  const { currentUser } = useAuthStore();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState("ALL");
 
+  // Telemarketer: build the set of lead IDs they can see.
+  // Includes their own leads + leads of any adviser who has granted them access.
+  const tmLeadIds = useMemo(() => {
+    if (!currentUser || !isTelemarketer(currentUser)) return null;
+    const linkedAdviser = users.find(
+      (u) => u.role === "ADVISER" && u.telemarketer_access && u.telemarketer_id === currentUser.id
+    );
+    return new Set(
+      leads
+        .filter((l) => !l.deleted_at && (
+          l.telemarketer_owner_id === currentUser.id ||
+          l.assigned_to_id === currentUser.id ||
+          (linkedAdviser != null && l.assigned_to_id === linkedAdviser.id)
+        ))
+        .map((l) => l.id)
+    );
+  }, [leads, users, currentUser]);
+
+  // Adviser: build sets of their own lead IDs and deal IDs
+  const adviserLeadIds = useMemo(() => {
+    if (!currentUser || !isAdviser(currentUser) || isMaster(currentUser)) return null;
+    return new Set(
+      leads.filter((l) => !l.deleted_at && (
+        l.assigned_to_id === currentUser.id ||
+        l.adviser_owner_id === currentUser.id
+      )).map((l) => l.id)
+    );
+  }, [leads, currentUser]);
+
+  const adviserDealIds = useMemo(() => {
+    if (!currentUser || !isAdviser(currentUser) || isMaster(currentUser)) return null;
+    return new Set(
+      deals.filter((d) => !d.deleted_at && d.assigned_to_id === currentUser.id).map((d) => d.id)
+    );
+  }, [deals, currentUser]);
+
   const live = activities
     .filter((a) => !a.deleted_at)
     .filter((a) => {
+      if (!currentUser) return false;
+      // MASTER: sees everything
+      if (isMaster(currentUser)) { /* no filter */ }
+      // TELEMARKETER: only their own + their leads' activities
+      else if (tmLeadIds !== null) {
+        const isOwn = a.assigned_to_id === currentUser.id || a.created_by === currentUser.id;
+        const isTheirLead = a.lead_id ? tmLeadIds.has(a.lead_id) : false;
+        if (!isOwn && !isTheirLead) return false;
+      }
+      // ADVISER: only activities on their leads, deals, or directly assigned/created by them
+      else if (adviserLeadIds !== null) {
+        const isOwn = a.assigned_to_id === currentUser.id || a.created_by === currentUser.id;
+        const isTheirLead = a.lead_id ? adviserLeadIds.has(a.lead_id) : false;
+        const isTheirDeal = a.deal_id ? adviserDealIds!.has(a.deal_id) : false;
+        if (!isOwn && !isTheirLead && !isTheirDeal) return false;
+      }
       if (search && !a.subject.toLowerCase().includes(search.toLowerCase()))
         return false;
       if (filterType !== "ALL" && a.type !== filterType) return false;

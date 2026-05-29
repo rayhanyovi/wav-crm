@@ -6,13 +6,18 @@ export type LeadStatus = 'NA' | 'APPOINTMENT' | 'NOT_INTERESTED' | 'ABANDON' | '
 export type LeadSource = 'MAGNET' | 'SCOUT' | 'LENS' | 'BEACON' | 'REFERRAL' | 'MANUAL' | 'WALK_IN' | 'COLD_CALL';
 
 // WAV deal pipeline:
-//   CALLING  — telemarketer is cold-calling (telemarketer-only view)
+//   CALLING     — telemarketer is cold-calling (telemarketer-only view)
 //   APPOINTMENT — appointment set; adviser steps in from here
 //   PROPOSAL    — adviser has presented fund proposal(s)
-//   NEGOTIATION — client considering, active negotiation
-//   WON         — closed & invested
-//   LOST        — dropped / not interested
-export type DealStage = 'CALLING' | 'APPOINTMENT' | 'PROPOSAL' | 'NEGOTIATION' | 'WON' | 'LOST';
+//   SUBMITTED   — client agreed; application submitted to insurer
+//   WON         — insurer confirmed; policy active
+//   LOST        — dropped / not interested at any stage
+export type DealStage = 'CALLING' | 'APPOINTMENT' | 'PROPOSAL' | 'SUBMITTED' | 'WON' | 'LOST';
+
+// Fact-find fields collected by adviser after first meeting
+export type FinancialGoal = 'RETIREMENT' | 'EDUCATION' | 'WEALTH_GROWTH' | 'INCOME' | 'EMERGENCY_FUND' | 'OTHER';
+export type RiskTolerance = 'CONSERVATIVE' | 'MODERATE' | 'BALANCED' | 'GROWTH' | 'AGGRESSIVE';
+export type InvestmentHorizon = 'SHORT' | 'MEDIUM' | 'LONG'; // SHORT <3yr, MEDIUM 3-7yr, LONG 7yr+
 
 export type ActivityType = 'CALL' | 'EMAIL' | 'MEETING' | 'TASK' | 'NOTE' | 'FOLLOW_UP';
 export type ActivityResult = 'COMPLETED' | 'NO_ANSWER' | 'FOLLOW_UP_NEEDED' | 'MEETING_SCHEDULED' | 'CANCELLED' | 'FAILED';
@@ -124,6 +129,7 @@ export interface Lead {
   telemarketer_owner_id?: string;
   adviser_owner_id?: string;
   bounce_count?: number;
+  last_bounced_at?: string;    // set whenever NO_SHOW resets the lead; used to sort TM queue
   converted_contact_id?: string;
   converted_at?: string;
   created_by: string;
@@ -135,6 +141,14 @@ export interface Lead {
 export interface LeadNote {
   id: string;
   lead_id: string;
+  content: string;
+  created_by: string;
+  created_at: string;
+}
+
+export interface ContactNote {
+  id: string;
+  contact_id: string;
   content: string;
   created_by: string;
   created_at: string;
@@ -153,6 +167,19 @@ export interface Deal {
   expected_close_date?: string;
   lost_reason?: string;
   closed_at?: string;
+  // Adviser handoff: insurer submission details (filled when moving to SUBMITTED)
+  insurer?: string;
+  insurer_ref?: string;
+  submitted_at?: string;
+  policy_number?: string;   // filled when WON
+  // Fact-find — filled by adviser after first meeting
+  financial_goal?: FinancialGoal;
+  risk_tolerance?: RiskTolerance;
+  investment_horizon?: InvestmentHorizon;
+  monthly_investable?: number;      // SGD per month client can invest
+  existing_investments?: string;    // free text: what they already hold
+  fact_find_notes?: string;         // adviser's notes from fact-find session
+  fact_find_done?: boolean;         // whether fact-find is complete
   created_by: string;
   created_at: string;
   updated_at: string;

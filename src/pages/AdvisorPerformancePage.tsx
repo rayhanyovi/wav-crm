@@ -91,12 +91,12 @@ export function AdvisorPerformancePage() {
   ).map(([name, value]) => ({ name, value }));
 
   const dealsByStage = [
-    "LEAD",
-    "QUALIFIED",
+    "CALLING",
+    "APPOINTMENT",
     "PROPOSAL",
-    "NEGOTIATION",
-    "CLOSED_WON",
-    "CLOSED_LOST",
+    "SUBMITTED",
+    "WON",
+    "LOST",
   ]
     .map((stage) => ({
       stage,
@@ -265,8 +265,8 @@ export function AdvisorPerformancePage() {
         </Card>
       )}
 
-      {/* Telemarketer access panel — MASTER only, ADVISER profiles only (Task #9) */}
-      {isMaster(currentUser) && advisor.role === "ADVISER" && (
+      {/* Telemarketer access panel — MASTER can manage anyone; ADVISER can manage their own */}
+      {advisor.role === "ADVISER" && (isMaster(currentUser) || currentUser?.id === advisor.id) && (
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">

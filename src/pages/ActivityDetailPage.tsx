@@ -19,7 +19,7 @@ import {
 } from "@/components/common/StatusBadge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { formatCurrency, formatDateTime, formatRelative } from "@/lib/format";
-import { canEdit } from "@/lib/permissions";
+import { canEdit, isTelemarketer, isAdviser, isMaster } from "@/lib/permissions";
 
 export function ActivityDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -46,6 +46,45 @@ export function ActivityDetailPage() {
   const activity = activities.find((a) => a.id === id);
   if (!activity)
     return <div className="p-6 text-muted-foreground">Activity not found.</div>;
+
+  // Role-based access check for this activity
+  if (currentUser && !isMaster(currentUser)) {
+    const isOwn = activity.assigned_to_id === currentUser.id || activity.created_by === currentUser.id;
+
+    if (isTelemarketer(currentUser)) {
+      // TM: own or their leads' activities (including linked adviser's leads)
+      const linkedAdviser = users.find(
+        (u) => u.role === "ADVISER" && u.telemarketer_access && u.telemarketer_id === currentUser.id
+      );
+      const tmLeadIds = new Set(
+        leads
+          .filter((l) => !l.deleted_at && (
+            l.telemarketer_owner_id === currentUser.id ||
+            l.assigned_to_id === currentUser.id ||
+            (linkedAdviser != null && l.assigned_to_id === linkedAdviser.id)
+          ))
+          .map((l) => l.id)
+      );
+      const isTheirLead = activity.lead_id ? tmLeadIds.has(activity.lead_id) : false;
+      if (!isOwn && !isTheirLead)
+        return <div className="p-6 text-muted-foreground">You don't have access to this activity.</div>;
+    } else if (isAdviser(currentUser)) {
+      // Adviser: own or activities on their leads/deals
+      const adviserLeadIds = new Set(
+        leads.filter((l) => !l.deleted_at && (
+          l.assigned_to_id === currentUser.id ||
+          l.adviser_owner_id === currentUser.id
+        )).map((l) => l.id)
+      );
+      const adviserDealIds = new Set(
+        deals.filter((d) => !d.deleted_at && d.assigned_to_id === currentUser.id).map((d) => d.id)
+      );
+      const isTheirLead = activity.lead_id ? adviserLeadIds.has(activity.lead_id) : false;
+      const isTheirDeal = activity.deal_id ? adviserDealIds.has(activity.deal_id) : false;
+      if (!isOwn && !isTheirLead && !isTheirDeal)
+        return <div className="p-6 text-muted-foreground">You don't have access to this activity.</div>;
+    }
+  }
 
   const creator = users.find((u) => u.id === activity.created_by);
   const assignee = users.find((u) => u.id === activity.assigned_to_id);

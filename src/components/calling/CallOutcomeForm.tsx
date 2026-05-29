@@ -121,6 +121,16 @@ export function CallOutcomeForm({ lead }: CallOutcomeFormProps) {
       );
     }
 
+    // Auto-advance lead status when a meeting is scheduled (item #8)
+    if (result === "MEETING_SCHEDULED" && meetingDate) {
+      const dateParts = meetingDate.split("T");
+      updateLead(lead.id, {
+        status: "APPOINTMENT",
+        appointment_date: dateParts[0],
+        appointment_time: dateParts[1]?.slice(0, 5) || undefined,
+      }, currentUser.id);
+    }
+
     submitOutcome(pickup);
     nextLead();
     setResult("COMPLETED");

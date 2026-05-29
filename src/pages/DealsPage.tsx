@@ -28,14 +28,14 @@ import { can } from "@/lib/permissions";
 import type { Deal, DealStage } from "@/data/types";
 
 // Stages visible to each role
-const ALL_STAGES: DealStage[] = ["CALLING", "APPOINTMENT", "PROPOSAL", "NEGOTIATION", "WON", "LOST"];
-const ADVISER_STAGES: DealStage[] = ["APPOINTMENT", "PROPOSAL", "NEGOTIATION", "WON", "LOST"];
+const ALL_STAGES: DealStage[] = ["CALLING", "APPOINTMENT", "PROPOSAL", "SUBMITTED", "WON", "LOST"];
+const ADVISER_STAGES: DealStage[] = ["APPOINTMENT", "PROPOSAL", "SUBMITTED", "WON", "LOST"];
 
 const STAGE_LABELS: Record<DealStage, string> = {
   CALLING:     "Calling",
   APPOINTMENT: "Appointment",
   PROPOSAL:    "Proposal",
-  NEGOTIATION: "Negotiation",
+  SUBMITTED:   "Submitted",
   WON:         "Won",
   LOST:        "Lost",
 };
@@ -44,7 +44,7 @@ const STAGE_DESC: Record<DealStage, string> = {
   CALLING:     "Telemarketer is cold-calling",
   APPOINTMENT: "Appointment set — adviser steps in",
   PROPOSAL:    "Fund proposal(s) being presented",
-  NEGOTIATION: "Client is considering",
+  SUBMITTED:   "Application submitted to insurer",
   WON:         "Closed & invested",
   LOST:        "Did not proceed",
 };

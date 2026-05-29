@@ -13,7 +13,7 @@ const dealStageColors: Record<DealStage, string> = {
   CALLING:     "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
   APPOINTMENT: "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400",
   PROPOSAL:    "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400",
-  NEGOTIATION: "bg-orange-100 text-orange-700 dark:bg-orange-950/40 dark:text-orange-400",
+  SUBMITTED:   "bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:text-purple-400",
   WON:         "bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-400",
   LOST:        "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400",
 };
