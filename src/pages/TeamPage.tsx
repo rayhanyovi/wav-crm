@@ -21,8 +21,8 @@ export function TeamPage() {
           const pickups = calls.filter((a) => a.result !== "NO_ANSWER" && a.result !== "CANCELLED");
           const pickupRate = calls.length > 0 ? Math.round((pickups.length / calls.length) * 100) : 0;
           const dialerSeconds = calls.reduce((acc, a) => acc + ((a.metadata?.duration_seconds as number) || 0), 0);
-          const openDeals = deals.filter((d) => d.assigned_to_id === member.id && !d.deleted_at && d.stage !== "CLOSED_WON" && d.stage !== "CLOSED_LOST");
-          const wonDeals = deals.filter((d) => d.assigned_to_id === member.id && d.stage === "CLOSED_WON");
+          const openDeals = deals.filter((d) => d.assigned_to_id === member.id && !d.deleted_at && d.stage !== "WON" && d.stage !== "LOST");
+          const wonDeals = deals.filter((d) => d.assigned_to_id === member.id && d.stage === "WON");
 
           return (
             <Card key={member.id} className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => navigate(`/team/${member.id}`)}>

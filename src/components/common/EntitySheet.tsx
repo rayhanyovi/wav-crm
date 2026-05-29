@@ -182,8 +182,8 @@ function EntitySheetBody({ target }: { target: EntitySheetTarget }) {
           <DetailGrid items={[
             ["Activities", userActivities.length],
             ["Assigned Deals", userDeals.length],
-            ["Open Deals", userDeals.filter((deal) => deal.stage !== "CLOSED_WON" && deal.stage !== "CLOSED_LOST").length],
-            ["Won Deals", userDeals.filter((deal) => deal.stage === "CLOSED_WON").length],
+            ["Open Deals", userDeals.filter((deal) => deal.stage !== "WON" && deal.stage !== "LOST").length],
+            ["Won Deals", userDeals.filter((deal) => deal.stage === "WON").length],
           ]} />
         </InfoCard>
       </>

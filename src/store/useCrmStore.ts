@@ -330,8 +330,8 @@ export const useCrmStore = create<CrmState>()(
         const updates: Partial<Deal> = {
           stage: toStage,
           updated_at: now(),
-          ...(toStage === "CLOSED_LOST" ? { lost_reason: lostReason, closed_at: now() } : {}),
-          ...(toStage === "CLOSED_WON" ? { closed_at: now() } : {}),
+          ...(toStage === "LOST" ? { lost_reason: lostReason, closed_at: now() } : {}),
+          ...(toStage === "WON" ? { closed_at: now() } : {}),
         };
         set((s) => ({
           deals: s.deals.map((d) => d.id === dealId ? { ...d, ...updates } : d),
@@ -342,7 +342,7 @@ export const useCrmStore = create<CrmState>()(
         }));
         get().addAuditLog(userId, "STAGE_CHANGE", "deal", dealId, { from: fromStage, to: toStage });
         if (deal.assigned_to_id) {
-          const msg = toStage === "CLOSED_WON" ? `Deal "${deal.title}" is now CLOSED WON!` : `Deal "${deal.title}" moved to ${toStage}`;
+          const msg = toStage === "WON" ? `Deal "${deal.title}" is now WON! 🎉` : `Deal "${deal.title}" moved to ${toStage}`;
           get().addNotification(deal.assigned_to_id, "DEAL_STAGE_CHANGE", "Deal stage updated", msg, "deal", dealId);
         }
       },

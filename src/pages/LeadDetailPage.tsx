@@ -44,8 +44,8 @@ const SOURCES: LeadSource[] = [
   "WALK_IN",
 ];
 const DEAL_STAGES: DealStage[] = [
-  "LEAD",
-  "QUALIFIED",
+  "CALLING",
+  "APPOINTMENT",
   "PROPOSAL",
   "NEGOTIATION",
 ];
@@ -79,7 +79,7 @@ export function LeadDetailPage() {
     createDeal: false,
     dealTitle: "",
     dealValue: "",
-    dealStage: "LEAD" as DealStage,
+    dealStage: "CALLING" as DealStage,
   });
   const [noteText, setNoteText] = useState("");
   const [outcomeOpen, setOutcomeOpen] = useState(false);

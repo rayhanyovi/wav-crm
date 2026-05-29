@@ -33,7 +33,7 @@ export function getStaleDeals(deals: import("@/data/types").Deal[], thresholdDay
   const cutoff = Date.now() - thresholdDays * 24 * 60 * 60 * 1000;
   return deals.filter((d) => {
     if (d.deleted_at) return false;
-    if (d.stage === "CLOSED_WON" || d.stage === "CLOSED_LOST") return false;
+    if (d.stage === "WON" || d.stage === "LOST") return false;
     return new Date(d.updated_at).getTime() < cutoff;
   });
 }
@@ -105,6 +105,6 @@ export function getCampaignDealConversions(
     (deal) =>
       convertedDealIds.has(deal.id) &&
       !deal.deleted_at &&
-      deal.stage !== "CLOSED_LOST"
+      deal.stage !== "LOST"
   );
 }
