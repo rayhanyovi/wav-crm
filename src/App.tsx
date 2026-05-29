@@ -7,8 +7,6 @@ import { LeadsPage } from "@/pages/LeadsPage";
 import { LeadDetailPage } from "@/pages/LeadDetailPage";
 import { ContactsPage } from "@/pages/ContactsPage";
 import { ContactDetailPage } from "@/pages/ContactDetailPage";
-import { CompaniesPage } from "@/pages/CompaniesPage";
-import { CompanyDetailPage } from "@/pages/CompanyDetailPage";
 import { ActivitiesPage } from "@/pages/ActivitiesPage";
 import { ActivityDetailPage } from "@/pages/ActivityDetailPage";
 import { CalendarPage } from "@/pages/CalendarPage";
@@ -61,8 +59,6 @@ export default function App() {
         <Route path="leads/:id" element={<LeadDetailPage />} />
         <Route path="contacts" element={<ContactsPage />} />
         <Route path="contacts/:id" element={<ContactDetailPage />} />
-        <Route path="companies" element={<CompaniesPage />} />
-        <Route path="companies/:id" element={<CompanyDetailPage />} />
         <Route path="activities" element={<ActivitiesPage />} />
         <Route path="activities/:id" element={<ActivityDetailPage />} />
         <Route path="calendar" element={<CalendarPage />} />

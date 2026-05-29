@@ -17,7 +17,6 @@ import { formatCurrency, formatDate, formatDateTime } from "@/lib/format";
 export type EntitySheetTarget =
   | { type: "lead"; id: string }
   | { type: "contact"; id: string }
-  | { type: "company"; id: string }
   | { type: "deal"; id: string }
   | { type: "user"; id: string }
   | { type: "activity"; id: string };
@@ -28,9 +27,9 @@ interface EntitySheetProps {
 }
 
 export function EntitySheet({ target, onClose }: EntitySheetProps) {
-  const { leads, contacts, companies, deals, users, activities } = useCrmStore();
+  const { leads, contacts, deals, users, activities } = useCrmStore();
 
-  const title = getTitle(target, { leads, contacts, companies, deals, users, activities });
+  const title = getTitle(target, { leads, contacts, deals, users, activities });
   const href = target ? getHref(target) : "";
 
   return (
@@ -61,12 +60,11 @@ export function EntitySheet({ target, onClose }: EntitySheetProps) {
 }
 
 function EntitySheetBody({ target }: { target: EntitySheetTarget }) {
-  const { leads, contacts, companies, deals, users, activities } = useCrmStore();
+  const { leads, contacts, deals, users, activities } = useCrmStore();
 
   if (target.type === "lead") {
     const lead = leads.find((item) => item.id === target.id);
     if (!lead) return <MissingEntity />;
-    const company = companies.find((item) => item.id === lead.company_id);
     const assignee = users.find((item) => item.id === lead.assigned_to_id);
     const leadActivities = activities.filter((activity) => activity.lead_id === lead.id && !activity.deleted_at).slice(0, 4);
     return (
@@ -76,7 +74,6 @@ function EntitySheetBody({ target }: { target: EntitySheetTarget }) {
           <DetailGrid items={[
             ["Email", lead.email || "N/A"],
             ["Phone", lead.phone || "N/A"],
-            ["Company", company ? <InlineEntityLink to={`/companies/${company.id}`}>{company.name}</InlineEntityLink> : "N/A"],
             ["Assignee", assignee ? <InlineEntityLink to={`/team/${assignee.id}`}>{assignee.name}</InlineEntityLink> : "N/A"],
             ["Created", formatDate(lead.created_at)],
             ["Updated", formatDate(lead.updated_at)],
@@ -91,7 +88,6 @@ function EntitySheetBody({ target }: { target: EntitySheetTarget }) {
   if (target.type === "contact") {
     const contact = contacts.find((item) => item.id === target.id);
     if (!contact) return <MissingEntity />;
-    const company = companies.find((item) => item.id === contact.company_id);
     const contactDeals = deals.filter((deal) => deal.contact_id === contact.id && !deal.deleted_at);
     return (
       <>
@@ -100,7 +96,6 @@ function EntitySheetBody({ target }: { target: EntitySheetTarget }) {
             ["Email", contact.email || "N/A"],
             ["Phone", contact.phone || "N/A"],
             ["Title", contact.title || "N/A"],
-            ["Company", company ? <InlineEntityLink to={`/companies/${company.id}`}>{company.name}</InlineEntityLink> : "N/A"],
             ["Created", formatDate(contact.created_at)],
             ["Updated", formatDate(contact.updated_at)],
           ]} />
@@ -110,34 +105,10 @@ function EntitySheetBody({ target }: { target: EntitySheetTarget }) {
     );
   }
 
-  if (target.type === "company") {
-    const company = companies.find((item) => item.id === target.id);
-    if (!company) return <MissingEntity />;
-    const companyContacts = contacts.filter((contact) => contact.company_id === company.id && !contact.deleted_at);
-    const companyDeals = deals.filter((deal) => deal.company_id === company.id && !deal.deleted_at);
-    return (
-      <>
-        <InfoCard title="Company Details">
-          <DetailGrid items={[
-            ["Industry", company.industry || "N/A"],
-            ["Website", company.website || "N/A"],
-            ["Phone", company.phone || "N/A"],
-            ["Email", company.email || "N/A"],
-            ["Created", formatDate(company.created_at)],
-            ["Contacts", companyContacts.length],
-          ]} />
-          {company.notes && <p className="text-xs">{company.notes}</p>}
-        </InfoCard>
-        <DealList deals={companyDeals} title="Deals" />
-      </>
-    );
-  }
-
   if (target.type === "deal") {
     const deal = deals.find((item) => item.id === target.id);
     if (!deal) return <MissingEntity />;
     const contact = contacts.find((item) => item.id === deal.contact_id);
-    const company = companies.find((item) => item.id === deal.company_id);
     const assignee = users.find((item) => item.id === deal.assigned_to_id);
     const dealActivities = activities.filter((activity) => activity.deal_id === deal.id && !activity.deleted_at).slice(0, 4);
     return (
@@ -149,7 +120,6 @@ function EntitySheetBody({ target }: { target: EntitySheetTarget }) {
           </div>
           <DetailGrid items={[
             ["Contact", contact ? <InlineEntityLink to={`/contacts/${contact.id}`}>{contact.first_name} {contact.last_name}</InlineEntityLink> : "N/A"],
-            ["Company", company ? <InlineEntityLink to={`/companies/${company.id}`}>{company.name}</InlineEntityLink> : "N/A"],
             ["Assignee", assignee ? <InlineEntityLink to={`/team/${assignee.id}`}>{assignee.name}</InlineEntityLink> : "N/A"],
             ["Expected Close", formatDate(deal.expected_close_date)],
             ["Created", formatDate(deal.created_at)],
@@ -282,7 +252,6 @@ function MissingEntity() {
 function getHref(target: EntitySheetTarget): string {
   if (target.type === "lead") return `/leads/${target.id}`;
   if (target.type === "contact") return `/contacts/${target.id}`;
-  if (target.type === "company") return `/companies/${target.id}`;
   if (target.type === "deal") return `/deals/${target.id}`;
   if (target.type === "activity") return `/activities/${target.id}`;
   return `/team/${target.id}`;
@@ -291,7 +260,6 @@ function getHref(target: EntitySheetTarget): string {
 function getTitle(target: EntitySheetTarget | null, store: {
   leads: ReturnType<typeof useCrmStore.getState>["leads"];
   contacts: ReturnType<typeof useCrmStore.getState>["contacts"];
-  companies: ReturnType<typeof useCrmStore.getState>["companies"];
   deals: ReturnType<typeof useCrmStore.getState>["deals"];
   users: ReturnType<typeof useCrmStore.getState>["users"];
   activities: ReturnType<typeof useCrmStore.getState>["activities"];
@@ -305,7 +273,6 @@ function getTitle(target: EntitySheetTarget | null, store: {
     const contact = store.contacts.find((item) => item.id === target.id);
     return contact ? `${contact.first_name} ${contact.last_name}` : "Contact";
   }
-  if (target.type === "company") return store.companies.find((item) => item.id === target.id)?.name || "Company";
   if (target.type === "deal") return store.deals.find((item) => item.id === target.id)?.title || "Deal";
   if (target.type === "user") return store.users.find((item) => item.id === target.id)?.name || "User";
   return store.activities.find((item) => item.id === target.id)?.subject || "Activity";

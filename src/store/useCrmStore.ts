@@ -3,7 +3,7 @@ import { persist } from "zustand/middleware";
 import { nanoid } from "nanoid";
 import seedData from "@/data/seed.json";
 import type {
-  User, Company, Contact, Lead, LeadNote, ContactNote, Deal, DealProposal, StageHistoryEntry,
+  User, Contact, Lead, LeadNote, ContactNote, Deal, DealProposal, StageHistoryEntry,
   Activity, Comment, Product, Bundle, Campaign, Notification,
   AuditLog, DealStage, AuditAction, CallSession, LeadStatus, CreditTransaction
 } from "@/data/types";
@@ -30,7 +30,6 @@ function calculateBundleRisk(products: Product[], productIds: string[], allocati
 
 interface CrmState {
   users: User[];
-  companies: Company[];
   contacts: Contact[];
   leads: Lead[];
   lead_notes: LeadNote[];
@@ -53,12 +52,6 @@ interface CrmState {
   // ─── Audit ─────────────────────────────────────────────────────────────
   addAuditLog: (userId: string, action: AuditAction, entityType: string, entityId: string, metadata?: Record<string, unknown>) => void;
   addNotification: (recipientId: string, type: string, title: string, message: string, entityType: string, entityId: string) => void;
-
-  // ─── Companies ─────────────────────────────────────────────────────────
-  createCompany: (data: Omit<Company, "id" | "created_at" | "updated_at">, userId: string) => Company;
-  updateCompany: (id: string, data: Partial<Company>, userId: string) => void;
-  deleteCompany: (id: string, userId: string) => void;
-
   // ─── Contacts ──────────────────────────────────────────────────────────
   createContact: (data: Omit<Contact, "id" | "created_at" | "updated_at">, userId: string) => Contact;
   updateContact: (id: string, data: Partial<Contact>, userId: string) => void;
@@ -135,7 +128,6 @@ export const useCrmStore = create<CrmState>()(
   persist(
     (set, get) => ({
       users: seedData.users as User[],
-      companies: seedData.companies as Company[],
       contacts: seedData.contacts as Contact[],
       leads: seedData.leads as Lead[],
       lead_notes: [],
@@ -156,7 +148,6 @@ export const useCrmStore = create<CrmState>()(
       resetToSeed: () =>
         set({
           users: seedData.users as User[],
-          companies: seedData.companies as Company[],
           contacts: seedData.contacts as Contact[],
           leads: seedData.leads as Lead[],
           lead_notes: [],
@@ -208,22 +199,6 @@ export const useCrmStore = create<CrmState>()(
             ...s.notifications,
           ],
         })),
-
-      // Companies
-      createCompany: (data, userId) => {
-        const company: Company = { ...data, id: `co-${nanoid(6)}`, created_at: now(), updated_at: now() };
-        set((s) => ({ companies: [...s.companies, company] }));
-        get().addAuditLog(userId, "CREATE", "company", company.id, { name: company.name });
-        return company;
-      },
-      updateCompany: (id, data, userId) => {
-        set((s) => ({ companies: s.companies.map((c) => c.id === id ? { ...c, ...data, updated_at: now() } : c) }));
-        get().addAuditLog(userId, "UPDATE", "company", id);
-      },
-      deleteCompany: (id, userId) => {
-        set((s) => ({ companies: s.companies.map((c) => c.id === id ? { ...c, deleted_at: now() } : c) }));
-        get().addAuditLog(userId, "DELETE", "company", id);
-      },
 
       // Contacts
       createContact: (data, userId) => {
@@ -657,7 +632,6 @@ export const useCrmStore = create<CrmState>()(
       name: "crm-prototype-v1",
       partialize: (state) => ({
         users: state.users,
-        companies: state.companies,
         contacts: state.contacts,
         leads: state.leads,
         lead_notes: state.lead_notes,

@@ -49,21 +49,6 @@ export interface User {
   created_at: string;
 }
 
-export interface Company {
-  id: string;
-  name: string;
-  industry: string;
-  website?: string;
-  phone?: string;
-  email?: string;
-  address?: string;
-  notes?: string;
-  created_by: string;
-  created_at: string;
-  updated_at: string;
-  deleted_at?: string;
-}
-
 export interface Contact {
   id: string;
   first_name: string;
@@ -71,7 +56,6 @@ export interface Contact {
   email?: string;
   phone?: string;
   title?: string;
-  company_id?: string;
   source?: LeadSource;
   created_by: string;
   created_at: string;
@@ -124,7 +108,6 @@ export interface Lead {
   // Products discussed (Task #12)
   products_discussed?: string[];  // array of product IDs from atlas
   // Ownership
-  company_id?: string;
   assigned_to_id?: string;
   telemarketer_owner_id?: string;
   adviser_owner_id?: string;
@@ -161,7 +144,6 @@ export interface Deal {
   stage: DealStage;
   lead_id?: string;        // source lead
   contact_id: string;      // converted contact (may be same as lead initially)
-  company_id?: string;
   telemarketer_id?: string; // who cold-called this lead
   assigned_to_id?: string;  // adviser handling the deal
   expected_close_date?: string;

@@ -20,7 +20,6 @@ export function CallingPanel() {
     return () => clearInterval(interval);
   }, [phase, tickCallDuration]);
 
-  const { companies } = useCrmStore();
 
   if (!active) return null;
 
@@ -72,7 +71,7 @@ export function CallingPanel() {
           ) : phase === "outcome" ? (
             <CallOutcomeForm lead={currentLead} />
           ) : (
-            <CallSheet lead={currentLead} companies={companies} />
+            <CallSheet lead={currentLead} />
           )}
         </div>
       </SheetContent>

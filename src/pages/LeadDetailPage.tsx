@@ -55,7 +55,6 @@ export function LeadDetailPage() {
   const navigate = useNavigate();
   const {
     leads,
-    companies,
     users,
     activities,
     contacts,
@@ -95,7 +94,6 @@ export function LeadDetailPage() {
   if (!lead)
     return <div className="p-6 text-muted-foreground">Lead not found.</div>;
 
-  const company = companies.find((c) => c.id === lead.company_id);
   const assignee = users.find((u) => u.id === lead.assigned_to_id);
   const convertedContact = contacts.find(
     (c) => c.id === lead.converted_contact_id,
@@ -121,7 +119,6 @@ export function LeadDetailPage() {
         last_name: lead.last_name,
         email: lead.email,
         phone: lead.phone,
-        company_id: lead.company_id,
         source: lead.source,
         created_by: currentUser.id,
       },
@@ -130,8 +127,7 @@ export function LeadDetailPage() {
             title: convForm.dealTitle,
             value: parseFloat(convForm.dealValue) || 0,
             stage: convForm.dealStage,
-            company_id: lead.company_id,
-            assigned_to_id: currentUser.id,
+                assigned_to_id: currentUser.id,
             created_by: currentUser.id,
             contact_id: "",
           }
@@ -386,19 +382,6 @@ export function LeadDetailPage() {
                 <InfoRow
                   label="Source"
                   value={lead.source?.replace("_", " ")}
-                />
-                <InfoRow
-                  label="Company"
-                  value={
-                    company ? (
-                      <Link
-                        to={`/companies/${company.id}`}
-                        className="text-primary hover:underline"
-                      >
-                        {company.name}
-                      </Link>
-                    ) : undefined
-                  }
                 />
                 <InfoRow
                   label="Assigned To"

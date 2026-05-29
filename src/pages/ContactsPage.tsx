@@ -40,7 +40,7 @@ import { canEdit } from "@/lib/permissions";
 import { Link, useNavigate } from "react-router-dom";
 
 export function ContactsPage() {
-  const { contacts, companies, deals, createContact } = useCrmStore();
+  const { contacts, deals, createContact } = useCrmStore();
   const { currentUser } = useAuthStore();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
@@ -54,7 +54,6 @@ export function ContactsPage() {
     email: "",
     phone: "",
     title: "",
-    company_id: "",
   });
 
   const liveContacts = contacts.filter((c) => !c.deleted_at);
@@ -72,7 +71,6 @@ export function ContactsPage() {
     createContact(
       {
         ...form,
-        company_id: form.company_id || undefined,
         created_by: currentUser.id,
       },
       currentUser.id,
@@ -84,14 +82,10 @@ export function ContactsPage() {
       email: "",
       phone: "",
       title: "",
-      company_id: "",
-    });
+      });
   };
 
   const selectedContact = contacts.find((c) => c.id === selectedContactId);
-  const selectedCompany = selectedContact
-    ? companies.find((co) => co.id === selectedContact.company_id)
-    : undefined;
   const selectedDeals = selectedContact
     ? deals.filter((d) => d.contact_id === selectedContact.id && !d.deleted_at)
     : [];
@@ -134,13 +128,11 @@ export function ContactsPage() {
                 <TableHead>Email</TableHead>
                 <TableHead>Phone</TableHead>
                 <TableHead>Title</TableHead>
-                <TableHead>Company</TableHead>
                 <TableHead>Deals</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filtered.map((c) => {
-                const company = companies.find((co) => co.id === c.company_id);
                 const dealCount = deals.filter(
                   (d) => d.contact_id === c.id && !d.deleted_at,
                 ).length;
@@ -161,19 +153,6 @@ export function ContactsPage() {
                     </TableCell>
                     <TableCell className="text-xs">
                       {c.title || "..."}
-                    </TableCell>
-                    <TableCell className="text-xs">
-                      {company ? (
-                        <Link
-                          to={`/companies/${company.id}`}
-                          onClick={(event) => event.stopPropagation()}
-                          className="font-medium text-primary hover:underline"
-                        >
-                          {company.name}
-                        </Link>
-                      ) : (
-                        "..."
-                      )}
                     </TableCell>
                     <TableCell className="text-xs">{dealCount}</TableCell>
                   </TableRow>
@@ -237,28 +216,6 @@ export function ContactsPage() {
                 </div>
               </div>
 
-              <div className="rounded-lg border p-3 text-sm space-y-2">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  Company
-                </p>
-                {selectedCompany ? (
-                  <div>
-                    <Link
-                      to={`/companies/${selectedCompany.id}`}
-                      className="font-medium text-primary hover:underline"
-                    >
-                      {selectedCompany.name}
-                    </Link>
-                    <p className="text-xs text-muted-foreground">
-                      {selectedCompany.industry}
-                    </p>
-                  </div>
-                ) : (
-                  <p className="text-xs text-muted-foreground">
-                    No company linked.
-                  </p>
-                )}
-              </div>
 
               <div className="rounded-lg border p-3 text-sm space-y-2">
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
@@ -342,26 +299,6 @@ export function ContactsPage() {
                 value={form.title}
                 onChange={(e) => setForm({ ...form, title: e.target.value })}
               />
-            </div>
-            <div className="space-y-1">
-              <Label>Company</Label>
-              <Select
-                value={form.company_id}
-                onValueChange={(v) => setForm({ ...form, company_id: v })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {companies
-                    .filter((c) => !c.deleted_at)
-                    .map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.name}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
             </div>
           </div>
           <DialogFooter>

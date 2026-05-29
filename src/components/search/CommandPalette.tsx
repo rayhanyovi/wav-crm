@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Search, Building2, UserCheck, Users, TrendingUp, Megaphone } from "lucide-react";
+import { Search, UserCheck, Users, TrendingUp, Megaphone } from "lucide-react";
 import { useCrmStore } from "@/store/useCrmStore";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -22,7 +22,7 @@ interface SearchResult {
 
 export function CommandPalette({ open, onClose }: CommandPaletteProps) {
   const [query, setQuery] = useState("");
-  const { companies, contacts, leads, deals, campaigns } = useCrmStore();
+  const { contacts, leads, deals, campaigns } = useCrmStore();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -33,9 +33,6 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
   const results: SearchResult[] = [];
 
   if (q.length >= 1) {
-    companies.filter((c) => !c.deleted_at && c.name.toLowerCase().includes(q)).slice(0, 3).forEach((c) => {
-      results.push({ id: c.id, label: c.name, sub: c.industry, type: "Company", href: `/companies/${c.id}`, icon: Building2 });
-    });
     contacts.filter((c) => !c.deleted_at && `${c.first_name} ${c.last_name}`.toLowerCase().includes(q)).slice(0, 3).forEach((c) => {
       results.push({ id: c.id, label: `${c.first_name} ${c.last_name}`, sub: c.title || "Contact", type: "Contact", href: `/contacts/${c.id}`, icon: UserCheck });
     });

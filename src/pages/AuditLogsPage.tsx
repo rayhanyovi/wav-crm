@@ -20,7 +20,7 @@ const ACTION_COLORS: Record<string, string> = {
   COMPLETE: "bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300",
 };
 
-const ENTITY_TYPES = ["company", "contact", "lead", "deal", "activity", "campaign", "product", "bundle", "user"];
+const ENTITY_TYPES = ["contact", "lead", "deal", "activity", "campaign", "product", "bundle", "user"];
 const ACTIONS = ["CREATE", "UPDATE", "DELETE", "CONVERT", "STAGE_CHANGE", "LOGIN", "LOGOUT", "COMPLETE"];
 
 function formatValue(value: unknown): string {
@@ -63,7 +63,6 @@ function getEntityHref(entityType: string, entityId: string): string | null {
   const routes: Record<string, string> = {
     lead: "leads",
     contact: "contacts",
-    company: "companies",
     deal: "deals",
     activity: "activities",
     campaign: "campaigns",

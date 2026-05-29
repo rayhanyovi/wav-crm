@@ -42,7 +42,7 @@ export function ContactDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const {
-    contacts, companies, deals, activities, users,
+    contacts, deals, activities, users,
     contact_notes, addContactNote, deleteContactNote,
     updateContact,
   } = useCrmStore();
@@ -55,7 +55,6 @@ export function ContactDetailPage() {
   if (!contact)
     return <div className="p-6 text-muted-foreground">Contact not found.</div>;
 
-  const company = companies.find((c) => c.id === contact.company_id);
   const contactDeals = deals.filter((d) => d.contact_id === id && !d.deleted_at);
   const contactActivities = getContactActivities(id!, activities);
   const thisNotes = contact_notes
@@ -98,14 +97,6 @@ export function ContactDetailPage() {
           </h1>
           <p className="text-muted-foreground text-sm">
             {contact.title || "Client"}
-            {company && (
-              <>
-                {" · "}
-                <Link to={`/companies/${company.id}`} className="text-primary hover:underline">
-                  {company.name}
-                </Link>
-              </>
-            )}
           </p>
         </div>
         {canEdit(currentUser) &&
@@ -195,12 +186,6 @@ export function ContactDetailPage() {
                 <p><span className="text-muted-foreground">Phone:</span> {contact.phone || "—"}</p>
                 <p><span className="text-muted-foreground">Title:</span> {contact.title || "—"}</p>
                 <p><span className="text-muted-foreground">Source:</span> {contact.source?.replace("_", " ") || "—"}</p>
-                {company && (
-                  <p>
-                    <span className="text-muted-foreground">Company:</span>{" "}
-                    <Link to={`/companies/${company.id}`} className="text-primary hover:underline">{company.name}</Link>
-                  </p>
-                )}
                 <p><span className="text-muted-foreground">Client since:</span> {formatDate(contact.created_at)}</p>
               </>
             )}

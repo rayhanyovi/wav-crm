@@ -1,6 +1,5 @@
 import {
   BriefcaseBusiness,
-  Building2,
   ClipboardList,
   FileText,
   History,
@@ -18,7 +17,7 @@ import { useCallSessionStore } from "@/store/useCallSessionStore";
 import { useCrmStore } from "@/store/useCrmStore";
 import { LeadStatusBadge } from "@/components/common/StatusBadge";
 import { formatCurrency, formatDate } from "@/lib/format";
-import type { Lead, Company, FinancialGoal, RiskTolerance, InvestmentHorizon } from "@/data/types";
+import type { Lead, FinancialGoal, RiskTolerance, InvestmentHorizon } from "@/data/types";
 import { getLeadActivities } from "@/lib/selectors";
 import { getCampaignOfferItems } from "@/lib/campaignOfferings";
 import { Link } from "react-router-dom";
@@ -38,10 +37,9 @@ const HORIZON_LABELS: Record<InvestmentHorizon, string> = {
 
 interface CallSheetProps {
   lead: Lead | undefined;
-  companies: Company[];
 }
 
-export function CallSheet({ lead, companies }: CallSheetProps) {
+export function CallSheet({ lead }: CallSheetProps) {
   const { campaign, startCall, endCall, liveNotes, setLiveNotes, phase } =
     useCallSessionStore();
   const { activities, products, bundles, contacts, deals, updateDeal } = useCrmStore();
@@ -59,7 +57,6 @@ export function CallSheet({ lead, companies }: CallSheetProps) {
   if (!lead)
     return <div className="p-6 text-muted-foreground">No lead selected.</div>;
 
-  const company = companies.find((c) => c.id === lead.company_id);
   const leadActivities = getLeadActivities(lead.id, activities).slice(0, 3);
   const offerItems = campaign
     ? getCampaignOfferItems(campaign, products, bundles)
@@ -139,20 +136,6 @@ export function CallSheet({ lead, companies }: CallSheetProps) {
           <User className="h-3.5 w-3.5 shrink-0" />
           <span>{lead.email || "..."}</span>
         </div>
-        {company && (
-          <div className="flex items-center gap-2 text-muted-foreground col-span-2">
-            <Building2 className="h-3.5 w-3.5 shrink-0" />
-            <span>
-              <Link
-                to={`/companies/${company.id}`}
-                className="text-primary hover:underline"
-              >
-                {company.name}
-              </Link>{" "}
-              - {company.industry}
-            </span>
-          </div>
-        )}
       </div>
 
       <Tabs defaultValue="toolkit" className="space-y-3">
@@ -166,7 +149,7 @@ export function CallSheet({ lead, companies }: CallSheetProps) {
             Fact Find
           </TabsTrigger>
           <TabsTrigger value="details" className="gap-1 px-1.5 text-[11px]">
-            <Building2 className="h-3.5 w-3.5" />
+            <User className="h-3.5 w-3.5" />
             Details
           </TabsTrigger>
           <TabsTrigger value="history" className="gap-1 px-1.5 text-[11px]">
@@ -341,46 +324,6 @@ export function CallSheet({ lead, companies }: CallSheetProps) {
             )}
           </div>
 
-          <div className="rounded-lg border p-3 space-y-2">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-              Company Account
-            </p>
-            {company ? (
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <Link
-                  to={`/companies/${company.id}`}
-                  className="col-span-2 font-medium text-sm text-primary hover:underline"
-                >
-                  {company.name}
-                </Link>
-                <div>
-                  <span className="text-muted-foreground">Industry:</span>{" "}
-                  {company.industry}
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Phone:</span>{" "}
-                  {company.phone || "N/A"}
-                </div>
-                <div className="col-span-2">
-                  <span className="text-muted-foreground">Email:</span>{" "}
-                  {company.email || "N/A"}
-                </div>
-                <div className="col-span-2">
-                  <span className="text-muted-foreground">Website:</span>{" "}
-                  {company.website || "N/A"}
-                </div>
-                {company.notes && (
-                  <div className="col-span-2 text-foreground">
-                    {company.notes}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                No company is linked to this lead.
-              </p>
-            )}
-          </div>
         </TabsContent>
 
         <TabsContent value="history" className="mt-0 space-y-3 text-sm">

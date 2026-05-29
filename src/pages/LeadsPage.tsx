@@ -62,7 +62,7 @@ const SOURCES: LeadSource[] = [
 ];
 
 export function LeadsPage() {
-  const { leads, companies, users, activities, createLead } = useCrmStore();
+  const { leads, users, activities, createLead } = useCrmStore();
   const { currentUser } = useAuthStore();
   const navigate = useNavigate();
 
@@ -161,9 +161,6 @@ export function LeadsPage() {
   };
 
   const selectedLead = leads.find((l) => l.id === selectedLeadId);
-  const selectedCompany = selectedLead
-    ? companies.find((c) => c.id === selectedLead.company_id)
-    : undefined;
   const selectedAssignee = selectedLead
     ? users.find((u) => u.id === selectedLead.assigned_to_id)
     : undefined;
@@ -281,14 +278,12 @@ export function LeadsPage() {
                 <TableHead>Phone</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Source</TableHead>
-                <TableHead>Company</TableHead>
                 <TableHead>Assigned To</TableHead>
                 <TableHead>Last Contacted</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filtered.map((lead) => {
-                const company = companies.find((c) => c.id === lead.company_id);
                 const assignee = users.find(
                   (u) => u.id === lead.assigned_to_id,
                 );
@@ -313,19 +308,6 @@ export function LeadsPage() {
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {lead.source.replace("_", " ")}
-                    </TableCell>
-                    <TableCell className="text-xs">
-                      {company ? (
-                        <Link
-                          to={`/companies/${company.id}`}
-                          onClick={(event) => event.stopPropagation()}
-                          className="font-medium text-primary hover:underline"
-                        >
-                          {company.name}
-                        </Link>
-                      ) : (
-                        "..."
-                      )}
                     </TableCell>
                     <TableCell className="text-xs">
                       {assignee ? (
@@ -399,19 +381,6 @@ export function LeadsPage() {
                   <div>
                     <span className="text-muted-foreground">Phone:</span>{" "}
                     {selectedLead.phone || "N/A"}
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Company:</span>{" "}
-                    {selectedCompany ? (
-                      <Link
-                        to={`/companies/${selectedCompany.id}`}
-                        className="font-medium text-primary hover:underline"
-                      >
-                        {selectedCompany.name}
-                      </Link>
-                    ) : (
-                      "N/A"
-                    )}
                   </div>
                   <div>
                     <span className="text-muted-foreground">Assignee:</span>{" "}
