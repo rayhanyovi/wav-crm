@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { ArrowLeft, Phone, Calendar, TrendingUp, MessageSquare, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Phone, Calendar, TrendingUp, MessageSquare, Plus, Trash2, ClipboardList } from "lucide-react";
 import { useCrmStore } from "@/store/useCrmStore";
 import { useAuthStore } from "@/store/useAuthStore";
 import { Button } from "@/components/ui/button";
@@ -9,13 +9,16 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import {
   DealStageBadge,
   ActivityTypeBadge,
   ActivityResultBadge,
 } from "@/components/common/StatusBadge";
 import { formatDate, formatCurrency, formatDateTime } from "@/lib/format";
 import { getContactActivities } from "@/lib/selectors";
-import { canEdit } from "@/lib/permissions";
+import { canEdit, isAdviser, isMaster } from "@/lib/permissions";
 import type { RiskTolerance, FinancialGoal, InvestmentHorizon } from "@/data/types";
 
 const GOAL_LABELS: Record<FinancialGoal, string> = {
@@ -44,12 +47,24 @@ export function ContactDetailPage() {
   const {
     contacts, deals, activities, users,
     contact_notes, addContactNote, deleteContactNote,
-    updateContact,
+    updateContact, updateDeal, createDeal,
   } = useCrmStore();
   const { currentUser } = useAuthStore();
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<Record<string, string>>({});
   const [noteText, setNoteText] = useState("");
+
+  // ── Fact Find state ──────────────────────────────────────────────────────────
+  const [editingFF, setEditingFF] = useState(false);
+  const [investPeriod, setInvestPeriod] = useState<"monthly" | "annually">("monthly");
+  const [ffForm, setFfForm] = useState({
+    financial_goal: "" as FinancialGoal | "",
+    risk_tolerance: "" as RiskTolerance | "",
+    investment_horizon: "" as InvestmentHorizon | "",
+    monthly_investable: "",
+    existing_investments: "",
+    fact_find_notes: "",
+  });
 
   const contact = contacts.find((c) => c.id === id);
   if (!contact)
@@ -71,6 +86,63 @@ export function ContactDetailPage() {
   const dealWithFF = [...contactDeals]
     .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
     .find((d) => d.risk_tolerance || d.financial_goal || d.investment_horizon);
+
+  // Target deal to write fact-find to: prefer the one that already has FF, else newest deal
+  const ffTargetDeal = dealWithFF
+    ?? [...contactDeals].sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())[0]
+    ?? null;
+
+  const canFillFF = currentUser && (isAdviser(currentUser) || isMaster(currentUser));
+
+  const openFF = () => {
+    const src = ffTargetDeal;
+    setFfForm({
+      financial_goal: src?.financial_goal ?? "",
+      risk_tolerance: src?.risk_tolerance ?? "",
+      investment_horizon: src?.investment_horizon ?? "",
+      monthly_investable: src?.monthly_investable != null ? String(src.monthly_investable) : "",
+      existing_investments: src?.existing_investments ?? "",
+      fact_find_notes: src?.fact_find_notes ?? "",
+    });
+    setInvestPeriod("monthly");
+    setEditingFF(true);
+  };
+
+  const saveFF = () => {
+    if (!currentUser) return;
+    const investable = ffForm.monthly_investable
+      ? (investPeriod === "annually"
+          ? parseFloat(ffForm.monthly_investable) / 12
+          : parseFloat(ffForm.monthly_investable))
+      : undefined;
+    const ffData = {
+      financial_goal: (ffForm.financial_goal as FinancialGoal) || undefined,
+      risk_tolerance: (ffForm.risk_tolerance as RiskTolerance) || undefined,
+      investment_horizon: (ffForm.investment_horizon as InvestmentHorizon) || undefined,
+      monthly_investable: investable,
+      existing_investments: ffForm.existing_investments || undefined,
+      fact_find_notes: ffForm.fact_find_notes || undefined,
+      fact_find_done: !!(ffForm.financial_goal && ffForm.risk_tolerance && ffForm.investment_horizon),
+    };
+
+    if (ffTargetDeal) {
+      updateDeal(ffTargetDeal.id, ffData, currentUser.id);
+    } else {
+      // No deal yet — auto-create one so we have somewhere to save the fact-find
+      const newDeal = createDeal({
+        title: `${contact.first_name} ${contact.last_name}`,
+        value: 0,
+        stage: "APPOINTMENT",
+        contact_id: contact.id,
+        assigned_to_id: currentUser.id,
+        created_by: currentUser.id,
+        deleted_at: undefined,
+        ...ffData,
+      }, currentUser.id);
+      void newDeal; // deal is saved in store
+    }
+    setEditingFF(false);
+  };
 
   const handleSave = () => {
     if (!currentUser) return;
@@ -192,15 +264,136 @@ export function ContactDetailPage() {
           </CardContent>
         </Card>
 
-        {/* Risk Profile (from fact-find on most recent deal) */}
+        {/* Fact Find / Risk Profile */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Risk Profile</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm flex items-center gap-1.5">
+                <ClipboardList className="h-4 w-4 text-muted-foreground" />
+                Fact Find
+                {dealWithFF?.fact_find_done && (
+                  <span className="ml-1 text-[10px] font-normal text-green-600 dark:text-green-400">✓ Complete</span>
+                )}
+              </CardTitle>
+              {canFillFF && !editingFF && (
+                <Button size="sm" variant={dealWithFF ? "outline" : "default"} className="h-7 text-xs gap-1" onClick={openFF}>
+                  {dealWithFF ? "Edit" : (
+                    <><ClipboardList className="h-3.5 w-3.5" />Fill In</>
+                  )}
+                </Button>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
-            {!dealWithFF ? (
-              <p className="text-sm text-muted-foreground">No fact-find data yet. Complete a fact-find on a deal to populate this.</p>
+            {editingFF ? (
+              /* ── Edit form ── */
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Financial Goal</Label>
+                  <Select value={ffForm.financial_goal} onValueChange={(v) => setFfForm((f) => ({ ...f, financial_goal: v as FinancialGoal }))}>
+                    <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select goal…" /></SelectTrigger>
+                    <SelectContent>
+                      {(Object.keys(GOAL_LABELS) as FinancialGoal[]).map((g) => (
+                        <SelectItem key={g} value={g}>{GOAL_LABELS[g]}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs">Risk Tolerance</Label>
+                  <Select value={ffForm.risk_tolerance} onValueChange={(v) => setFfForm((f) => ({ ...f, risk_tolerance: v as RiskTolerance }))}>
+                    <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select risk…" /></SelectTrigger>
+                    <SelectContent>
+                      {(Object.keys(TOLERANCE_LABELS) as RiskTolerance[]).map((r) => (
+                        <SelectItem key={r} value={r}>{TOLERANCE_LABELS[r]}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs">Investment Horizon</Label>
+                  <Select value={ffForm.investment_horizon} onValueChange={(v) => setFfForm((f) => ({ ...f, investment_horizon: v as InvestmentHorizon }))}>
+                    <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select horizon…" /></SelectTrigger>
+                    <SelectContent>
+                      {(Object.keys(HORIZON_LABELS) as InvestmentHorizon[]).map((h) => (
+                        <SelectItem key={h} value={h}>{HORIZON_LABELS[h]}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs">Investable Amount (SGD)</Label>
+                  <div className="flex gap-1">
+                    <Input
+                      type="number"
+                      className="h-8 text-sm"
+                      value={ffForm.monthly_investable}
+                      onChange={(e) => setFfForm((f) => ({ ...f, monthly_investable: e.target.value }))}
+                      placeholder="e.g. 1000"
+                    />
+                    <div className="flex rounded-md border overflow-hidden shrink-0">
+                      {(["monthly", "annually"] as const).map((p) => (
+                        <button
+                          key={p}
+                          type="button"
+                          onClick={() => setInvestPeriod(p)}
+                          className={`px-2 py-1 text-xs transition-colors ${
+                            investPeriod === p
+                              ? "bg-primary text-primary-foreground"
+                              : "bg-background text-muted-foreground hover:bg-muted"
+                          }`}
+                        >
+                          {p === "monthly" ? "/mo" : "/yr"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs">Existing Investments</Label>
+                  <Input
+                    className="h-8 text-sm"
+                    value={ffForm.existing_investments}
+                    onChange={(e) => setFfForm((f) => ({ ...f, existing_investments: e.target.value }))}
+                    placeholder="CPF, endowment, unit trusts…"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs">Notes</Label>
+                  <Textarea
+                    rows={3}
+                    className="text-sm resize-none"
+                    value={ffForm.fact_find_notes}
+                    onChange={(e) => setFfForm((f) => ({ ...f, fact_find_notes: e.target.value }))}
+                    placeholder="Client concerns, goals, anything notable from the meeting…"
+                  />
+                </div>
+
+                {!ffTargetDeal && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-md px-2.5 py-1.5">
+                    No deal linked yet — a new deal will be created automatically when you save.
+                  </p>
+                )}
+
+                <div className="flex gap-2 justify-end pt-1">
+                  <Button variant="outline" size="sm" onClick={() => setEditingFF(false)}>Cancel</Button>
+                  <Button size="sm" onClick={saveFF}>Save Fact Find</Button>
+                </div>
+              </div>
+            ) : !dealWithFF ? (
+              /* ── Empty state ── */
+              <p className="text-sm text-muted-foreground">
+                {canFillFF
+                  ? "No fact-find recorded yet. Tap \"Fill In\" to record this client's financial profile."
+                  : "No fact-find data yet."}
+              </p>
             ) : (
+              /* ── Read view ── */
               <div className="space-y-3">
                 {dealWithFF.risk_tolerance && (
                   <div className="flex items-center justify-between">
@@ -225,7 +418,10 @@ export function ContactDetailPage() {
                 {dealWithFF.monthly_investable && (
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">Monthly Investable</span>
-                    <span className="text-sm font-semibold">{formatCurrency(dealWithFF.monthly_investable)}</span>
+                    <span className="text-sm font-semibold">
+                      {formatCurrency(dealWithFF.monthly_investable)}
+                      <span className="text-muted-foreground font-normal"> /mo</span>
+                    </span>
                   </div>
                 )}
                 {dealWithFF.existing_investments && (
@@ -236,12 +432,12 @@ export function ContactDetailPage() {
                 )}
                 {dealWithFF.fact_find_notes && (
                   <div className="pt-1 border-t">
-                    <p className="text-xs text-muted-foreground mb-0.5">Adviser Notes</p>
-                    <p className="text-sm">{dealWithFF.fact_find_notes}</p>
+                    <p className="text-xs text-muted-foreground mb-0.5">Notes</p>
+                    <p className="text-sm whitespace-pre-wrap">{dealWithFF.fact_find_notes}</p>
                   </div>
                 )}
                 <p className="text-[10px] text-muted-foreground border-t pt-1">
-                  From deal: <Link to={`/deals/${dealWithFF.id}`} className="text-primary hover:underline">{dealWithFF.title}</Link>
+                  Linked to: <Link to={`/deals/${dealWithFF.id}`} className="text-primary hover:underline">{dealWithFF.title}</Link>
                 </p>
               </div>
             )}
