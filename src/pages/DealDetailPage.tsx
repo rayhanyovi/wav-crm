@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import {
   ArrowLeft, Phone, Calendar, User, Plus, ChevronRight,
-  Trash2, Pencil, Check, X, BookOpen, TrendingUp, FileText, LogOut,
+  Trash2, Pencil, Check, X, BookOpen, TrendingUp, FileText, LogOut, ClipboardList,
 } from "lucide-react";
 import { useCrmStore } from "@/store/useCrmStore";
 import { useAuthStore } from "@/store/useAuthStore";
@@ -280,6 +280,7 @@ export function DealDetailPage() {
     risk_tolerance: "" as RiskTolerance | "",
     investment_horizon: "" as InvestmentHorizon | "",
     monthly_investable: "",
+    investable_period: "monthly" as "monthly" | "annually",
     existing_investments: "",
     fact_find_notes: "",
   });
@@ -340,6 +341,7 @@ export function DealDetailPage() {
       risk_tolerance: deal.risk_tolerance ?? "",
       investment_horizon: deal.investment_horizon ?? "",
       monthly_investable: deal.monthly_investable != null ? String(deal.monthly_investable) : "",
+      investable_period: "monthly",
       existing_investments: deal.existing_investments ?? "",
       fact_find_notes: deal.fact_find_notes ?? "",
     });
@@ -360,7 +362,11 @@ export function DealDetailPage() {
       financial_goal: factFindForm.financial_goal || undefined,
       risk_tolerance: factFindForm.risk_tolerance || undefined,
       investment_horizon: factFindForm.investment_horizon || undefined,
-      monthly_investable: factFindForm.monthly_investable ? parseFloat(factFindForm.monthly_investable) : undefined,
+      monthly_investable: factFindForm.monthly_investable
+        ? factFindForm.investable_period === "annually"
+          ? parseFloat(factFindForm.monthly_investable) / 12
+          : parseFloat(factFindForm.monthly_investable)
+        : undefined,
       existing_investments: factFindForm.existing_investments || undefined,
       fact_find_notes: factFindForm.fact_find_notes || undefined,
       fact_find_done: !!(factFindForm.financial_goal && factFindForm.risk_tolerance && factFindForm.investment_horizon),
@@ -553,9 +559,15 @@ export function DealDetailPage() {
                 )}
               </div>
               {canEdit && !editingFactFind && (
-                <button onClick={openFactFind} className="text-[11px] text-primary hover:underline flex items-center gap-1">
-                  <Pencil className="h-3 w-3" />{deal.fact_find_done ? "Edit" : "Fill In"}
-                </button>
+                deal.fact_find_done ? (
+                  <button onClick={openFactFind} className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1">
+                    <Pencil className="h-3 w-3" />Edit
+                  </button>
+                ) : (
+                  <Button size="sm" onClick={openFactFind} className="h-7 text-xs gap-1.5">
+                    <ClipboardList className="h-3.5 w-3.5" />Fill In Fact Find
+                  </Button>
+                )
               )}
             </div>
 
@@ -584,8 +596,32 @@ export function DealDetailPage() {
                     </Select>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[11px] text-muted-foreground font-medium">Monthly Investable (SGD)</label>
-                    <Input type="number" className="h-7 text-xs" value={factFindForm.monthly_investable} onChange={(e) => setFactFindForm((f) => ({ ...f, monthly_investable: e.target.value }))} placeholder="e.g. 1000" />
+                    <label className="text-[11px] text-muted-foreground font-medium">Investable Amount (SGD)</label>
+                    <div className="flex gap-1.5">
+                      <Input type="number" className="h-7 text-xs flex-1" value={factFindForm.monthly_investable} onChange={(e) => setFactFindForm((f) => ({ ...f, monthly_investable: e.target.value }))} placeholder="e.g. 1000" />
+                      <div className="flex rounded-md border overflow-hidden text-[11px] shrink-0">
+                        {(["monthly", "annually"] as const).map((p) => (
+                          <button
+                            key={p}
+                            type="button"
+                            onClick={() => setFactFindForm((f) => ({ ...f, investable_period: p }))}
+                            className={[
+                              "px-2 h-7 capitalize transition-colors",
+                              factFindForm.investable_period === p
+                                ? "bg-primary text-primary-foreground font-medium"
+                                : "bg-background text-muted-foreground hover:bg-muted",
+                            ].join(" ")}
+                          >
+                            {p === "monthly" ? "/ mo" : "/ yr"}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    {factFindForm.monthly_investable && factFindForm.investable_period === "annually" && (
+                      <p className="text-[10px] text-muted-foreground">
+                        = SGD {(parseFloat(factFindForm.monthly_investable) / 12).toFixed(0)} / month (stored as monthly)
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-1 col-span-2">
                     <label className="text-[11px] text-muted-foreground font-medium">Existing Investments</label>
@@ -607,7 +643,7 @@ export function DealDetailPage() {
                   <div><span className="text-muted-foreground">Goal: </span><span className="font-medium">{GOAL_LABELS[deal.financial_goal]}</span></div>
                   {deal.risk_tolerance && <div><span className="text-muted-foreground">Risk: </span><span className="font-medium">{TOLERANCE_LABELS[deal.risk_tolerance]}</span></div>}
                   {deal.investment_horizon && <div><span className="text-muted-foreground">Horizon: </span><span className="font-medium">{HORIZON_LABELS[deal.investment_horizon]}</span></div>}
-                  {deal.monthly_investable && <div><span className="text-muted-foreground">Monthly: </span><span className="font-medium">{formatCurrency(deal.monthly_investable)}</span></div>}
+                  {deal.monthly_investable && <div><span className="text-muted-foreground">Investable: </span><span className="font-medium">{formatCurrency(deal.monthly_investable)}<span className="text-muted-foreground font-normal"> / mo</span></span></div>}
                   {deal.existing_investments && <div className="col-span-2"><span className="text-muted-foreground">Existing: </span><span>{deal.existing_investments}</span></div>}
                 </div>
                 {deal.fact_find_notes && <p className="text-muted-foreground italic border-t pt-2 mt-1">{deal.fact_find_notes}</p>}
