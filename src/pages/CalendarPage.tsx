@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
   addMonths,
   eachDayOfInterval,
@@ -16,6 +16,7 @@ import { CalendarDays, ChevronLeft, ChevronRight, Plus, RefreshCw } from "lucide
 import { Link } from "react-router-dom";
 import { useCrmStore } from "@/store/useCrmStore";
 import { useAuthStore } from "@/store/useAuthStore";
+import { isMaster, isTelemarketer } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -88,7 +89,7 @@ export function CalendarPage() {
   const [filterStatus, setFilterStatus] =
     useState<(typeof STATUS_FILTERS)[number]>("ALL");
   const [filterRelated, setFilterRelated] = useState<RelatedFilter>("ALL");
-  const [filterOwner, setFilterOwner] = useState("ALL");
+  const [filterOwner, setFilterOwner] = useState(currentUser?.id ?? "ALL");
   const [form, setForm] = useState({
     subject: "",
     description: "",
@@ -108,9 +109,39 @@ export function CalendarPage() {
     });
   }, [visibleMonth]);
 
+  // ── Which user IDs this person is allowed to see ────────────────────────────
+  const allowedUserIds = useMemo(() => {
+    if (!currentUser) return new Set<string>();
+    if (isMaster(currentUser)) return null; // null = no restriction (see all)
+    const ids = new Set([currentUser.id]);
+    // TM: also see calendars of advisers who granted them access
+    if (isTelemarketer(currentUser)) {
+      users.forEach((u) => {
+        if (u.role === "ADVISER" && u.telemarketer_access && u.telemarketer_id === currentUser.id) {
+          ids.add(u.id);
+        }
+      });
+    }
+    return ids;
+  }, [currentUser, users]);
+
+  // Users visible in the owner dropdown
+  const allowedUsers = useMemo(
+    () => (allowedUserIds === null ? users.filter((u) => u.is_active) : users.filter((u) => allowedUserIds.has(u.id))),
+    [users, allowedUserIds],
+  );
+
   const filteredActivities = useMemo(() => {
     return activities
       .filter((activity) => !activity.deleted_at)
+      // Base ownership gate — non-MASTER users can only see their allowed set
+      .filter((activity) => {
+        if (allowedUserIds === null) return true; // MASTER sees all
+        return (
+          allowedUserIds.has(activity.assigned_to_id ?? "") ||
+          allowedUserIds.has(activity.created_by)
+        );
+      })
       .filter(
         (activity) => filterType === "ALL" || activity.type === filterType,
       )
@@ -134,7 +165,7 @@ export function CalendarPage() {
           activity.assigned_to_id === filterOwner ||
           activity.created_by === filterOwner,
       );
-  }, [activities, filterOwner, filterRelated, filterStatus, filterType]);
+  }, [activities, allowedUserIds, filterOwner, filterRelated, filterStatus, filterType]);
 
   const selectedDayActivities = selectedDate
     ? filteredActivities
@@ -324,14 +355,13 @@ export function CalendarPage() {
               <SelectValue placeholder="Owner" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="ALL">All Owners</SelectItem>
-              {users
-                .filter((user) => user.is_active)
-                .map((user) => (
-                  <SelectItem key={user.id} value={user.id}>
-                    {user.name}
-                  </SelectItem>
-                ))}
+              {/* MASTER can see all; others only see their allowed set */}
+              {allowedUserIds === null && <SelectItem value="ALL">All Owners</SelectItem>}
+              {allowedUsers.map((user) => (
+                <SelectItem key={user.id} value={user.id}>
+                  {user.id === currentUser?.id ? `${user.name} (me)` : user.name}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>

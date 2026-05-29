@@ -43,9 +43,9 @@ import { Link, useNavigate } from "react-router-dom";
 import type { LeadStatus, LeadSource } from "@/data/types";
 import { LeadImportDialog } from "@/components/leads/LeadImportDialog";
 
+// APPOINTMENT is excluded — once a lead reaches that status it lives in Deals
 const STATUSES: LeadStatus[] = [
   "NA",
-  "APPOINTMENT",
   "NOT_INTERESTED",
   "ABANDON",
   "OTHERS",
@@ -109,8 +109,11 @@ export function LeadsPage() {
     return false;
   });
 
+  // APPOINTMENT leads have been handed off to Deals — hide them here
+  const preAppointmentLeads = scopedLeads.filter((l) => l.status !== "APPOINTMENT");
+
   // Abandon filter — hide abandoned leads by default (Task #5)
-  const liveLeads = scopedLeads.filter((l) =>
+  const liveLeads = preAppointmentLeads.filter((l) =>
     showAbandoned ? true : !l.is_abandoned
   );
 

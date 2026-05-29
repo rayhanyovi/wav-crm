@@ -51,7 +51,7 @@ export function CallOutcomeForm({ lead }: CallOutcomeFormProps) {
   const [prospectValue, setProspectValue] = useState("");
 
   const { submitOutcome, nextLead, liveNotes, callDurationSeconds } = useCallSessionStore();
-  const { createActivity, updateLead } = useCrmStore();
+  const { createActivity, updateLead, createContact, createDeal, deals } = useCrmStore();
 
   // ── Derived flags ──────────────────────────────────────────────────────────
   const showMeetingDate  = result === "MEETING_SCHEDULED";
@@ -138,7 +138,7 @@ export function CallOutcomeForm({ lead }: CallOutcomeFormProps) {
       );
     }
 
-    // Auto-advance lead to APPOINTMENT when TM schedules a meeting
+    // Auto-advance lead to APPOINTMENT + create contact & deal when TM schedules a meeting
     if (result === "MEETING_SCHEDULED" && meetingDate) {
       const dateParts = meetingDate.split("T");
       updateLead(lead.id, {
@@ -146,6 +146,39 @@ export function CallOutcomeForm({ lead }: CallOutcomeFormProps) {
         appointment_date: dateParts[0],
         appointment_time: dateParts[1]?.slice(0, 5) || undefined,
       }, currentUser.id);
+
+      // Auto-create contact + deal if they don't exist yet
+      const existingDeal = deals.find((d) => d.lead_id === lead.id && !d.deleted_at);
+      if (!existingDeal) {
+        // Create contact from lead (or reuse existing converted contact)
+        let contactId = lead.converted_contact_id;
+        if (!contactId) {
+          const newContact = createContact({
+            first_name: lead.first_name,
+            last_name: lead.last_name,
+            email: lead.email,
+            phone: lead.phone,
+            source: lead.source,
+            created_by: currentUser.id,
+            deleted_at: undefined,
+          }, currentUser.id);
+          contactId = newContact.id;
+          updateLead(lead.id, { converted_contact_id: contactId }, currentUser.id);
+        }
+        createDeal({
+          title: `${lead.first_name} ${lead.last_name}`,
+          value: 0,
+          stage: "APPOINTMENT",
+          lead_id: lead.id,
+          contact_id: contactId,
+          assigned_to_id: lead.assigned_to_id ?? lead.adviser_owner_id ?? undefined,
+          telemarketer_id: currentUser.id,
+          created_by: currentUser.id,
+          deleted_at: undefined,
+          lost_reason: undefined,
+          closed_at: undefined,
+        }, currentUser.id);
+      }
     }
 
     submitOutcome(pickup);

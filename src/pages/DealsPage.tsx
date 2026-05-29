@@ -1,12 +1,19 @@
 import { useState, useMemo } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Plus, Search, Phone, Calendar, TrendingUp, UserPlus } from "lucide-react";
 import { useCrmStore } from "@/store/useCrmStore";
 import { useAuthStore } from "@/store/useAuthStore";
 import { isAdviser as isAdviserRole } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -53,6 +60,7 @@ const STAGE_DESC: Record<DealStage, string> = {
 export function DealsPage() {
   const { deals, leads, contacts, users, activities, createDeal, updateDeal } = useCrmStore();
   const { currentUser } = useAuthStore();
+  const navigate = useNavigate();
 
   const [search, setSearch] = useState("");
   const [filterStage, setFilterStage] = useState<DealStage | "ALL">("ALL");
@@ -232,94 +240,97 @@ export function DealsPage() {
         </span>
       </div>
 
-      {/* Deal list */}
+      {/* Deal table */}
       {filtered.length === 0 ? (
         <EmptyState
           icon={TrendingUp}
           title="No deals yet"
-          description={search ? "No deals match your search." : "Create a deal from a lead to get started."}
+          description={search ? "No deals match your search." : "Deals appear here once a TM sets an appointment."}
         />
       ) : (
-        <div className="divide-y rounded-lg border overflow-hidden">
-          {filtered.map((deal) => {
-            const lead = leads.find((l) => l.id === deal.lead_id);
-            const contact = contacts.find((c) => c.id === deal.contact_id);
-            const adviser = users.find((u) => u.id === deal.assigned_to_id);
-            const telemarketer = users.find((u) => u.id === deal.telemarketer_id);
-            const stats = dealStats[deal.id] || { calls: 0, meetings: 0 };
-            const person = lead
-              ? `${lead.salutation ? lead.salutation + " " : ""}${lead.first_name} ${lead.last_name}`
-              : contact
-              ? `${contact.first_name} ${contact.last_name}`
-              : deal.title;
-            const isReleased = !deal.assigned_to_id && ADVISER_STAGES.includes(deal.stage);
+        <div className="rounded-lg border overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Client</TableHead>
+                <TableHead>Stage</TableHead>
+                <TableHead className="hidden md:table-cell">Adviser</TableHead>
+                <TableHead className="hidden sm:table-cell text-right">Value</TableHead>
+                <TableHead className="hidden lg:table-cell text-center">Activity</TableHead>
+                <TableHead className="hidden md:table-cell">Updated</TableHead>
+                <TableHead />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.map((deal) => {
+                const lead = leads.find((l) => l.id === deal.lead_id);
+                const contact = contacts.find((c) => c.id === deal.contact_id);
+                const adviser = users.find((u) => u.id === deal.assigned_to_id);
+                const telemarketer = users.find((u) => u.id === deal.telemarketer_id);
+                const stats = dealStats[deal.id] || { calls: 0, meetings: 0 };
+                const person = contact
+                  ? `${contact.first_name} ${contact.last_name}`
+                  : lead
+                  ? `${lead.salutation ? lead.salutation + " " : ""}${lead.first_name} ${lead.last_name}`
+                  : deal.title;
+                const isReleased = !deal.assigned_to_id && ADVISER_STAGES.includes(deal.stage);
 
-            return (
-              <div key={deal.id} className={`flex items-center gap-3 px-4 py-3 transition-colors ${isReleased ? "bg-amber-50/50 dark:bg-amber-950/10" : "hover:bg-muted/40"}`}>
-                <Link
-                  to={`/deals/${deal.id}`}
-                  className="flex flex-1 items-center gap-4 min-w-0"
-                >
-                  {/* Name + stage */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-medium text-sm truncate">{person}</p>
-                      <DealStageBadge stage={deal.stage} />
+                return (
+                  <TableRow
+                    key={deal.id}
+                    className={`cursor-pointer ${isReleased ? "bg-amber-50/50 dark:bg-amber-950/10" : ""}`}
+                    onClick={() => navigate(`/deals/${deal.id}`)}
+                  >
+                    <TableCell>
+                      <p className="font-medium text-sm">{person}</p>
                       {isReleased && (
-                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-300 dark:border-amber-700">
+                        <span className="text-[10px] font-medium text-amber-600 dark:text-amber-400">
                           Released — available
                         </span>
                       )}
-                    </div>
-                    <p className="text-xs text-muted-foreground truncate mt-0.5">{deal.title}</p>
-                  </div>
-
-                  {/* Activity stats */}
-                  <div className="hidden sm:flex items-center gap-4 text-xs text-muted-foreground shrink-0">
-                    <span className="flex items-center gap-1">
-                      <Phone className="h-3 w-3" />{stats.calls} call{stats.calls !== 1 ? "s" : ""}
-                    </span>
-                    {stats.meetings > 0 && (
-                      <span className="flex items-center gap-1">
-                        <Calendar className="h-3 w-3" />{stats.meetings} meeting{stats.meetings !== 1 ? "s" : ""}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Value + people */}
-                  <div className="hidden md:flex flex-col items-end gap-0.5 shrink-0 text-xs">
-                    {deal.value > 0 && (
-                      <span className="font-semibold text-sm tabular-nums">
-                        {formatCurrency(deal.value)}
-                      </span>
-                    )}
-                    <span className="text-muted-foreground">
+                    </TableCell>
+                    <TableCell>
+                      <DealStageBadge stage={deal.stage} />
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
                       {adviser
-                        ? `Adviser: ${adviser.name.split(" ")[0]}`
+                        ? adviser.name.split(" ")[0]
                         : telemarketer
-                        ? `TM: ${telemarketer.name.split(" ")[0]}`
-                        : <span className="text-amber-600 dark:text-amber-400 font-medium">Unassigned</span>}
-                    </span>
-                  </div>
-                </Link>
-
-                {/* Claim released deal (adviser only) */}
-                {isReleased && isAdviserRole(currentUser) && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="shrink-0 gap-1 text-xs h-7 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      if (currentUser) updateDeal(deal.id, { assigned_to_id: currentUser.id }, currentUser.id);
-                    }}
-                  >
-                    <UserPlus className="h-3 w-3" /> Claim
-                  </Button>
-                )}
-              </div>
-            );
-          })}
+                        ? <span className="text-xs">TM: {telemarketer.name.split(" ")[0]}</span>
+                        : <span className="text-amber-600 dark:text-amber-400 font-medium text-xs">Unassigned</span>}
+                    </TableCell>
+                    <TableCell className="hidden sm:table-cell text-right font-semibold text-sm tabular-nums">
+                      {deal.value > 0 ? formatCurrency(deal.value) : <span className="text-muted-foreground font-normal">—</span>}
+                    </TableCell>
+                    <TableCell className="hidden lg:table-cell text-center">
+                      <span className="text-xs text-muted-foreground flex items-center justify-center gap-2">
+                        {stats.calls > 0 && <span className="flex items-center gap-0.5"><Phone className="h-3 w-3" />{stats.calls}</span>}
+                        {stats.meetings > 0 && <span className="flex items-center gap-0.5"><Calendar className="h-3 w-3" />{stats.meetings}</span>}
+                        {stats.calls === 0 && stats.meetings === 0 && "—"}
+                      </span>
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell text-xs text-muted-foreground">
+                      {formatDate(deal.updated_at)}
+                    </TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      {isReleased && isAdviserRole(currentUser) && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="gap-1 text-xs h-7 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400"
+                          onClick={() => {
+                            if (currentUser) updateDeal(deal.id, { assigned_to_id: currentUser.id }, currentUser.id);
+                          }}
+                        >
+                          <UserPlus className="h-3 w-3" /> Claim
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
         </div>
       )}
 
