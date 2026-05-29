@@ -1,8 +1,9 @@
 import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
-import { Plus, Search, Phone, Calendar, TrendingUp } from "lucide-react";
+import { Plus, Search, Phone, Calendar, TrendingUp, UserPlus } from "lucide-react";
 import { useCrmStore } from "@/store/useCrmStore";
 import { useAuthStore } from "@/store/useAuthStore";
+import { isAdviser as isAdviserRole } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -50,7 +51,7 @@ const STAGE_DESC: Record<DealStage, string> = {
 };
 
 export function DealsPage() {
-  const { deals, leads, contacts, users, activities, createDeal } = useCrmStore();
+  const { deals, leads, contacts, users, activities, createDeal, updateDeal } = useCrmStore();
   const { currentUser } = useAuthStore();
 
   const [search, setSearch] = useState("");
@@ -70,14 +71,18 @@ export function DealsPage() {
   const visibleDeals = useMemo(() => {
     return deals.filter((d) => {
       if (d.deleted_at) return false;
-      // Role scoping: telemarketer sees only their deals; adviser sees APPOINTMENT+
+      // MASTER: sees all deals including unassigned (released) ones
+      if (!isAdviser && !isTelemarketer) return true;
+      // ADVISER: sees APPOINTMENT+ deals assigned to them, plus unassigned released deals (to claim)
+      if (isAdviser) {
+        if (!ADVISER_STAGES.includes(d.stage)) return false;
+        // Show own deals + unassigned deals in APPOINTMENT+ that they can pick up
+        if (d.assigned_to_id && d.assigned_to_id !== currentUser?.id) return false;
+      }
+      // TELEMARKETER: only their deals (Deals page is ADVISER+ so TM can't reach this)
       if (isTelemarketer) {
         if (d.telemarketer_id && d.telemarketer_id !== currentUser?.id) return false;
         if (!d.telemarketer_id && d.created_by !== currentUser?.id) return false;
-      }
-      if (isAdviser) {
-        if (!ADVISER_STAGES.includes(d.stage)) return false;
-        if (d.assigned_to_id && d.assigned_to_id !== currentUser?.id) return false;
       }
       return true;
     });
@@ -247,46 +252,72 @@ export function DealsPage() {
               : contact
               ? `${contact.first_name} ${contact.last_name}`
               : deal.title;
+            const isReleased = !deal.assigned_to_id && ADVISER_STAGES.includes(deal.stage);
 
             return (
-              <Link
-                key={deal.id}
-                to={`/deals/${deal.id}`}
-                className="flex items-center gap-4 px-4 py-3 hover:bg-muted/40 transition-colors"
-              >
-                {/* Name + stage */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="font-medium text-sm truncate">{person}</p>
-                    <DealStageBadge stage={deal.stage} />
+              <div key={deal.id} className={`flex items-center gap-3 px-4 py-3 transition-colors ${isReleased ? "bg-amber-50/50 dark:bg-amber-950/10" : "hover:bg-muted/40"}`}>
+                <Link
+                  to={`/deals/${deal.id}`}
+                  className="flex flex-1 items-center gap-4 min-w-0"
+                >
+                  {/* Name + stage */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-medium text-sm truncate">{person}</p>
+                      <DealStageBadge stage={deal.stage} />
+                      {isReleased && (
+                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-300 dark:border-amber-700">
+                          Released — available
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground truncate mt-0.5">{deal.title}</p>
                   </div>
-                  <p className="text-xs text-muted-foreground truncate mt-0.5">{deal.title}</p>
-                </div>
 
-                {/* Activity stats */}
-                <div className="hidden sm:flex items-center gap-4 text-xs text-muted-foreground shrink-0">
-                  <span className="flex items-center gap-1">
-                    <Phone className="h-3 w-3" />{stats.calls} call{stats.calls !== 1 ? "s" : ""}
-                  </span>
-                  {stats.meetings > 0 && (
+                  {/* Activity stats */}
+                  <div className="hidden sm:flex items-center gap-4 text-xs text-muted-foreground shrink-0">
                     <span className="flex items-center gap-1">
-                      <Calendar className="h-3 w-3" />{stats.meetings} meeting{stats.meetings !== 1 ? "s" : ""}
+                      <Phone className="h-3 w-3" />{stats.calls} call{stats.calls !== 1 ? "s" : ""}
                     </span>
-                  )}
-                </div>
+                    {stats.meetings > 0 && (
+                      <span className="flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />{stats.meetings} meeting{stats.meetings !== 1 ? "s" : ""}
+                      </span>
+                    )}
+                  </div>
 
-                {/* Value + people */}
-                <div className="hidden md:flex flex-col items-end gap-0.5 shrink-0 text-xs">
-                  {deal.value > 0 && (
-                    <span className="font-semibold text-sm tabular-nums">
-                      {formatCurrency(deal.value)}
+                  {/* Value + people */}
+                  <div className="hidden md:flex flex-col items-end gap-0.5 shrink-0 text-xs">
+                    {deal.value > 0 && (
+                      <span className="font-semibold text-sm tabular-nums">
+                        {formatCurrency(deal.value)}
+                      </span>
+                    )}
+                    <span className="text-muted-foreground">
+                      {adviser
+                        ? `Adviser: ${adviser.name.split(" ")[0]}`
+                        : telemarketer
+                        ? `TM: ${telemarketer.name.split(" ")[0]}`
+                        : <span className="text-amber-600 dark:text-amber-400 font-medium">Unassigned</span>}
                     </span>
-                  )}
-                  <span className="text-muted-foreground">
-                    {adviser ? `Adviser: ${adviser.name.split(" ")[0]}` : telemarketer ? `TM: ${telemarketer.name.split(" ")[0]}` : "Unassigned"}
-                  </span>
-                </div>
-              </Link>
+                  </div>
+                </Link>
+
+                {/* Claim released deal (adviser only) */}
+                {isReleased && isAdviserRole(currentUser) && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="shrink-0 gap-1 text-xs h-7 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      if (currentUser) updateDeal(deal.id, { assigned_to_id: currentUser.id }, currentUser.id);
+                    }}
+                  >
+                    <UserPlus className="h-3 w-3" /> Claim
+                  </Button>
+                )}
+              </div>
             );
           })}
         </div>

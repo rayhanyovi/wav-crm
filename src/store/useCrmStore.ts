@@ -75,6 +75,8 @@ interface CrmState {
   updateDeal: (id: string, data: Partial<Deal>, userId: string) => void;
   deleteDeal: (id: string, userId: string) => void;
   moveDealStage: (dealId: string, toStage: DealStage, note: string | undefined, userId: string, lostReason?: string) => void;
+  /** Adviser releases a deal: unassigns it (back to pool) or transfers to another adviser. Earns +1 credit. */
+  releaseDeal: (dealId: string, releaserId: string, transferToId?: string) => void;
 
   // ─── Deal Proposals ────────────────────────────────────────────────────
   createDealProposal: (data: Omit<DealProposal, "id" | "created_at" | "updated_at">, userId: string) => DealProposal;
@@ -369,6 +371,47 @@ export const useCrmStore = create<CrmState>()(
         if (deal.assigned_to_id) {
           const msg = toStage === "WON" ? `Deal "${deal.title}" is now WON! 🎉` : `Deal "${deal.title}" moved to ${toStage}`;
           get().addNotification(deal.assigned_to_id, "DEAL_STAGE_CHANGE", "Deal stage updated", msg, "deal", dealId);
+        }
+      },
+
+      releaseDeal: (dealId, releaserId, transferToId) => {
+        const state = get();
+        const deal = state.deals.find((d) => d.id === dealId);
+        const releaser = state.users.find((u) => u.id === releaserId);
+        if (!deal || !releaser) return;
+
+        // Give +1 credit to the releasing adviser
+        const balanceBefore = releaser.credit_balance ?? 0;
+        const balanceAfter = balanceBefore + 1;
+        const tx: CreditTransaction = {
+          id: `ctx-${nanoid(6)}`,
+          user_id: releaserId,
+          action: "RETURN",
+          balance_before: balanceBefore,
+          balance_after: balanceAfter,
+          created_at: now(),
+        };
+
+        const newAssignee = transferToId ?? undefined; // undefined = unassigned (back to pool)
+        set((s) => ({
+          deals: s.deals.map((d) =>
+            d.id === dealId ? { ...d, assigned_to_id: newAssignee, updated_at: now() } : d
+          ),
+          users: s.users.map((u) => u.id === releaserId ? { ...u, credit_balance: balanceAfter } : u),
+          credit_transactions: [...s.credit_transactions, tx],
+        }));
+
+        get().addAuditLog(releaserId, "ASSIGNMENT_CHANGE", "deal", dealId, {
+          action: transferToId ? "transfer" : "release",
+          from: releaserId,
+          to: transferToId ?? null,
+        });
+
+        if (transferToId) {
+          get().addNotification(
+            transferToId, "DEAL_ASSIGNED", "Deal transferred to you",
+            `"${deal.title}" has been transferred to you by ${releaser.name}.`, "deal", dealId
+          );
         }
       },
 

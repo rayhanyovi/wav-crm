@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import {
   ArrowLeft, Phone, Calendar, User, Plus, ChevronRight,
-  Trash2, Pencil, Check, X, BookOpen, TrendingUp, FileText,
+  Trash2, Pencil, Check, X, BookOpen, TrendingUp, FileText, LogOut,
 } from "lucide-react";
 import { useCrmStore } from "@/store/useCrmStore";
 import { useAuthStore } from "@/store/useAuthStore";
@@ -257,7 +257,7 @@ export function DealDetailPage() {
   const navigate = useNavigate();
   const {
     deals, leads, contacts, users, activities,
-    deal_proposals, moveDealStage, updateDeal,
+    deal_proposals, moveDealStage, updateDeal, releaseDeal,
     createDealProposal, updateDealProposal, deleteDealProposal,
   } = useCrmStore();
   const { currentUser } = useAuthStore();
@@ -270,6 +270,9 @@ export function DealDetailPage() {
   const [stageInsurerRef, setStageInsurerRef] = useState("");
   const [stagePolicyNumber, setStagePolicyNumber] = useState("");
   const [stageAssignAdviser, setStageAssignAdviser] = useState("");
+  const [releaseOpen, setReleaseOpen] = useState(false);
+  const [releaseMode, setReleaseMode] = useState<"pool" | "transfer">("pool");
+  const [transferTarget, setTransferTarget] = useState("");
   const [editingProposalId, setEditingProposalId] = useState<string | "new" | null>(null);
   const [editingFactFind, setEditingFactFind] = useState(false);
   const [factFindForm, setFactFindForm] = useState({
@@ -343,6 +346,14 @@ export function DealDetailPage() {
     setEditingFactFind(true);
   };
 
+  const handleRelease = () => {
+    if (!currentUser) return;
+    releaseDeal(id!, currentUser.id, releaseMode === "transfer" ? transferTarget || undefined : undefined);
+    setReleaseOpen(false);
+    setTransferTarget("");
+    navigate("/deals");
+  };
+
   const handleSaveFactFind = () => {
     if (!currentUser) return;
     updateDeal(id!, {
@@ -371,11 +382,27 @@ export function DealDetailPage() {
           </div>
           <p className="text-sm text-muted-foreground mt-0.5 truncate">{deal.title}</p>
         </div>
-        {canEdit && (
-          <Button size="sm" variant="outline" className="shrink-0" onClick={() => setStageModalOpen(true)}>
-            Move Stage <ChevronRight className="h-3.5 w-3.5 ml-1" />
-          </Button>
-        )}
+        <div className="flex gap-2 shrink-0">
+          {/* Release / Transfer — only the assigned adviser (or master) can do this */}
+          {canEdit && deal.assigned_to_id && (
+            deal.assigned_to_id === currentUser?.id || currentUser?.role === "MASTER"
+          ) && deal.stage !== "WON" && deal.stage !== "LOST" && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-muted-foreground gap-1 hover:text-destructive"
+              onClick={() => setReleaseOpen(true)}
+            >
+              <LogOut className="h-3.5 w-3.5" />
+              Release
+            </Button>
+          )}
+          {canEdit && (
+            <Button size="sm" variant="outline" onClick={() => setStageModalOpen(true)}>
+              Move Stage <ChevronRight className="h-3.5 w-3.5 ml-1" />
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Stage stepper */}
@@ -857,6 +884,80 @@ export function DealDetailPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setStageModalOpen(false)}>Cancel</Button>
             <Button onClick={handleMoveStage} disabled={!newStage}>Move</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Release / Transfer dialog */}
+      <Dialog open={releaseOpen} onOpenChange={setReleaseOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <LogOut className="h-4 w-4 text-muted-foreground" />
+              Release Deal
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-1">
+            <p className="text-sm text-muted-foreground">
+              Release <strong>{deal.title}</strong> from your active pipeline. You'll earn{" "}
+              <strong>+1 credit</strong> for returning a warm prospect.
+            </p>
+
+            {/* Release mode selector */}
+            <div className="grid grid-cols-2 gap-2">
+              {(["pool", "transfer"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => setReleaseMode(mode)}
+                  className={`rounded-lg border p-3 text-left text-sm font-medium transition-colors ${
+                    releaseMode === mode
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-border bg-background hover:bg-muted"
+                  }`}
+                >
+                  <span className="block text-base mb-0.5">
+                    {mode === "pool" ? "🔙 Return to Pool" : "🔄 Transfer"}
+                  </span>
+                  <span className="block text-xs text-muted-foreground font-normal">
+                    {mode === "pool"
+                      ? "Master can reassign to any adviser"
+                      : "Pass directly to another adviser"}
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            {/* Transfer target */}
+            {releaseMode === "transfer" && (
+              <div className="space-y-1.5">
+                <Label>Transfer to Adviser *</Label>
+                <Select value={transferTarget || "none"} onValueChange={(v) => setTransferTarget(v === "none" ? "" : v)}>
+                  <SelectTrigger><SelectValue placeholder="Select adviser" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">— Select adviser —</SelectItem>
+                    {advisers
+                      .filter((u) => u.id !== currentUser?.id)
+                      .map((u) => (
+                        <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div className="rounded-md bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 p-2.5 text-xs text-amber-700 dark:text-amber-400">
+              ⚠️ This action removes this deal from your pipeline immediately.
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReleaseOpen(false)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              onClick={handleRelease}
+              disabled={releaseMode === "transfer" && !transferTarget}
+            >
+              Release Deal (+1 credit)
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
