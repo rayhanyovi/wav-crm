@@ -3,6 +3,16 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import { ArrowLeft, Paperclip, CheckCircle2 } from "lucide-react";
 import { useCrmStore } from "@/store/useCrmStore";
 import { useAuthStore } from "@/store/useAuthStore";
+import { useUsers } from "@/hooks/useUsers";
+import { useLeads } from "@/hooks/useLeads";
+import {
+  useActivity,
+  useCompleteActivity,
+  useComments,
+  useAddComment,
+  useUpdateComment,
+  useDeleteComment,
+} from "@/hooks/useActivities";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -24,35 +34,44 @@ import { canEdit, isTelemarketer, isAdviser, isMaster } from "@/lib/permissions"
 export function ActivityDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const {
-    activities,
-    users,
-    deals,
-    contacts,
-    leads,
-    comments,
-    addComment,
-    updateComment,
-    deleteComment,
-    completeActivity,
-  } = useCrmStore();
+  const { deals, contacts } = useCrmStore();
   const { currentUser } = useAuthStore();
+  const { data: users = [] } = useUsers();
+  const { data: leads = [] } = useLeads({ includeAbandoned: true });
+  const { data: activity, isLoading, isError } = useActivity(id);
+  const { data: activityComments = [] } = useComments(id);
+  const completeActivityMutation = useCompleteActivity();
+  const addCommentMutation = useAddComment();
+  const updateCommentMutation = useUpdateComment();
+  const deleteCommentMutation = useDeleteComment();
 
   const [newComment, setNewComment] = useState("");
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editCommentText, setEditCommentText] = useState("");
   const [resultValue, setResultValue] = useState("COMPLETED");
 
-  const activity = activities.find((a) => a.id === id);
-  if (!activity)
-    return <div className="p-6 text-muted-foreground">Activity not found.</div>;
+  if (isLoading) {
+    return (
+      <div className="space-y-4 max-w-7xl">
+        <div className="h-10 w-48 rounded bg-muted animate-pulse" />
+        <div className="grid grid-cols-2 gap-4">
+          <div className="h-52 rounded-lg bg-muted animate-pulse" />
+          <div className="h-52 rounded-lg bg-muted animate-pulse" />
+        </div>
+        <div className="h-64 rounded-lg bg-muted animate-pulse" />
+      </div>
+    );
+  }
 
-  // Role-based access check for this activity
+  if (isError || !activity) {
+    return <div className="p-6 text-muted-foreground">Activity not found.</div>;
+  }
+
+  // Role-based access check
   if (currentUser && !isMaster(currentUser)) {
     const isOwn = activity.assigned_to_id === currentUser.id || activity.created_by === currentUser.id;
 
     if (isTelemarketer(currentUser)) {
-      // TM: own or their leads' activities (including linked adviser's leads)
       const linkedAdviser = users.find(
         (u) => u.role === "ADVISER" && u.telemarketer_access && u.telemarketer_id === currentUser.id
       );
@@ -69,7 +88,6 @@ export function ActivityDetailPage() {
       if (!isOwn && !isTheirLead)
         return <div className="p-6 text-muted-foreground">You don't have access to this activity.</div>;
     } else if (isAdviser(currentUser)) {
-      // Adviser: own or activities on their leads/deals
       const adviserLeadIds = new Set(
         leads.filter((l) => !l.deleted_at && (
           l.assigned_to_id === currentUser.id ||
@@ -88,31 +106,21 @@ export function ActivityDetailPage() {
 
   const creator = users.find((u) => u.id === activity.created_by);
   const assignee = users.find((u) => u.id === activity.assigned_to_id);
-  const deal = activity.deal_id
-    ? deals.find((d) => d.id === activity.deal_id)
-    : null;
-  const contact = activity.contact_id
-    ? contacts.find((c) => c.id === activity.contact_id)
-    : null;
-  const lead = activity.lead_id
-    ? leads.find((l) => l.id === activity.lead_id)
-    : null;
-  const activityComments = comments
-    .filter((c) => c.activity_id === activity.id)
-    .sort(
-      (a, b) =>
-        new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
-    );
+  const deal = activity.deal_id ? deals.find((d) => d.id === activity.deal_id) : null;
+  const contact = activity.contact_id ? contacts.find((c) => c.id === activity.contact_id) : null;
+  const lead = activity.lead_id ? leads.find((l) => l.id === activity.lead_id) : null;
 
   const handleAddComment = () => {
     if (!newComment.trim() || !currentUser) return;
-    addComment(activity.id, newComment.trim(), currentUser.id);
-    setNewComment("");
+    addCommentMutation.mutate(
+      { activityId: activity.id, text: newComment.trim(), createdBy: currentUser.id },
+      { onSuccess: () => setNewComment("") }
+    );
   };
 
   const handleComplete = () => {
     if (!currentUser) return;
-    completeActivity(activity.id, resultValue, currentUser.id);
+    completeActivityMutation.mutate({ id: activity.id, result: resultValue, userId: currentUser.id });
   };
 
   const duration = activity.metadata?.duration_seconds as number | undefined;
@@ -123,11 +131,7 @@ export function ActivityDetailPage() {
   return (
     <div className="space-y-6 max-w-7xl">
       <div className="flex items-center gap-3">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => navigate("/activities")}
-        >
+        <Button variant="ghost" size="icon" onClick={() => navigate("/activities")}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div className="flex-1">
@@ -159,9 +163,14 @@ export function ActivityDetailPage() {
                 ))}
               </SelectContent>
             </Select>
-            <Button size="sm" className="gap-1" onClick={handleComplete}>
+            <Button
+              size="sm"
+              className="gap-1"
+              onClick={handleComplete}
+              disabled={completeActivityMutation.isPending}
+            >
               <CheckCircle2 className="h-4 w-4" />
-              Complete
+              {completeActivityMutation.isPending ? "Completing…" : "Complete"}
             </Button>
           </div>
         )}
@@ -176,10 +185,7 @@ export function ActivityDetailPage() {
             <p>
               <span className="text-muted-foreground">Creator:</span>{" "}
               {creator ? (
-                <Link
-                  to={`/team/${creator.id}`}
-                  className="text-primary hover:underline"
-                >
+                <Link to={`/team/${creator.id}`} className="text-primary hover:underline">
                   {creator.name}
                 </Link>
               ) : (
@@ -189,10 +195,7 @@ export function ActivityDetailPage() {
             <p>
               <span className="text-muted-foreground">Assigned To:</span>{" "}
               {assignee ? (
-                <Link
-                  to={`/team/${assignee.id}`}
-                  className="text-primary hover:underline"
-                >
+                <Link to={`/team/${assignee.id}`} className="text-primary hover:underline">
                   {assignee.name}
                 </Link>
               ) : (
@@ -248,10 +251,7 @@ export function ActivityDetailPage() {
             {deal && (
               <p>
                 <span className="text-muted-foreground">Deal:</span>{" "}
-                <Link
-                  to={`/deals/${deal.id}`}
-                  className="text-primary hover:underline"
-                >
+                <Link to={`/deals/${deal.id}`} className="text-primary hover:underline">
                   {deal.title}
                 </Link>
               </p>
@@ -259,10 +259,7 @@ export function ActivityDetailPage() {
             {contact && (
               <p>
                 <span className="text-muted-foreground">Contact:</span>{" "}
-                <Link
-                  to={`/contacts/${contact.id}`}
-                  className="text-primary hover:underline"
-                >
+                <Link to={`/contacts/${contact.id}`} className="text-primary hover:underline">
                   {contact.first_name} {contact.last_name}
                 </Link>
               </p>
@@ -270,10 +267,7 @@ export function ActivityDetailPage() {
             {lead && (
               <p>
                 <span className="text-muted-foreground">Lead:</span>{" "}
-                <Link
-                  to={`/leads/${lead.id}`}
-                  className="text-primary hover:underline"
-                >
+                <Link to={`/leads/${lead.id}`} className="text-primary hover:underline">
                   {lead.first_name} {lead.last_name}
                 </Link>
               </p>
@@ -330,9 +324,12 @@ export function ActivityDetailPage() {
                         size="sm"
                         className="h-7 text-xs"
                         onClick={() => {
-                          updateComment(c.id, editCommentText);
-                          setEditingCommentId(null);
+                          updateCommentMutation.mutate(
+                            { id: c.id, text: editCommentText, activityId: activity.id },
+                            { onSuccess: () => setEditingCommentId(null) }
+                          );
                         }}
+                        disabled={updateCommentMutation.isPending}
                       >
                         Save
                       </Button>
@@ -360,7 +357,9 @@ export function ActivityDetailPage() {
                         Edit
                       </button>
                       <button
-                        onClick={() => deleteComment(c.id)}
+                        onClick={() =>
+                          deleteCommentMutation.mutate({ id: c.id, activityId: activity.id })
+                        }
                         className="text-xs text-muted-foreground hover:text-destructive"
                       >
                         Delete
@@ -379,16 +378,14 @@ export function ActivityDetailPage() {
                 onChange={(e) => setNewComment(e.target.value)}
                 placeholder="Add a comment..."
                 className="text-sm"
-                onKeyDown={(e) =>
-                  e.key === "Enter" && !e.shiftKey && handleAddComment()
-                }
+                onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleAddComment()}
               />
               <Button
                 size="sm"
                 onClick={handleAddComment}
-                disabled={!newComment.trim()}
+                disabled={!newComment.trim() || addCommentMutation.isPending}
               >
-                Post
+                {addCommentMutation.isPending ? "Posting…" : "Post"}
               </Button>
             </div>
           )}

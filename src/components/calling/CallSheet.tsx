@@ -14,11 +14,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCallSessionStore } from "@/store/useCallSessionStore";
-import { useCrmStore } from "@/store/useCrmStore";
+import { useActivities } from "@/hooks/useActivities";
+import { useContact } from "@/hooks/useContacts";
+import { useDeals, useUpdateDeal } from "@/hooks/useDeals";
 import { LeadStatusBadge } from "@/components/common/StatusBadge";
 import { formatCurrency, formatDate } from "@/lib/format";
 import type { Lead, FinancialGoal, RiskTolerance, InvestmentHorizon } from "@/data/types";
-import { getLeadActivities } from "@/lib/selectors";
 import { Link } from "react-router-dom";
 import { useAuthStore } from "@/store/useAuthStore";
 
@@ -41,7 +42,10 @@ interface CallSheetProps {
 export function CallSheet({ lead }: CallSheetProps) {
   const { startCall, endCall, liveNotes, setLiveNotes, phase } =
     useCallSessionStore();
-  const { activities, contacts, deals, updateDeal } = useCrmStore();
+  const { data: activities = [] } = useActivities({ lead_id: lead?.id });
+  const { data: deals = [] } = useDeals();
+  const { data: convertedContact } = useContact(lead?.converted_contact_id);
+  const updateDealMutation = useUpdateDeal();
   const { currentUser } = useAuthStore();
   const [editingFF, setEditingFF] = useState(false);
   const [ffForm, setFfForm] = useState({
@@ -56,10 +60,9 @@ export function CallSheet({ lead }: CallSheetProps) {
   if (!lead)
     return <div className="p-6 text-muted-foreground">No lead selected.</div>;
 
-  const leadActivities = getLeadActivities(lead.id, activities).slice(0, 3);
-  const convertedContact = lead.converted_contact_id
-    ? contacts.find((contact) => contact.id === lead.converted_contact_id)
-    : undefined;
+  const leadActivities = [...activities]
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .slice(0, 3);
   const relatedDeals = deals
     .filter(
       (deal) =>
@@ -88,7 +91,9 @@ export function CallSheet({ lead }: CallSheetProps) {
 
   const saveFF = () => {
     if (!activeDeal || !currentUser) return;
-    updateDeal(activeDeal.id, {
+    updateDealMutation.mutate({
+      id: activeDeal.id,
+      payload: {
       financial_goal: ffForm.financial_goal || undefined,
       risk_tolerance: ffForm.risk_tolerance || undefined,
       investment_horizon: ffForm.investment_horizon || undefined,
@@ -96,7 +101,8 @@ export function CallSheet({ lead }: CallSheetProps) {
       existing_investments: ffForm.existing_investments || undefined,
       fact_find_notes: ffForm.fact_find_notes || undefined,
       fact_find_done: !!(ffForm.financial_goal && ffForm.risk_tolerance && ffForm.investment_horizon),
-    }, currentUser.id);
+      },
+    });
     setEditingFF(false);
   };
 

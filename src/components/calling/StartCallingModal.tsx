@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from "@/components/ui/button";
 import { useCrmStore } from "@/store/useCrmStore";
 import { useAuthStore } from "@/store/useAuthStore";
+import { useLeads } from "@/hooks/useLeads";
 import { useCallSessionStore } from "@/store/useCallSessionStore";
 import { isTelemarketer, isAdviser } from "@/lib/permissions";
 import type { Lead } from "@/data/types";
@@ -14,10 +15,11 @@ interface StartCallingModalProps {
 }
 
 /** Statuses that mean the lead is done / unworkable — exclude from call queues */
-const DEAD_STATUSES = new Set(["ABANDON", "NOT_INTERESTED", "OTHERS"]);
+const DEAD_STATUSES = new Set(["AVOID", "NOT_INTERESTED", "OTHERS"]);
 
 export function StartCallingModal({ open, onClose }: StartCallingModalProps) {
-  const { leads, deals } = useCrmStore();
+  const { deals } = useCrmStore();
+  const { data: leads = [] } = useLeads({ includeAbandoned: false });
   const { currentUser } = useAuthStore();
   const { startSession } = useCallSessionStore();
 

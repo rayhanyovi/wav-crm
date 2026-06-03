@@ -1,8 +1,12 @@
 import { Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { useCrmStore } from "@/store/useCrmStore";
 import { useAuthStore } from "@/store/useAuthStore";
+import {
+  useMarkAllNotificationsRead,
+  useMarkNotificationRead,
+  useNotifications,
+} from "@/hooks/useNotifications";
 import { formatRelative } from "@/lib/format";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -18,17 +22,19 @@ const entityRoutes: Record<string, (id: string) => string> = {
 
 export function NotificationBell() {
   const { currentUser } = useAuthStore();
-  const { notifications, markNotificationRead, markAllNotificationsRead } = useCrmStore();
+  const { data: notifications = [], isLoading } = useNotifications(currentUser?.id);
+  const markNotificationReadMutation = useMarkNotificationRead();
+  const markAllNotificationsReadMutation = useMarkAllNotificationsRead();
   const navigate = useNavigate();
 
-  const myNotifs = notifications.filter((n) => n.recipient_id === currentUser?.id)
+  const myNotifs = notifications
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     .slice(0, 20);
 
   const unreadCount = myNotifs.filter((n) => !n.is_read).length;
 
   const handleClick = (id: string, entityType: string, entityId: string) => {
-    markNotificationRead(id);
+    markNotificationReadMutation.mutate(id);
     const routeFn = entityRoutes[entityType];
     if (routeFn) navigate(routeFn(entityId));
   };
@@ -50,7 +56,7 @@ export function NotificationBell() {
           <span className="font-semibold text-sm">Notifications</span>
           {unreadCount > 0 && (
             <button
-              onClick={() => currentUser && markAllNotificationsRead(currentUser.id)}
+              onClick={() => currentUser && markAllNotificationsReadMutation.mutate(currentUser.id)}
               className="text-xs text-primary hover:underline"
             >
               Mark all read
@@ -58,7 +64,17 @@ export function NotificationBell() {
           )}
         </div>
         <div className="max-h-80 overflow-y-auto">
-          {myNotifs.length === 0 ? (
+          {isLoading ? (
+            <div className="space-y-2 px-4 py-3">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <div key={index} className="space-y-2 rounded-md border p-3">
+                  <div className="h-4 w-32 animate-pulse rounded bg-muted" />
+                  <div className="h-3 w-full animate-pulse rounded bg-muted" />
+                  <div className="h-3 w-20 animate-pulse rounded bg-muted" />
+                </div>
+              ))}
+            </div>
+          ) : myNotifs.length === 0 ? (
             <div className="px-4 py-8 text-center text-sm text-muted-foreground">No notifications</div>
           ) : (
             myNotifs.map((n) => (

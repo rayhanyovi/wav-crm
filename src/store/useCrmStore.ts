@@ -233,7 +233,7 @@ export const useCrmStore = create<CrmState>()(
           extraUpdates.status_history = [...(old?.status_history || []), newEntry];
 
           // Abandon soft-delete (Task #5)
-          if (data.status === "ABANDON") {
+          if (data.status === "AVOID") {
             extraUpdates.is_abandoned = true;
             extraUpdates.abandoned_at = now();
           }

@@ -2,8 +2,8 @@
 
 export type UserRole = 'MASTER' | 'ADVISER' | 'TELEMARKETER';
 
-export type LeadStatus = 'NA' | 'APPOINTMENT' | 'NOT_INTERESTED' | 'ABANDON' | 'OTHERS';
-export type LeadSource = 'MAGNET' | 'SCOUT' | 'LENS' | 'BEACON' | 'REFERRAL' | 'MANUAL' | 'WALK_IN' | 'COLD_CALL';
+export type LeadStatus = 'NA' | 'APPOINTMENT' | 'NOT_INTERESTED' | 'AVOID' | 'KIV' | 'OTHERS';
+export type LeadSource = 'AP_MARKETING' | 'LP_MARKETING' | 'OWN_SOURCE' | 'OTHERS';
 
 // WAV deal pipeline:
 //   CALLING     — telemarketer is cold-calling (telemarketer-only view)

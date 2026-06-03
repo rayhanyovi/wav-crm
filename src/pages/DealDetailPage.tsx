@@ -6,10 +6,25 @@ import {
 } from "lucide-react";
 import { useCrmStore } from "@/store/useCrmStore";
 import { useAuthStore } from "@/store/useAuthStore";
+import { useUsers } from "@/hooks/useUsers";
+import { useLeads } from "@/hooks/useLeads";
+import { useContact } from "@/hooks/useContacts";
+import { useActivities } from "@/hooks/useActivities";
+import {
+  useCreateDealProposal,
+  useDeal,
+  useDealProposals,
+  useMoveDealStage,
+  useReleaseDeal,
+  useUpdateDeal,
+  useUpdateDealProposal,
+  useDeleteDealProposal,
+} from "@/hooks/useDeals";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
   SelectContent,
@@ -255,12 +270,19 @@ function ProposalEditor({
 export function DealDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const {
-    deals, leads, contacts, users, activities,
-    deal_proposals, moveDealStage, updateDeal, releaseDeal,
-    createDealProposal, updateDealProposal, deleteDealProposal,
-  } = useCrmStore();
+  const { data: leads = [] } = useLeads({ includeAbandoned: true });
   const { currentUser } = useAuthStore();
+  const { data: activities = [] } = useActivities();
+  const { data: users = [] } = useUsers();
+  const { data: deal, isLoading: dealLoading, error: dealError } = useDeal(id);
+  const { data: contact } = useContact(deal?.contact_id);
+  const { data: proposals = [], isLoading: proposalsLoading, error: proposalsError } = useDealProposals(id);
+  const moveDealStageMutation = useMoveDealStage();
+  const updateDealMutation = useUpdateDeal();
+  const releaseDealMutation = useReleaseDeal();
+  const createDealProposalMutation = useCreateDealProposal();
+  const updateDealProposalMutation = useUpdateDealProposal();
+  const deleteDealProposalMutation = useDeleteDealProposal();
 
   const [stageModalOpen, setStageModalOpen] = useState(false);
   const [newStage, setNewStage] = useState<DealStage | "">("");
@@ -285,28 +307,49 @@ export function DealDetailPage() {
     fact_find_notes: "",
   });
 
-  const deal = deals.find((d) => d.id === id);
-  if (!deal) return (
-    <div className="p-6 text-muted-foreground">Deal not found. <Link to="/deals" className="text-primary underline">Back to Deals</Link></div>
-  );
+  if (dealLoading || proposalsLoading) {
+    return (
+      <div className="space-y-6 pb-8">
+        <Skeleton className="h-10 w-80" />
+        <Skeleton className="h-10 w-full" />
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+          <div className="lg:col-span-2 space-y-4">
+            <Skeleton className="h-56" />
+            <Skeleton className="h-40" />
+            <Skeleton className="h-72" />
+          </div>
+          <div className="lg:col-span-3 space-y-4">
+            <Skeleton className="h-24" />
+            <Skeleton className="h-64" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!deal || dealError || proposalsError) {
+    return (
+      <div className="p-6 text-sm text-destructive">
+        {dealError?.message || proposalsError?.message || "Deal not found."}{" "}
+        <Link to="/deals" className="text-primary underline">Back to Deals</Link>
+      </div>
+    );
+  }
 
   const lead = leads.find((l) => l.id === deal.lead_id);
-  const contact = contacts.find((c) => c.id === deal.contact_id);
   const adviser = users.find((u) => u.id === deal.assigned_to_id);
   const telemarketer = users.find((u) => u.id === deal.telemarketer_id);
 
   const dealActivities = useMemo(
     () =>
       activities
-        .filter((a) => !a.deleted_at && (a.deal_id === id || a.lead_id === deal.lead_id))
+        .filter((a) => a.deal_id === id || a.lead_id === deal.lead_id)
         .sort((a, b) => (b.scheduled_at ?? b.created_at).localeCompare(a.scheduled_at ?? a.created_at)),
     [activities, id, deal.lead_id]
   );
 
   const callCount = dealActivities.filter((a) => a.type === "CALL").length;
   const meetings = dealActivities.filter((a) => a.type === "MEETING");
-  const proposals = deal_proposals.filter((p) => p.deal_id === id);
-
   const stageIdx = DEAL_STAGES.indexOf(deal.stage);
   const personName = lead
     ? `${lead.salutation ? lead.salutation + " " : ""}${lead.first_name} ${lead.last_name}`
@@ -317,7 +360,7 @@ export function DealDetailPage() {
   const canEdit = can(currentUser, "ADVISER") || currentUser?.role === "MASTER";
   const advisers = users.filter((u) => u.is_active && can(u, "ADVISER") && !can(u, "MASTER"));
 
-  const handleMoveStage = () => {
+  const handleMoveStage = async () => {
     if (!newStage || !currentUser) return;
     const extras: Record<string, unknown> = {};
     if (newStage === "SUBMITTED") {
@@ -328,8 +371,19 @@ export function DealDetailPage() {
     if (newStage === "APPOINTMENT" && stageAssignAdviser && !deal.assigned_to_id) {
       extras.assigned_to_id = stageAssignAdviser;
     }
-    if (Object.keys(extras).length > 0) updateDeal(id!, extras, currentUser.id);
-    moveDealStage(id!, newStage as DealStage, stageNote || undefined, currentUser.id, lostReason || undefined);
+    if (Object.keys(extras).length > 0) {
+      await updateDealMutation.mutateAsync({
+        id: id!,
+        payload: extras,
+      });
+    }
+    await moveDealStageMutation.mutateAsync({
+      dealId: id!,
+      toStage: newStage as DealStage,
+      note: stageNote || undefined,
+      userId: currentUser.id,
+      lostReason: lostReason || undefined,
+    });
     setStageModalOpen(false);
     setNewStage(""); setStageNote(""); setLostReason("");
     setStageInsurer(""); setStageInsurerRef(""); setStagePolicyNumber(""); setStageAssignAdviser("");
@@ -348,29 +402,36 @@ export function DealDetailPage() {
     setEditingFactFind(true);
   };
 
-  const handleRelease = () => {
+  const handleRelease = async () => {
     if (!currentUser) return;
-    releaseDeal(id!, currentUser.id, releaseMode === "transfer" ? transferTarget || undefined : undefined);
+    await releaseDealMutation.mutateAsync({
+      dealId: id!,
+      releaserId: currentUser.id,
+      transferToId: releaseMode === "transfer" ? transferTarget || undefined : undefined,
+    });
     setReleaseOpen(false);
     setTransferTarget("");
     navigate("/deals");
   };
 
-  const handleSaveFactFind = () => {
+  const handleSaveFactFind = async () => {
     if (!currentUser) return;
-    updateDeal(id!, {
-      financial_goal: factFindForm.financial_goal || undefined,
-      risk_tolerance: factFindForm.risk_tolerance || undefined,
-      investment_horizon: factFindForm.investment_horizon || undefined,
-      monthly_investable: factFindForm.monthly_investable
-        ? factFindForm.investable_period === "annually"
-          ? parseFloat(factFindForm.monthly_investable) / 12
-          : parseFloat(factFindForm.monthly_investable)
-        : undefined,
-      existing_investments: factFindForm.existing_investments || undefined,
-      fact_find_notes: factFindForm.fact_find_notes || undefined,
-      fact_find_done: !!(factFindForm.financial_goal && factFindForm.risk_tolerance && factFindForm.investment_horizon),
-    }, currentUser.id);
+    await updateDealMutation.mutateAsync({
+      id: id!,
+      payload: {
+        financial_goal: factFindForm.financial_goal || undefined,
+        risk_tolerance: factFindForm.risk_tolerance || undefined,
+        investment_horizon: factFindForm.investment_horizon || undefined,
+        monthly_investable: factFindForm.monthly_investable
+          ? factFindForm.investable_period === "annually"
+            ? parseFloat(factFindForm.monthly_investable) / 12
+            : parseFloat(factFindForm.monthly_investable)
+          : undefined,
+        existing_investments: factFindForm.existing_investments || undefined,
+        fact_find_notes: factFindForm.fact_find_notes || undefined,
+        fact_find_done: !!(factFindForm.financial_goal && factFindForm.risk_tolerance && factFindForm.investment_horizon),
+      },
+    });
     setEditingFactFind(false);
   };
 
@@ -634,7 +695,7 @@ export function DealDetailPage() {
                 </div>
                 <div className="flex justify-end gap-2">
                   <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setEditingFactFind(false)}>Cancel</Button>
-                  <Button size="sm" className="h-7 text-xs" onClick={handleSaveFactFind}><Check className="h-3 w-3 mr-1" />Save</Button>
+                  <Button size="sm" className="h-7 text-xs" onClick={() => void handleSaveFactFind()}><Check className="h-3 w-3 mr-1" />Save</Button>
                 </div>
               </div>
             ) : deal.financial_goal ? (
@@ -705,7 +766,7 @@ export function DealDetailPage() {
             <ProposalEditor
               proposal={{ deal_id: id!, created_by: currentUser.id }}
               onSave={(data) => {
-                createDealProposal({ ...data, created_by: currentUser.id }, currentUser.id);
+                createDealProposalMutation.mutate({ ...data, created_by: currentUser.id });
                 setEditingProposalId(null);
               }}
               onCancel={() => setEditingProposalId(null)}
@@ -737,7 +798,7 @@ export function DealDetailPage() {
                   key={p.id}
                   proposal={p}
                   onSave={(data) => {
-                    updateDealProposal(p.id, data, currentUser.id);
+                    updateDealProposalMutation.mutate({ id: p.id, payload: data, dealId: p.deal_id });
                     setEditingProposalId(null);
                   }}
                   onCancel={() => setEditingProposalId(null)}
@@ -764,7 +825,7 @@ export function DealDetailPage() {
                         <Button
                           variant="ghost" size="icon"
                           className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                          onClick={() => currentUser && deleteDealProposal(p.id, currentUser.id)}
+                          onClick={() => deleteDealProposalMutation.mutate({ id: p.id, dealId: p.deal_id })}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
@@ -919,7 +980,7 @@ export function DealDetailPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setStageModalOpen(false)}>Cancel</Button>
-            <Button onClick={handleMoveStage} disabled={!newStage}>Move</Button>
+            <Button onClick={() => void handleMoveStage()} disabled={!newStage}>Move</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -989,7 +1050,7 @@ export function DealDetailPage() {
             <Button variant="outline" onClick={() => setReleaseOpen(false)}>Cancel</Button>
             <Button
               variant="destructive"
-              onClick={handleRelease}
+              onClick={() => void handleRelease()}
               disabled={releaseMode === "transfer" && !transferTarget}
             >
               Release Deal (+1 credit)

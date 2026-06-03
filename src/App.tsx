@@ -1,7 +1,12 @@
 import { Routes, Route, Navigate, useParams } from "react-router-dom";
+import { useEffect } from "react";
 import { useAuthStore } from "@/store/useAuthStore";
 import { AppShell } from "@/components/layout/AppShell";
 import { LoginPage } from "@/pages/LoginPage";
+import { RegisterPage } from "@/pages/RegisterPage";
+import { AuthCallbackPage } from "@/pages/AuthCallbackPage";
+import { OnboardingPage } from "@/pages/OnboardingPage";
+import { PendingApprovalPage } from "@/pages/PendingApprovalPage";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { LeadsPage } from "@/pages/LeadsPage";
 import { LeadDetailPage } from "@/pages/LeadDetailPage";
@@ -21,8 +26,13 @@ import { NoAccessPage } from "@/pages/NoAccessPage";
 import { canManage, roleLevel } from "@/lib/permissions";
 
 function ProtectedRoute({ children, minRole }: { children: React.ReactNode; minRole?: number }) {
-  const { currentUser } = useAuthStore();
-  if (!currentUser) return <Navigate to="/login" replace />;
+  const { currentUser, accountStatus } = useAuthStore();
+  if (!currentUser) {
+    if (accountStatus === "PENDING_PROFILE") return <Navigate to="/onboarding" replace />;
+    if (accountStatus === "PENDING_APPROVAL" || accountStatus === "REJECTED")
+      return <Navigate to="/pending" replace />;
+    return <Navigate to="/login" replace />;
+  }
   if (minRole !== undefined && roleLevel(currentUser.role) < minRole) return <NoAccessPage />;
   return <>{children}</>;
 }
@@ -38,7 +48,11 @@ function TeamProfileRoute() {
 }
 
 export default function App() {
-  const { currentUser } = useAuthStore();
+  const { currentUser, loadSession } = useAuthStore();
+
+  useEffect(() => {
+    void loadSession();
+  }, [loadSession]);
 
   return (
     <Routes>
@@ -46,6 +60,13 @@ export default function App() {
         path="/login"
         element={currentUser ? <Navigate to="/" replace /> : <LoginPage />}
       />
+      <Route
+        path="/register"
+        element={currentUser ? <Navigate to="/" replace /> : <RegisterPage />}
+      />
+      <Route path="/auth/callback" element={<AuthCallbackPage />} />
+      <Route path="/onboarding" element={<OnboardingPage />} />
+      <Route path="/pending" element={<PendingApprovalPage />} />
       <Route
         path="/"
         element={

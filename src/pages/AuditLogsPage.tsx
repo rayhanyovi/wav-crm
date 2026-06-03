@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Shield } from "lucide-react";
-import { useCrmStore } from "@/store/useCrmStore";
+import { useUsers } from "@/hooks/useUsers";
+import { useAuditLogs } from "@/hooks/useAuditLogs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -8,6 +9,7 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatDateTime } from "@/lib/format";
 import { Link } from "react-router-dom";
+import { Button } from "@/components/ui/button";
 
 const ACTION_COLORS: Record<string, string> = {
   CREATE: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
@@ -20,8 +22,8 @@ const ACTION_COLORS: Record<string, string> = {
   COMPLETE: "bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300",
 };
 
-const ENTITY_TYPES = ["contact", "lead", "deal", "activity", "product", "bundle", "user"];
-const ACTIONS = ["CREATE", "UPDATE", "DELETE", "CONVERT", "STAGE_CHANGE", "LOGIN", "LOGOUT", "COMPLETE"];
+const ENTITY_TYPES = ["contact", "lead", "deal", "activity", "product", "bundle", "user"] as const;
+const ACTIONS = ["CREATE", "UPDATE", "DELETE", "CONVERT", "STAGE_CHANGE", "LOGIN", "LOGOUT", "COMPLETE"] as const;
 
 function formatValue(value: unknown): string {
   if (typeof value === "boolean") return value ? "Active" : "Inactive";
@@ -74,30 +76,38 @@ function getEntityHref(entityType: string, entityId: string): string | null {
 }
 
 export function AuditLogsPage() {
-  const { audit_logs, users } = useCrmStore();
+  const { data: users = [] } = useUsers();
   const [search, setSearch] = useState("");
   const [filterUser, setFilterUser] = useState("ALL");
   const [filterAction, setFilterAction] = useState("ALL");
   const [filterEntity, setFilterEntity] = useState("ALL");
+  const [page, setPage] = useState(1);
 
-  const filtered = [...audit_logs]
-    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-    .filter((l) => {
-      if (filterUser !== "ALL" && l.user_id !== filterUser) return false;
-      if (filterAction !== "ALL" && l.action !== filterAction) return false;
-      if (filterEntity !== "ALL" && l.entity_type !== filterEntity) return false;
-      if (search) {
-        const q = search.toLowerCase();
-        const user = users.find((u) => u.id === l.user_id);
-        if (
-          !l.entity_type.toLowerCase().includes(q) &&
-          !l.action.toLowerCase().includes(q) &&
-          !(user?.name.toLowerCase().includes(q)) &&
-          !JSON.stringify(l.metadata).toLowerCase().includes(q)
-        ) return false;
-      }
-      return true;
-    });
+  const { data, isLoading, isError } = useAuditLogs({
+    page,
+    pageSize: 25,
+    search,
+    userId: filterUser === "ALL" ? undefined : filterUser,
+    action: filterAction,
+    entityType: filterEntity,
+  });
+
+  const logs = data?.items ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / 25));
+
+  const filtered = logs.filter((l) => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    const user = users.find((u) => u.id === l.user_id);
+    return (
+      l.entity_type.toLowerCase().includes(q) ||
+      l.action.toLowerCase().includes(q) ||
+      l.entity_id.toLowerCase().includes(q) ||
+      !!user?.name.toLowerCase().includes(q) ||
+      JSON.stringify(l.metadata ?? {}).toLowerCase().includes(q)
+    );
+  });
 
   return (
     <div className="space-y-4">
@@ -111,7 +121,7 @@ export function AuditLogsPage() {
             {users.map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
           </SelectContent>
         </Select>
-        <Select value={filterAction} onValueChange={setFilterAction}>
+        <Select value={filterAction} onValueChange={(value) => setFilterAction(value)}>
           <SelectTrigger className="w-40"><SelectValue placeholder="Action" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="ALL">All Actions</SelectItem>
@@ -127,7 +137,15 @@ export function AuditLogsPage() {
         </Select>
       </div>
 
-      {filtered.length === 0 ? (
+      {isLoading ? (
+        <div className="space-y-2 rounded-lg border p-4">
+          {Array.from({ length: 8 }).map((_, index) => (
+            <div key={index} className="h-10 animate-pulse rounded bg-muted" />
+          ))}
+        </div>
+      ) : isError ? (
+        <EmptyState icon={Shield} title="Could not load audit logs" description="Try refreshing the page." />
+      ) : filtered.length === 0 ? (
         <EmptyState icon={Shield} title="No audit logs" description="Actions taken in the system will appear here." />
       ) : (
         <div className="border rounded-lg overflow-hidden">
@@ -182,7 +200,29 @@ export function AuditLogsPage() {
           </Table>
         </div>
       )}
-      <p className="text-xs text-muted-foreground">{filtered.length} of {audit_logs.length} entries</p>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs text-muted-foreground">
+          Page {page} of {totalPages} · {filtered.length} visible · {total} total
+        </p>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page <= 1}
+            onClick={() => setPage((current) => Math.max(1, current - 1))}
+          >
+            Previous
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page >= totalPages}
+            onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+          >
+            Next
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

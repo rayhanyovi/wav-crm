@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Search, UserCheck, Users, TrendingUp } from "lucide-react";
 import { useCrmStore } from "@/store/useCrmStore";
+import { useLeads } from "@/hooks/useLeads";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useNavigate } from "react-router-dom";
@@ -22,7 +23,8 @@ interface SearchResult {
 
 export function CommandPalette({ open, onClose }: CommandPaletteProps) {
   const [query, setQuery] = useState("");
-  const { contacts, leads, deals } = useCrmStore();
+  const { contacts, deals } = useCrmStore();
+  const { data: leads = [] } = useLeads({ includeAbandoned: true });
   const navigate = useNavigate();
 
   useEffect(() => {

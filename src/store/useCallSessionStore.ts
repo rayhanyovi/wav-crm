@@ -1,5 +1,7 @@
 import { create } from "zustand";
 import type { Lead } from "@/data/types";
+import { createCallSession } from "@/services/callSessions";
+import { useAuthStore } from "@/store/useAuthStore";
 
 interface CallSessionState {
   active: boolean;
@@ -59,12 +61,31 @@ export const useCallSessionStore = create<CallSessionState>((set, get) => ({
     }),
 
   stopSession: () =>
-    set({
-      active: false,
-      queue: [],
-      panelOpen: false,
-      phase: "sheet",
-    }),
+    {
+      const state = get();
+      const currentUser = useAuthStore.getState().currentUser;
+
+      if (state.active && state.sessionStartedAt && currentUser) {
+        void createCallSession({
+          user_id: currentUser.id,
+          started_at: state.sessionStartedAt,
+          ended_at: new Date().toISOString(),
+          total_duration_seconds: state.totalDurationSeconds,
+          calls_made: state.callsMade,
+          pickups: state.pickups,
+          lead_ids: state.queue.map((lead) => lead.id),
+        }).catch((error) => {
+          console.error("Failed to save call session", error);
+        });
+      }
+
+      set({
+        active: false,
+        queue: [],
+        panelOpen: false,
+        phase: "sheet",
+      });
+    },
 
   openPanel: () => set({ panelOpen: true }),
   closePanel: () => set({ panelOpen: false }),

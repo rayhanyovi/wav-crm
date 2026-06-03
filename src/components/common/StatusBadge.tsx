@@ -5,7 +5,8 @@ const leadStatusColors: Record<LeadStatus, string> = {
   NA:             "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
   APPOINTMENT:    "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400",
   NOT_INTERESTED: "bg-yellow-100 text-yellow-700 dark:bg-yellow-950/40 dark:text-yellow-400",
-  ABANDON:        "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400",
+  AVOID:          "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400",
+  KIV:            "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400",
   OTHERS:         "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
 };
 

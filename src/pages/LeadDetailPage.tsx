@@ -1,8 +1,16 @@
 import { useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { ArrowLeft, UserCheck, Plus, Trash2, MessageSquare, CalendarPlus, Download } from "lucide-react";
-import { useCrmStore } from "@/store/useCrmStore";
 import { useAuthStore } from "@/store/useAuthStore";
+import { useUsers } from "@/hooks/useUsers";
+import {
+  useLead, useUpdateLead, useLeadNotes,
+  useAddLeadNote, useDeleteLeadNote,
+  useClaimLead, useReturnLead, useConvertLead,
+} from "@/hooks/useLeads";
+import { useActivities, useCreateActivity } from "@/hooks/useActivities";
+import { useContact } from "@/hooks/useContacts";
+import { useProducts } from "@/hooks/useProducts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,21 +36,23 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { formatDate, formatDateTime } from "@/lib/format";
-import { getLeadActivities } from "@/lib/selectors";
 import { canEdit, canLogActivity, canManage, isAdviser } from "@/lib/permissions";
 import { buildGoogleCalendarUrl, downloadIcs } from "@/lib/calendar";
 import type { LeadStatus, LeadSource, DealStage, Lead, AppointmentResult } from "@/data/types";
 
 const SOURCES: LeadSource[] = [
-  "COLD_CALL",
-  "REFERRAL",
-  "MAGNET",
-  "SCOUT",
-  "LENS",
-  "BEACON",
-  "MANUAL",
-  "WALK_IN",
+  "AP_MARKETING",
+  "LP_MARKETING",
+  "OWN_SOURCE",
+  "OTHERS",
 ];
+
+const SOURCE_LABELS: Record<LeadSource, string> = {
+  AP_MARKETING: "AP Marketing",
+  LP_MARKETING: "LP Marketing",
+  OWN_SOURCE: "Own Source",
+  OTHERS: "Others",
+};
 const DEAL_STAGES: DealStage[] = [
   "CALLING",
   "APPOINTMENT",
@@ -53,24 +63,24 @@ const DEAL_STAGES: DealStage[] = [
 export function LeadDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const {
-    leads,
-    users,
-    activities,
-    contacts,
-    products,
-    lead_notes,
-    updateLead,
-    convertLead,
-    createActivity,
-    addLeadNote,
-    deleteLeadNote,
-    claimLead,
-    returnLead,
-  } = useCrmStore();
   const { currentUser } = useAuthStore();
+  const { data: users = [] } = useUsers();
 
-  const lead = leads.find((l) => l.id === id);
+  // Real Supabase hooks
+  const { data: leadData, isLoading: leadLoading } = useLead(id);
+  const { data: activities = [] } = useActivities({ lead_id: id });
+  const { data: products = [] } = useProducts();
+  const { data: convertedContact } = useContact(leadData?.converted_contact_id);
+  const { data: leadNotesList = [] } = useLeadNotes(id);
+  const updateLeadMutation = useUpdateLead();
+  const createActivityMutation = useCreateActivity();
+  const addLeadNoteMutation = useAddLeadNote();
+  const deleteLeadNoteMutation = useDeleteLeadNote();
+  const claimLeadMutation = useClaimLead();
+  const returnLeadMutation = useReturnLead();
+  const convertLeadMutation = useConvertLead();
+
+  const lead = leadData;
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<Partial<Lead>>({});
   const [convertOpen, setConvertOpen] = useState(false);
@@ -91,49 +101,52 @@ export function LeadDetailPage() {
     result: "COMPLETED" as const,
   });
 
+  if (leadLoading)
+    return <div className="p-6 text-muted-foreground">Loading lead…</div>;
   if (!lead)
     return <div className="p-6 text-muted-foreground">Lead not found.</div>;
 
   const assignee = users.find((u) => u.id === lead.assigned_to_id);
-  const convertedContact = contacts.find(
-    (c) => c.id === lead.converted_contact_id,
+  const leadActivities = [...activities].sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
   );
-  const leadActivities = getLeadActivities(lead.id, activities);
-  const thisLeadNotes = lead_notes
-    .filter((n) => n.lead_id === lead.id)
-    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  const thisLeadNotes = [...leadNotesList].sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  );
   const isConverted = lead.status === "OTHERS" && !!lead.converted_contact_id;
 
   const handleSave = () => {
     if (!currentUser) return;
-    updateLead(lead.id, form as Partial<typeof lead>, currentUser.id);
+    updateLeadMutation.mutate({ id: lead.id, payload: form as Parameters<typeof updateLeadMutation.mutate>[0]["payload"] });
     setEditing(false);
   };
 
   const handleConvert = () => {
     if (!currentUser) return;
-    convertLead(
-      lead.id,
-      {
-        first_name: lead.first_name,
-        last_name: lead.last_name,
-        email: lead.email,
-        phone: lead.phone,
-        source: lead.source,
-        created_by: currentUser.id,
+    convertLeadMutation.mutate({
+      leadId: lead.id,
+      payload: {
+        contact: {
+          first_name: lead.first_name,
+          last_name: lead.last_name,
+          email: lead.email,
+          phone: lead.phone,
+          source: lead.source,
+          created_by: currentUser.id,
+        },
+        deal: convForm.createDeal && convForm.dealTitle
+          ? {
+              title: convForm.dealTitle,
+              value: parseFloat(convForm.dealValue) || 0,
+              stage: convForm.dealStage,
+              assigned_to_id: currentUser.id,
+              created_by: currentUser.id,
+              contact_id: "",
+            }
+          : null,
       },
-      convForm.createDeal && convForm.dealTitle
-        ? {
-            title: convForm.dealTitle,
-            value: parseFloat(convForm.dealValue) || 0,
-            stage: convForm.dealStage,
-                assigned_to_id: currentUser.id,
-            created_by: currentUser.id,
-            contact_id: "",
-          }
-        : null,
-      currentUser.id,
-    );
+      userId: currentUser.id,
+    });
     setConvertOpen(false);
     navigate(`/leads/${lead.id}`);
   };
@@ -142,33 +155,28 @@ export function LeadDetailPage() {
     if (!currentUser) return;
     const base: Partial<Lead> = { appointment_result: outcomeResult };
     if (outcomeResult === "NO_SHOW") {
-      // Bounce back: reset to NA, clear appointment, increment bounce count
       base.status = "NA";
       base.appointment_date = undefined;
       base.appointment_time = undefined;
       base.bounce_count = (lead.bounce_count ?? 0) + 1;
     } else if (outcomeResult === "RESCHEDULED") {
-      // Keep APPOINTMENT status but clear the date so adviser can set a new one
       base.appointment_date = undefined;
       base.appointment_time = undefined;
     }
-    updateLead(lead.id, base, currentUser.id);
+    updateLeadMutation.mutate({ id: lead.id, payload: base });
     setOutcomeOpen(false);
   };
 
   const handleAddActivity = () => {
     if (!currentUser || !actForm.subject) return;
-    createActivity(
-      {
-        ...actForm,
-        lead_id: lead.id,
-        assigned_to_id: currentUser.id,
-        created_by: currentUser.id,
-        scheduled_at: new Date().toISOString(),
-        completed_at: new Date().toISOString(),
-      },
-      currentUser.id,
-    );
+    createActivityMutation.mutate({
+      ...actForm,
+      lead_id: lead.id,
+      assigned_to_id: currentUser.id,
+      created_by: currentUser.id,
+      scheduled_at: new Date().toISOString(),
+      completed_at: new Date().toISOString(),
+    });
     setActivityOpen(false);
     setActForm({
       type: "CALL",
@@ -297,7 +305,7 @@ export function LeadDetailPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {(["NA", "APPOINTMENT", "NOT_INTERESTED", "ABANDON", "OTHERS"] as LeadStatus[]).map((s) => (
+                      {(["NA", "APPOINTMENT", "NOT_INTERESTED", "AVOID", "KIV", "OTHERS"] as LeadStatus[]).map((s) => (
                         <SelectItem key={s} value={s}>
                           {s.replace("_", " ")}
                         </SelectItem>
@@ -319,7 +327,7 @@ export function LeadDetailPage() {
                     <SelectContent>
                       {SOURCES.map((s) => (
                         <SelectItem key={s} value={s}>
-                          {s.replace("_", " ")}
+                          {SOURCE_LABELS[s]}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -381,7 +389,7 @@ export function LeadDetailPage() {
                 <InfoRow label="Phone" value={lead.phone} />
                 <InfoRow
                   label="Source"
-                  value={lead.source?.replace("_", " ")}
+                  value={SOURCE_LABELS[lead.source] ?? lead.source}
                 />
                 <InfoRow
                   label="Assigned To"
@@ -529,7 +537,7 @@ export function LeadDetailPage() {
                       disabled={(currentUser?.credit_balance ?? 0) < 1}
                       onClick={() => {
                         if (!currentUser) return;
-                        claimLead(lead.id, currentUser.id);
+                        claimLeadMutation.mutate({ leadId: lead.id, userId: currentUser.id });
                       }}
                     >
                       Claim Lead (1 credit)
@@ -547,7 +555,7 @@ export function LeadDetailPage() {
                       className="w-full text-muted-foreground gap-1.5"
                       onClick={() => {
                         if (!currentUser) return;
-                        returnLead(lead.id, currentUser.id);
+                        returnLeadMutation.mutate({ leadId: lead.id, userId: currentUser.id });
                       }}
                     >
                       Return Lead (+1 credit)
@@ -636,7 +644,10 @@ export function LeadDetailPage() {
                           const next = discussed
                             ? current.filter((id) => id !== p.id)
                             : [...current, p.id];
-                          updateLead(lead.id, { products_discussed: next }, currentUser.id);
+                          updateLeadMutation.mutate({
+                            id: lead.id,
+                            payload: { products_discussed: next },
+                          });
                         }}
                         title={p.name}
                         className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium border transition-colors ${
@@ -688,7 +699,7 @@ export function LeadDetailPage() {
                 className="flex-1 resize-none text-sm"
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && noteText.trim() && currentUser) {
-                    addLeadNote(lead.id, noteText.trim(), currentUser.id);
+                    addLeadNoteMutation.mutate({ leadId: lead.id, content: noteText.trim(), createdBy: currentUser.id });
                     setNoteText("");
                   }
                 }}
@@ -699,7 +710,7 @@ export function LeadDetailPage() {
                 disabled={!noteText.trim()}
                 onClick={() => {
                   if (!noteText.trim() || !currentUser) return;
-                  addLeadNote(lead.id, noteText.trim(), currentUser.id);
+                  addLeadNoteMutation.mutate({ leadId: lead.id, content: noteText.trim(), createdBy: currentUser.id });
                   setNoteText("");
                 }}
               >
@@ -739,7 +750,7 @@ export function LeadDetailPage() {
                     </div>
                     {canDelete && (
                       <button
-                        onClick={() => deleteLeadNote(note.id)}
+                        onClick={() => deleteLeadNoteMutation.mutate({ noteId: note.id, leadId: lead.id })}
                         className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive p-0.5 rounded"
                         title="Delete note"
                       >

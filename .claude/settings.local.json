@@ -4,7 +4,12 @@
       "Bash(npm run *)",
       "Bash(mkdir -p \"C:\\\\Projects\\\\crm-demo\\\\.claude\")",
       "mcp__Claude_Preview__preview_start",
-      "Bash(powershell -Command \"\\(Get-Content 'C:\\\\Projects\\\\crm-demo\\\\src\\\\data\\\\seed.json' -Raw\\) -replace '2025-', '2026-' | Set-Content 'C:\\\\Projects\\\\crm-demo\\\\src\\\\data\\\\seed.json' -Encoding UTF8\")"
+      "Bash(powershell -Command \"\\(Get-Content 'C:\\\\Projects\\\\crm-demo\\\\src\\\\data\\\\seed.json' -Raw\\) -replace '2025-', '2026-' | Set-Content 'C:\\\\Projects\\\\crm-demo\\\\src\\\\data\\\\seed.json' -Encoding UTF8\")",
+      "Bash(rtk grep *)",
+      "Bash(find /home/rayhanyovi/Documents/Projects/Projectsz/wav -type f -name \"*.prisma\" -o -name \"schema.prisma\" | head -20)",
+      "Bash(rtk find *)",
+      "Bash(rtk ls *)",
+      "Bash(rtk read *)"
     ]
   }
 }

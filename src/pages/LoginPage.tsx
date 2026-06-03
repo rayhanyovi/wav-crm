@@ -1,93 +1,226 @@
-import { useNavigate } from "react-router-dom";
-import { useAuthStore } from "@/store/useAuthStore";
-import { useCrmStore } from "@/store/useCrmStore";
-import { Phone, TrendingUp, Users } from "lucide-react";
-import type { User } from "@/data/types";
+import { useState } from "react";
+import type { FormEvent } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { Lock, Mail, Phone, TrendingUp, Users } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { supabase } from "@/lib/supabase";
+import { mapAuthProfile, useAuthStore } from "@/store/useAuthStore";
+import type { UserRole } from "@/data/types";
 
-const roleConfig = {
-  MASTER: {
+const SEEDED_PASSWORD = "WavCRM@2026!";
+
+const roleAccounts: Array<{
+  name: string;
+  email: string;
+  role: UserRole;
+  icon: typeof TrendingUp;
+  desc: string;
+}> = [
+  {
+    name: "WAV Master",
+    email: "master@wav.sg",
+    role: "MASTER",
     icon: TrendingUp,
-    color: "text-violet-700 dark:text-violet-300",
-    bg: "bg-violet-100 dark:bg-violet-950/40",
-    border: "border-violet-200 dark:border-violet-800",
-    desc: "Full access. See all advisers' leads, manage team, view audit logs.",
+    desc: "Full access, team controls, audit logs, and all leads.",
   },
-  ADVISER: {
+  {
+    name: "Junhao",
+    email: "junhao@wav.sg",
+    role: "ADVISER",
     icon: Users,
-    color: "text-primary",
-    bg: "bg-primary/10",
-    border: "border-primary/25",
-    desc: "See own leads, log calls, set appointments, run calling sessions.",
+    desc: "Adviser account with assigned leads, deals, and follow-ups.",
   },
-  TELEMARKETER: {
+  {
+    name: "Javier",
+    email: "javier@wav.sg",
+    role: "ADVISER",
+    icon: Users,
+    desc: "Second adviser account for role and ownership testing.",
+  },
+  {
+    name: "Yinesa",
+    email: "yinesa@wav.sg",
+    role: "TELEMARKETER",
     icon: Phone,
-    color: "text-emerald-700 dark:text-emerald-300",
-    bg: "bg-emerald-100 dark:bg-emerald-950/40",
-    border: "border-emerald-200 dark:border-emerald-800",
-    desc: "Cold call prospects, qualify leads, hand off to assigned adviser.",
+    desc: "Telemarketer account for cold-call queues and handoffs.",
   },
+  {
+    name: "Zee",
+    email: "zee@wav.sg",
+    role: "TELEMARKETER",
+    icon: Phone,
+    desc: "Second telemarketer account for import and calling flows.",
+  },
+];
+
+const roleBadgeClass: Record<UserRole, string> = {
+  MASTER: "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-300",
+  ADVISER: "border-primary/25 bg-primary/10 text-primary",
+  TELEMARKETER: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300",
 };
 
 export function LoginPage() {
   const { login } = useAuthStore();
-  const { users } = useCrmStore();
   const navigate = useNavigate();
+  const [email, setEmail] = useState(roleAccounts[0].email);
+  const [password, setPassword] = useState(SEEDED_PASSWORD);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSelect = (user: User) => {
-    login(user);
+  const submit = async (event?: FormEvent) => {
+    event?.preventDefault();
+    setSubmitting(true);
+    setError(null);
+
+    const { data: authData, error: authError } =
+      await supabase.auth.signInWithPassword({ email, password });
+
+    if (authError || !authData.user) {
+      setSubmitting(false);
+      setError(authError?.message ?? "Unable to sign in.");
+      return;
+    }
+
+    const { data: profile, error: profileError } = await supabase
+      .from("crm_users")
+      .select("id,name,email,role,avatar,is_active,credit_balance,telemarketer_access,telemarketer_id,created_at")
+      .eq("auth_user_id", authData.user.id)
+      .single();
+
+    if (profileError || !profile) {
+      await supabase.auth.signOut();
+      setSubmitting(false);
+      setError("Signed in, but no CRM profile was found for this account.");
+      return;
+    }
+
+    if (!profile.is_active) {
+      await supabase.auth.signOut();
+      setSubmitting(false);
+      setError("This CRM account is inactive.");
+      return;
+    }
+
+    login(mapAuthProfile(profile));
     navigate("/");
   };
 
+  const fillAccount = (account: (typeof roleAccounts)[number]) => {
+    setEmail(account.email);
+    setPassword(SEEDED_PASSWORD);
+    setError(null);
+  };
+
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-card p-6 sm:p-8">
-      {/* Header */}
-      <div className="mb-10 text-center">
-        <div className="mb-4 inline-flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-lg shadow-primary/25">
-            <TrendingUp className="h-6 w-6" />
+    <div className="flex min-h-screen bg-background">
+      <section className="flex flex-1 flex-col justify-center px-6 py-10 sm:px-10 lg:px-16">
+        <div className="w-full max-w-md">
+          <div className="mb-8">
+            <div className="mb-4 inline-flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-lg shadow-primary/25">
+                <TrendingUp className="h-6 w-6" />
+              </div>
+              <span className="text-3xl font-bold tracking-tight text-foreground">
+                Dealflow
+              </span>
+            </div>
+            <p className="text-lg font-medium text-foreground/80">
+              WAV Telemarketing &amp; Advisory CRM
+            </p>
           </div>
-          <span className="text-3xl font-bold tracking-tight text-foreground">Dealflow</span>
+
+          <form onSubmit={submit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <div className="relative">
+                <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  className="pl-9"
+                  autoComplete="email"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <div className="relative">
+                <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  className="pl-9"
+                  autoComplete="current-password"
+                  required
+                />
+              </div>
+            </div>
+
+            {error && (
+              <div className="rounded-md border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                {error}
+              </div>
+            )}
+
+            <Button type="submit" className="w-full gap-2" disabled={submitting}>
+              <Lock className="h-4 w-4" />
+              {submitting ? "Signing in..." : "Sign in"}
+            </Button>
+
+            <p className="text-center text-sm text-muted-foreground">
+              New to Dealflow?{" "}
+              <Link to="/register" className="font-medium text-primary hover:underline">
+                Create an account
+              </Link>
+            </p>
+          </form>
         </div>
-        <p className="text-lg font-medium text-foreground/80">WAV Telemarketing &amp; Advisory CRM</p>
-        <p className="mt-1 text-sm text-muted-foreground">Select a role to explore the prototype</p>
-      </div>
+      </section>
 
-      {/* Role cards */}
-      <div className="grid w-full max-w-4xl grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {users.map((user) => {
-          const cfg = roleConfig[user.role];
-          if (!cfg) return null;
-          const Icon = cfg.icon;
-          return (
-            <button
-              key={user.id}
-              onClick={() => handleSelect(user)}
-              className={`
-                group flex min-h-[148px] items-start gap-4 rounded-lg border bg-card/90 p-5 text-left
-                ${cfg.border}
-                cursor-pointer shadow-sm shadow-primary/5 backdrop-blur
-                transition-all duration-150 hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-lg hover:shadow-primary/10 active:translate-y-0
-              `}
-            >
-              <div className={`mt-0.5 rounded-lg p-2.5 shadow-sm transition-transform duration-150 group-hover:scale-105 ${cfg.bg} ${cfg.color}`}>
-                <Icon className="h-5 w-5" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="mb-0.5 flex items-center gap-2">
-                  <span className="font-semibold text-foreground">{user.name}</span>
-                  <span className={`rounded-full bg-background px-2 py-0.5 text-xs font-medium shadow-sm ${cfg.color}`}>
-                    {user.role}
-                  </span>
+      <aside className="hidden w-[520px] border-l bg-muted/30 p-8 lg:flex lg:flex-col lg:justify-center">
+        <div className="mb-5">
+          <p className="text-sm font-medium text-muted-foreground">Seeded role accounts</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Use the shared seed password for any account.
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          {roleAccounts.map((account) => {
+            const Icon = account.icon;
+            return (
+              <button
+                key={account.email}
+                type="button"
+                onClick={() => fillAccount(account)}
+                className="flex w-full items-start gap-3 rounded-lg border bg-background p-4 text-left shadow-sm transition-colors hover:border-primary/40 hover:bg-card"
+              >
+                <div className="rounded-md bg-primary/10 p-2 text-primary">
+                  <Icon className="h-4 w-4" />
                 </div>
-                <p className="text-xs text-muted-foreground">{user.email}</p>
-                <p className="mt-1.5 text-sm text-foreground/70">{cfg.desc}</p>
-              </div>
-            </button>
-          );
-        })}
-      </div>
-
-      <p className="mt-8 text-xs text-muted-foreground">Prototype demo — no passwords required</p>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-foreground">{account.name}</span>
+                    <span className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${roleBadgeClass[account.role]}`}>
+                      {account.role}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{account.email}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{account.desc}</p>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </aside>
     </div>
   );
 }

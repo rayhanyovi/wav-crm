@@ -2,6 +2,9 @@ import { useState, useMemo } from "react";
 import { Activity } from "lucide-react";
 import { useCrmStore } from "@/store/useCrmStore";
 import { useAuthStore } from "@/store/useAuthStore";
+import { useUsers } from "@/hooks/useUsers";
+import { useLeads } from "@/hooks/useLeads";
+import { useActivities } from "@/hooks/useActivities";
 import { isTelemarketer, isAdviser, isMaster } from "@/lib/permissions";
 import {
   Table,
@@ -30,7 +33,10 @@ import { Link, useNavigate } from "react-router-dom";
 const TYPES = ["CALL", "EMAIL", "MEETING", "TASK", "NOTE", "DEMO", "FOLLOW_UP"];
 
 export function ActivitiesPage() {
-  const { activities, contacts, deals, leads, users } = useCrmStore();
+  const { contacts, deals } = useCrmStore();
+  const { data: leads = [] } = useLeads({ includeAbandoned: true });
+  const { data: users = [] } = useUsers();
+  const { data: activities = [], isLoading, isError } = useActivities();
   const { currentUser } = useAuthStore();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
@@ -73,7 +79,6 @@ export function ActivitiesPage() {
   }, [deals, currentUser]);
 
   const live = activities
-    .filter((a) => !a.deleted_at)
     .filter((a) => {
       if (!currentUser) return false;
       // MASTER: sees everything
@@ -120,6 +125,30 @@ export function ActivitiesPage() {
     }
     return null;
   };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <h1 className="text-2xl font-bold">Activities</h1>
+        <div className="space-y-2">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="h-12 rounded-lg bg-muted animate-pulse" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="space-y-4">
+        <h1 className="text-2xl font-bold">Activities</h1>
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-6 text-center text-sm text-destructive">
+          Failed to load activities. Please refresh the page.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

@@ -25,8 +25,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useCrmStore } from "@/store/useCrmStore";
 import { useAuthStore } from "@/store/useAuthStore";
+import { useBulkCreateLeads } from "@/hooks/useLeads";
 import { isTelemarketer } from "@/lib/permissions";
 import type { LeadStatus, LeadSource } from "@/data/types";
 
@@ -62,27 +62,26 @@ const COL_ALIASES: Record<string, string> = {
 };
 
 // ─── Value normalisers ─────────────────────────────────────────────────────────
-const VALID_STATUSES = new Set<LeadStatus>(["NA", "APPOINTMENT", "NOT_INTERESTED", "ABANDON", "OTHERS"]);
+const VALID_STATUSES = new Set<LeadStatus>(["NA", "APPOINTMENT", "NOT_INTERESTED", "AVOID", "KIV", "OTHERS"]);
 const STATUS_MAP: Record<string, LeadStatus> = {
   new: "NA", contacted: "NA", dormant: "NA", na: "NA",
   qualified: "APPOINTMENT", appointment: "APPOINTMENT",
   converted: "OTHERS", others: "OTHERS",
   lost: "NOT_INTERESTED", "not interested": "NOT_INTERESTED", not_interested: "NOT_INTERESTED",
-  abandon: "ABANDON", abandoned: "ABANDON",
+  avoid: "AVOID", abandoned: "AVOID", abandon: "AVOID",
+  kiv: "KIV", "keep in view": "KIV",
 };
 
 const VALID_SOURCES = new Set<LeadSource>([
-  "COLD_CALL", "REFERRAL", "MAGNET", "SCOUT", "LENS", "BEACON", "MANUAL", "WALK_IN",
+  "AP_MARKETING", "LP_MARKETING", "OWN_SOURCE", "OTHERS",
 ]);
 const SOURCE_MAP: Record<string, LeadSource> = {
-  "cold call": "COLD_CALL", cold_call: "COLD_CALL", cold: "COLD_CALL",
-  referral: "REFERRAL", ref: "REFERRAL",
-  magnet: "MAGNET", website: "BEACON", web: "BEACON", beacon: "BEACON",
-  "social media": "MAGNET", social: "MAGNET",
-  scout: "SCOUT", advertisement: "SCOUT", ad: "SCOUT",
-  lens: "LENS", manual: "MANUAL", other: "MANUAL", others: "MANUAL",
-  "walk in": "WALK_IN", "walk-in": "WALK_IN", walk_in: "WALK_IN", walkin: "WALK_IN",
-  event: "REFERRAL",
+  "ap marketing": "AP_MARKETING", ap_marketing: "AP_MARKETING", ap: "AP_MARKETING",
+  "lp marketing": "LP_MARKETING", lp_marketing: "LP_MARKETING", lp: "LP_MARKETING",
+  "own source": "OWN_SOURCE", own_source: "OWN_SOURCE", own: "OWN_SOURCE",
+  referral: "OWN_SOURCE", manual: "OWN_SOURCE",
+  "cold call": "OWN_SOURCE", cold_call: "OWN_SOURCE",
+  other: "OTHERS", others: "OTHERS",
 };
 
 function normaliseStatus(raw: string): LeadStatus {
@@ -96,7 +95,7 @@ function normaliseSource(raw: string): LeadSource {
   const key = raw.trim().toLowerCase();
   if (VALID_SOURCES.has(raw.trim().toUpperCase() as LeadSource))
     return raw.trim().toUpperCase() as LeadSource;
-  return SOURCE_MAP[key] ?? "COLD_CALL";
+  return SOURCE_MAP[key] ?? "OTHERS";
 }
 
 // ─── CSV/TSV parser ────────────────────────────────────────────────────────────
@@ -234,19 +233,26 @@ interface Props {
 }
 
 const ALL_SOURCES: LeadSource[] = [
-  "COLD_CALL", "MANUAL", "REFERRAL", "WALK_IN", "MAGNET", "SCOUT", "LENS", "BEACON",
+  "AP_MARKETING", "LP_MARKETING", "OWN_SOURCE", "OTHERS",
 ];
 
+const SOURCE_LABELS: Record<LeadSource, string> = {
+  AP_MARKETING: "AP Marketing",
+  LP_MARKETING: "LP Marketing",
+  OWN_SOURCE: "Own Source",
+  OTHERS: "Others",
+};
+
 export function LeadImportDialog({ open, onClose }: Props) {
-  const { createLead } = useCrmStore();
   const { currentUser } = useAuthStore();
+  const bulkCreateMutation = useBulkCreateLeads();
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [text, setText] = useState("");
   const [parsed, setParsed] = useState<ParsedRow[]>([]);
   const [importing, setImporting] = useState(false);
   const [done, setDone] = useState<{ ok: number; skipped: number } | null>(null);
-  const [defaultSource, setDefaultSource] = useState<LeadSource>("COLD_CALL");
+  const [defaultSource, setDefaultSource] = useState<LeadSource>("AP_MARKETING");
   const [fileName, setFileName] = useState<string | null>(null);
   // Multi-sheet support
   const [sheetNames, setSheetNames] = useState<string[]>([]);
@@ -305,38 +311,40 @@ export function LeadImportDialog({ open, onClose }: Props) {
   const handleImport = () => {
     if (!currentUser) return;
     setImporting(true);
-    let ok = 0;
-    let skipped = 0;
     const isTm = isTelemarketer(currentUser);
-    for (const row of parsed) {
-      if (!row._valid) { skipped++; continue; }
-      createLead(
-        {
-          salutation: row.salutation,
-          first_name: row.first_name,
-          last_name: row.last_name,
-          phone: row.phone,
-          email: row.email,
-          status: row.status,
-          source: row.source,
-          age: row.age,
-          gender: row.gender,
-          residential_status: row.residential_status,
-          income_range: row.income_range,
-          zipcode: row.zipcode,
-          notes: row.notes,
-          // TM importing → they own the lead as telemarketer; adviser importing → assigned to them
-          telemarketer_owner_id: isTm ? currentUser.id : undefined,
-          assigned_to_id: isTm ? undefined : currentUser.id,
-          created_by: currentUser.id,
-          deleted_at: undefined,
-        },
-        currentUser.id,
-      );
-      ok++;
-    }
-    setImporting(false);
-    setDone({ ok, skipped });
+    const validRows = parsed.filter((r) => r._valid);
+    const skipped = parsed.length - validRows.length;
+    const ok = validRows.length;
+
+    const payloads = validRows.map((row) => ({
+      salutation: row.salutation,
+      first_name: row.first_name,
+      last_name: row.last_name,
+      phone: row.phone,
+      email: row.email,
+      status: row.status,
+      source: row.source,
+      age: row.age,
+      gender: row.gender,
+      residential_status: row.residential_status,
+      income_range: row.income_range,
+      zipcode: row.zipcode,
+      notes: row.notes,
+      telemarketer_owner_id: isTm ? currentUser.id : undefined,
+      assigned_to_id: isTm ? undefined : currentUser.id,
+      created_by: currentUser.id,
+      updated_at: new Date().toISOString(),
+    }));
+
+    bulkCreateMutation.mutate(payloads, {
+      onSuccess: () => {
+        setImporting(false);
+        setDone({ ok, skipped });
+      },
+      onError: () => {
+        setImporting(false);
+      },
+    });
   };
 
   const handleClose = () => {
@@ -390,7 +398,7 @@ export function LeadImportDialog({ open, onClose }: Props) {
                   <SelectContent>
                     {ALL_SOURCES.map((s) => (
                       <SelectItem key={s} value={s} className="text-xs">
-                        {s.replace("_", " ")}
+                        {SOURCE_LABELS[s]}
                       </SelectItem>
                     ))}
                   </SelectContent>

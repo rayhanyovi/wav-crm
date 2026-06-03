@@ -1,7 +1,11 @@
 import { useMemo, type ReactNode } from "react";
 import { Phone, PhoneCall, PhoneIncoming, Users, CalendarDays, Bell, TrendingUp, CalendarPlus } from "lucide-react";
-import { useCrmStore } from "@/store/useCrmStore";
 import { useAuthStore } from "@/store/useAuthStore";
+import { useUsers } from "@/hooks/useUsers";
+import { useLeads } from "@/hooks/useLeads";
+import { useActivities } from "@/hooks/useActivities";
+import { useNotifications } from "@/hooks/useNotifications";
+import { useCallSessions } from "@/hooks/useCallSessions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LeadStatusBadge, ActivityTypeBadge, RoleBadge } from "@/components/common/StatusBadge";
 import { formatDuration, formatRelative } from "@/lib/format";
@@ -18,15 +22,17 @@ const STATUS_COLORS: Record<LeadStatus, string> = {
   NA:             "#64748b",
   APPOINTMENT:    "#2563eb",
   NOT_INTERESTED: "#d97706",
-  ABANDON:        "#dc2626",
+  AVOID:          "#dc2626",
+  KIV:            "#f59e0b",
   OTHERS:         "#9333ea",
 };
 
 const STATUS_LABELS: Record<LeadStatus, string> = {
-  NA:             "No Answer",
+  NA:             "NA",
   APPOINTMENT:    "Appointment",
   NOT_INTERESTED: "Not Interested",
-  ABANDON:        "Abandoned",
+  AVOID:          "Avoid",
+  KIV:            "KIV",
   OTHERS:         "Others",
 };
 
@@ -66,8 +72,12 @@ function StatCard({
 }
 
 export function DashboardPage() {
-  const { leads, activities, users, notifications, call_sessions } = useCrmStore();
+  const { data: activities = [] } = useActivities();
+  const { data: users = [] } = useUsers();
+  const { data: leads = [] } = useLeads({ includeAbandoned: true });
   const { currentUser } = useAuthStore();
+  const { data: notifications = [] } = useNotifications(currentUser?.id, 50);
+  const { data: callSessions = [] } = useCallSessions({ userId: currentUser?.id });
 
   const isManager = canManage(currentUser);
   const isAdviserUser = isAdviser(currentUser);
@@ -75,14 +85,14 @@ export function DashboardPage() {
 
   // Today's call stats
   const { callsMade, pickups, totalDurationSeconds } = useMemo(
-    () => getTodayCallStats(activities, currentUser?.id || "", call_sessions),
-    [activities, currentUser, call_sessions]
+    () => getTodayCallStats(activities, currentUser?.id || "", callSessions),
+    [activities, currentUser, callSessions]
   );
 
   const answerRate = callsMade > 0 ? Math.round((pickups / callsMade) * 100) : 0;
 
   // My unread notifications
-  const myNotifs = notifications.filter((n) => n.recipient_id === currentUser?.id && !n.is_read);
+  const myNotifs = notifications.filter((n) => !n.is_read);
 
   // Lead status breakdown — scoped to current user's leads if not master
   const myLeads = leads.filter((l) => {
@@ -93,7 +103,7 @@ export function DashboardPage() {
     return false;
   });
 
-  const STATUSES: LeadStatus[] = ["NA", "APPOINTMENT", "NOT_INTERESTED", "ABANDON", "OTHERS"];
+  const STATUSES: LeadStatus[] = ["NA", "APPOINTMENT", "NOT_INTERESTED", "AVOID", "OTHERS"];
   const statusData = STATUSES.map((s) => ({
     name: STATUS_LABELS[s],
     count: myLeads.filter((l) => l.status === s).length,
@@ -114,7 +124,6 @@ export function DashboardPage() {
 
   // Recent activities (scoped)
   const recentActivities = [...activities]
-    .filter((a) => !a.deleted_at)
     .filter((a) => isManager || a.created_by === currentUser?.id)
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     .slice(0, 8);
@@ -124,7 +133,7 @@ export function DashboardPage() {
     ? users
         .filter((u) => u.is_active)
         .map((u) => {
-          const uActivities = activities.filter((a) => a.created_by === u.id && !a.deleted_at);
+          const uActivities = activities.filter((a) => a.created_by === u.id);
           const uCalls = uActivities.filter((a) => a.type === "CALL");
           const uLeads = leads.filter((l) => l.assigned_to_id === u.id && !l.deleted_at);
           return {

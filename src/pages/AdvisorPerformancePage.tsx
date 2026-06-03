@@ -3,6 +3,8 @@ import { Link, useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, UserCog } from "lucide-react";
 import { useCrmStore } from "@/store/useCrmStore";
 import { useAuthStore } from "@/store/useAuthStore";
+import { useUsers } from "@/hooks/useUsers";
+import { useActivities } from "@/hooks/useActivities";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -44,7 +46,9 @@ const RESULT_COLORS: Record<string, string> = {
 export function AdvisorPerformancePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { users, activities, deals, updateUser, assignCredits } = useCrmStore();
+  const { deals, updateUser, assignCredits } = useCrmStore();
+  const { data: activities = [] } = useActivities();
+  const { data: users = [] } = useUsers();
   const { currentUser } = useAuthStore();
   const [creditAdjust, setCreditAdjust] = useState(0);
 
@@ -52,9 +56,7 @@ export function AdvisorPerformancePage() {
   if (!advisor)
     return <div className="p-6 text-muted-foreground">User not found.</div>;
 
-  const userActivities = activities.filter(
-    (a) => a.created_by === id && !a.deleted_at,
-  );
+  const userActivities = activities.filter((a) => a.created_by === id);
   const calls = userActivities.filter((a) => a.type === "CALL");
   const pickups = calls.filter(
     (a) => a.result !== "NO_ANSWER" && a.result !== "CANCELLED",

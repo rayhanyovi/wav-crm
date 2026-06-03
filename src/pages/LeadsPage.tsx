@@ -1,7 +1,9 @@
 import { useState } from "react";
-import { ExternalLink, Plus, Upload, Users } from "lucide-react";
-import { useCrmStore } from "@/store/useCrmStore";
+import { ExternalLink, MoreHorizontal, Plus, Upload, Users } from "lucide-react";
 import { useAuthStore } from "@/store/useAuthStore";
+import { useActivities } from "@/hooks/useActivities";
+import { useUsers } from "@/hooks/useUsers";
+import { useLeads, useCreateLead, useUpdateLead } from "@/hooks/useLeads";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -41,30 +43,55 @@ import { getLastContactedDate } from "@/lib/selectors";
 import { canEdit, isMaster, isAdviser, isTelemarketer } from "@/lib/permissions";
 import { Link, useNavigate } from "react-router-dom";
 import type { LeadStatus, LeadSource } from "@/data/types";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { LeadImportDialog } from "@/components/leads/LeadImportDialog";
 
 // APPOINTMENT is excluded — once a lead reaches that status it lives in Deals
 const STATUSES: LeadStatus[] = [
   "NA",
   "NOT_INTERESTED",
-  "ABANDON",
+  "AVOID",
+  "KIV",
   "OTHERS",
 ];
 const SOURCES: LeadSource[] = [
-  "COLD_CALL",
-  "REFERRAL",
-  "MAGNET",
-  "SCOUT",
-  "LENS",
-  "BEACON",
-  "MANUAL",
-  "WALK_IN",
+  "AP_MARKETING",
+  "LP_MARKETING",
+  "OWN_SOURCE",
+  "OTHERS",
 ];
 
+const SOURCE_LABELS: Record<LeadSource, string> = {
+  AP_MARKETING: "AP Marketing",
+  LP_MARKETING: "LP Marketing",
+  OWN_SOURCE: "Own Source",
+  OTHERS: "Others",
+};
+
+const STATUS_LABELS: Record<LeadStatus, string> = {
+  NA: "NA",
+  APPOINTMENT: "Appointment",
+  NOT_INTERESTED: "Not Interested",
+  AVOID: "Avoid",
+  KIV: "KIV",
+  OTHERS: "Others",
+};
+
 export function LeadsPage() {
-  const { leads, users, activities, createLead } = useCrmStore();
+  const { data: activities = [] } = useActivities();
+  const { data: users = [] } = useUsers();
   const { currentUser } = useAuthStore();
   const navigate = useNavigate();
+
+  // Real Supabase data — RLS scopes by role automatically
+  const { data: leads = [] } = useLeads({ includeAbandoned: true });
+  const createLeadMutation = useCreateLead();
+  const updateLeadMutation = useUpdateLead();
 
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("ALL");
@@ -80,7 +107,7 @@ export function LeadsPage() {
     last_name: "",
     email: "",
     phone: "",
-    source: "COLD_CALL" as LeadSource,
+    source: "AP_MARKETING" as LeadSource,
     status: "NA" as LeadStatus,
     notes: "",
   });
@@ -147,9 +174,8 @@ export function LeadsPage() {
 
   const handleCreate = () => {
     if (!form.first_name || !form.last_name || !currentUser) return;
-    createLead(
+    createLeadMutation.mutate(
       { ...form, assigned_to_id: currentUser.id, created_by: currentUser.id },
-      currentUser.id,
     );
     setCreateOpen(false);
     setForm({
@@ -157,7 +183,7 @@ export function LeadsPage() {
       last_name: "",
       email: "",
       phone: "",
-      source: "COLD_CALL",
+      source: "AP_MARKETING",
       status: "NA",
       notes: "",
     });
@@ -214,7 +240,7 @@ export function LeadsPage() {
               <SelectItem value="ALL">All Sources</SelectItem>
               {SOURCES.map((s) => (
                 <SelectItem key={s} value={s}>
-                  {s.replace("_", " ")}
+                  {SOURCE_LABELS[s]}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -283,6 +309,7 @@ export function LeadsPage() {
                 <TableHead>Source</TableHead>
                 <TableHead>Assigned To</TableHead>
                 <TableHead>Last Contacted</TableHead>
+                {canEdit(currentUser) && <TableHead className="w-16">Action</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -310,7 +337,7 @@ export function LeadsPage() {
                       <LeadStatusBadge status={lead.status} />
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
-                      {lead.source.replace("_", " ")}
+                      {SOURCE_LABELS[lead.source] ?? lead.source}
                     </TableCell>
                     <TableCell className="text-xs">
                       {assignee ? (
@@ -332,6 +359,30 @@ export function LeadsPage() {
                         <span className="text-orange-500">Never</span>
                       )}
                     </TableCell>
+                    {canEdit(currentUser) && (
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                            <Button variant="ghost" size="icon" className="h-7 w-7">
+                              <MoreHorizontal className="h-3.5 w-3.5" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                            {STATUSES.filter((s) => s !== lead.status).map((s) => (
+                              <DropdownMenuItem
+                                key={s}
+                                onClick={() => {
+                                  if (!currentUser) return;
+                                  updateLeadMutation.mutate({ id: lead.id, payload: { status: s } });
+                                }}
+                              >
+                                <LeadStatusBadge status={s} />
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    )}
                   </TableRow>
                 );
               })}
@@ -509,7 +560,7 @@ export function LeadsPage() {
                 <SelectContent>
                   {SOURCES.map((s) => (
                     <SelectItem key={s} value={s}>
-                      {s.replace("_", " ")}
+                      {SOURCE_LABELS[s]}
                     </SelectItem>
                   ))}
                 </SelectContent>

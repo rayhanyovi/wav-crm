@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { ArrowLeft, Plus, Trash2, Search, AlertCircle, ChevronDown, BookOpen, PlusCircle, Check, Banknote } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Search, AlertCircle, ChevronDown, BookOpen, PlusCircle, Check, Banknote, Copy, CheckCheck } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -361,6 +361,106 @@ function RiskGauge({ score }: { score: number }) {
   );
 }
 
+// ── Copy Summary Card ────────────────────────────────────────────────────────
+const PROFILE_OPTIONS: RiskCategory[] = ['Conservative', 'Moderate', 'Balanced', 'Growth', 'Aggressive'];
+
+function RiskBarPreview({ highlight }: { highlight: RiskCategory }) {
+  return (
+    <span className="inline-flex gap-0.5">
+      {PROFILE_OPTIONS.map((c) => (
+        <span
+          key={c}
+          className={`inline-block w-4 h-4 rounded-sm text-[8px] leading-4 text-center ${
+            c === highlight
+              ? 'bg-blue-500 text-white'
+              : 'bg-muted border border-border'
+          }`}
+          title={c}
+        >
+          {c === highlight ? '●' : ''}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+function CopySummaryCard({
+  filledLines,
+  resultCategory,
+  clientProfile,
+  onClientProfileChange,
+  copied,
+  onCopy,
+}: {
+  filledLines: PortfolioLine[];
+  resultCategory: RiskCategory;
+  clientProfile: RiskCategory | '';
+  onClientProfileChange: (v: RiskCategory | '') => void;
+  copied: boolean;
+  onCopy: () => void;
+}) {
+  return (
+    <div className="rounded-lg border overflow-hidden">
+      <div className="px-3 py-2.5 bg-muted/50 border-b flex items-center justify-between">
+        <span className="text-xs font-medium">Client Summary</span>
+        <Button
+          size="sm"
+          variant={copied ? "ghost" : "outline"}
+          className="h-7 text-xs gap-1.5"
+          onClick={onCopy}
+        >
+          {copied ? <><CheckCheck className="h-3 w-3 text-green-600" />Copied!</> : <><Copy className="h-3 w-3" />Copy</>}
+        </Button>
+      </div>
+      <div className="p-3 space-y-3">
+        {/* Preview */}
+        <div className="rounded-md bg-muted/30 border p-3 text-xs leading-relaxed space-y-2 font-mono">
+          <p className="text-muted-foreground">Funds available were shown and you have selected the following:</p>
+          <div className="space-y-0.5">
+            {filledLines.map((l, i) => (
+              <p key={l.id}>
+                {i + 1}.&nbsp;&nbsp;{l.fund!.name} - <span className={`font-semibold ${RISK_CATEGORY_COLOR[l.fund!.riskCategory].split(' ').find(c => c.startsWith('text-')) ?? ''}`}>{l.fund!.riskCategory}</span> - {l.allocation}%
+              </p>
+            ))}
+          </div>
+          <p className="pt-1">
+            The overall risk classification of the funds selected by you is{' '}
+            <span className="font-semibold">{resultCategory}</span>.&nbsp;&nbsp;
+            <RiskBarPreview highlight={resultCategory} />
+          </p>
+          {clientProfile && (
+            <p>
+              Your risk profile is{' '}
+              <span className="font-semibold">{clientProfile}</span>.&nbsp;&nbsp;
+              <RiskBarPreview highlight={clientProfile} />
+            </p>
+          )}
+        </div>
+
+        {/* Client profile selector */}
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-muted-foreground shrink-0">Client's risk profile:</span>
+          <div className="flex gap-1">
+            {PROFILE_OPTIONS.map((opt) => (
+              <button
+                key={opt}
+                onClick={() => onClientProfileChange(clientProfile === opt ? '' : opt)}
+                className={`text-[10px] px-2 py-0.5 rounded-full border font-medium transition-colors ${
+                  clientProfile === opt
+                    ? RISK_CATEGORY_COLOR[opt]
+                    : 'text-muted-foreground border-border hover:bg-muted'
+                }`}
+              >
+                {opt}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 let nextId = 1;
 function makeId() { return String(nextId++); }
@@ -372,6 +472,8 @@ export function PortfolioRiskCalculatorPage() {
   const [lines, setLines] = useState<PortfolioLine[]>([EMPTY_LINE(), EMPTY_LINE()]);
   const [showMatrix, setShowMatrix] = useState(false);
   const [showBrowser, setShowBrowser] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [clientProfile, setClientProfile] = useState<RiskCategory | ''>('');
 
   // ── Derived calculations ──────────────────────────────────────────────────
   const filledLines = lines.filter((l) => l.fund !== null);
@@ -611,6 +713,33 @@ export function PortfolioRiskCalculatorPage() {
               </div>
             )}
           </div>
+
+          {/* Copy-to-clipboard summary for adviser → client */}
+          {filledLines.length > 0 && weightedScore !== null && !allocError && resultCategory && (
+            <CopySummaryCard
+              filledLines={filledLines}
+              resultCategory={resultCategory}
+              clientProfile={clientProfile}
+              onClientProfileChange={setClientProfile}
+              copied={copied}
+              onCopy={() => {
+                const riskBar = (cat: RiskCategory) => {
+                  const cats: RiskCategory[] = ['Conservative', 'Moderate', 'Balanced', 'Growth', 'Aggressive'];
+                  return cats.map((c) => c === cat ? `🟦` : `⬜`).join('');
+                };
+                const fundLines = filledLines.map((l, i) =>
+                  `${i + 1}.  ${l.fund!.name} - ${l.fund!.riskCategory} - ${l.allocation}%`
+                ).join('\n');
+                const profileLine = clientProfile
+                  ? `\n\nYour risk profile is ${clientProfile}.  ${riskBar(clientProfile)}`
+                  : '';
+                const text = `Funds available were shown and you have selected the following:\n${fundLines}\n\nThe overall risk classification of the funds selected by you is ${resultCategory}.  ${riskBar(resultCategory)}${profileLine}`;
+                navigator.clipboard.writeText(text);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+              }}
+            />
+          )}
 
           {/* Risk Matrix collapsible */}
           <div className="rounded-lg border overflow-hidden">

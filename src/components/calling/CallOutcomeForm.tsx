@@ -5,8 +5,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCallSessionStore } from "@/store/useCallSessionStore";
-import { useCrmStore } from "@/store/useCrmStore";
 import { useAuthStore } from "@/store/useAuthStore";
+import { useCreateActivity } from "@/hooks/useActivities";
+import { useCreateContact } from "@/hooks/useContacts";
+import { useCreateDeal, useDeals } from "@/hooks/useDeals";
+import { useUpdateLead } from "@/hooks/useLeads";
 import { isTelemarketer } from "@/lib/permissions";
 import type { ActivityResult, Lead } from "@/data/types";
 import { ChevronRight, PhoneOff } from "lucide-react";
@@ -51,7 +54,11 @@ export function CallOutcomeForm({ lead }: CallOutcomeFormProps) {
   const [prospectValue, setProspectValue] = useState("");
 
   const { submitOutcome, nextLead, liveNotes, callDurationSeconds } = useCallSessionStore();
-  const { createActivity, updateLead, createContact, createDeal, deals } = useCrmStore();
+  const createActivityMutation = useCreateActivity();
+  const updateLeadMutation = useUpdateLead();
+  const createContactMutation = useCreateContact();
+  const createDealMutation = useCreateDeal();
+  const { data: deals = [] } = useDeals();
 
   // ── Derived flags ──────────────────────────────────────────────────────────
   const showMeetingDate  = result === "MEETING_SCHEDULED";
@@ -78,7 +85,7 @@ export function CallOutcomeForm({ lead }: CallOutcomeFormProps) {
     (showMeetingDate && !meetingDate);
 
   // ── Submit ─────────────────────────────────────────────────────────────────
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!lead || !currentUser) return;
     if (submitDisabled) return;
 
@@ -91,8 +98,8 @@ export function CallOutcomeForm({ lead }: CallOutcomeFormProps) {
     if (showProspectValue && hasValidProspectValue)
       metadata.prospect_value = prospectValueNumber;
 
-    createActivity(
-      {
+    try {
+      await createActivityMutation.mutateAsync({
         type: "CALL",
         subject: `Call — ${lead.first_name} ${lead.last_name}`,
         description: finalNotes || undefined,
@@ -103,12 +110,10 @@ export function CallOutcomeForm({ lead }: CallOutcomeFormProps) {
         lead_id: lead.id,
         assigned_to_id: currentUser.id,
         created_by: currentUser.id,
-      },
-      currentUser.id
-    );
+      });
 
-    if (showMeetingDate && meetingDate) {
-      createActivity(
+      if (showMeetingDate && meetingDate) {
+        await createActivityMutation.mutateAsync(
         {
           type: "MEETING",
           subject: `Meeting — ${lead.first_name} ${lead.last_name}`,
@@ -118,13 +123,11 @@ export function CallOutcomeForm({ lead }: CallOutcomeFormProps) {
           lead_id: lead.id,
             assigned_to_id: currentUser.id,
           created_by: currentUser.id,
-        },
-        currentUser.id
-      );
-    }
+        });
+      }
 
-    if (showFollowUpDate && followUpDate) {
-      createActivity(
+      if (showFollowUpDate && followUpDate) {
+        await createActivityMutation.mutateAsync(
         {
           type: "FOLLOW_UP",
           subject: `Follow-up — ${lead.first_name} ${lead.last_name}`,
@@ -133,61 +136,62 @@ export function CallOutcomeForm({ lead }: CallOutcomeFormProps) {
           lead_id: lead.id,
             assigned_to_id: currentUser.id,
           created_by: currentUser.id,
-        },
-        currentUser.id
-      );
-    }
+        });
+      }
 
-    // Auto-advance lead to APPOINTMENT + create contact & deal when TM schedules a meeting
-    if (result === "MEETING_SCHEDULED" && meetingDate) {
-      const dateParts = meetingDate.split("T");
-      updateLead(lead.id, {
-        status: "APPOINTMENT",
-        appointment_date: dateParts[0],
-        appointment_time: dateParts[1]?.slice(0, 5) || undefined,
-      }, currentUser.id);
+      // Auto-advance lead to APPOINTMENT + create contact & deal when TM schedules a meeting
+      if (result === "MEETING_SCHEDULED" && meetingDate) {
+        const dateParts = meetingDate.split("T");
+        await updateLeadMutation.mutateAsync({
+          id: lead.id,
+          payload: {
+            status: "APPOINTMENT",
+            appointment_date: dateParts[0],
+            appointment_time: dateParts[1]?.slice(0, 5) || undefined,
+          },
+        });
 
-      // Auto-create contact + deal if they don't exist yet
-      const existingDeal = deals.find((d) => d.lead_id === lead.id && !d.deleted_at);
-      if (!existingDeal) {
-        // Create contact from lead (or reuse existing converted contact)
-        let contactId = lead.converted_contact_id;
-        if (!contactId) {
-          const newContact = createContact({
+        const existingDeal = deals.find((d) => d.lead_id === lead.id && !d.deleted_at);
+        if (!existingDeal) {
+          let contactId = lead.converted_contact_id;
+          if (!contactId) {
+            const newContact = await createContactMutation.mutateAsync({
             first_name: lead.first_name,
             last_name: lead.last_name,
             email: lead.email,
             phone: lead.phone,
             source: lead.source,
             created_by: currentUser.id,
-            deleted_at: undefined,
-          }, currentUser.id);
-          contactId = newContact.id;
-          updateLead(lead.id, { converted_contact_id: contactId }, currentUser.id);
+            });
+            contactId = newContact.id;
+            await updateLeadMutation.mutateAsync({
+              id: lead.id,
+              payload: { converted_contact_id: contactId },
+            });
+          }
+          await createDealMutation.mutateAsync({
+            title: `${lead.first_name} ${lead.last_name}`,
+            value: 0,
+            stage: "APPOINTMENT",
+            lead_id: lead.id,
+            contact_id: contactId,
+            assigned_to_id: lead.assigned_to_id ?? lead.adviser_owner_id ?? undefined,
+            telemarketer_id: currentUser.id,
+            created_by: currentUser.id,
+          });
         }
-        createDeal({
-          title: `${lead.first_name} ${lead.last_name}`,
-          value: 0,
-          stage: "APPOINTMENT",
-          lead_id: lead.id,
-          contact_id: contactId,
-          assigned_to_id: lead.assigned_to_id ?? lead.adviser_owner_id ?? undefined,
-          telemarketer_id: currentUser.id,
-          created_by: currentUser.id,
-          deleted_at: undefined,
-          lost_reason: undefined,
-          closed_at: undefined,
-        }, currentUser.id);
       }
-    }
 
-    submitOutcome(pickup);
-    nextLead();
-    setResult(isTM ? "NO_ANSWER" : "COMPLETED");
-    setNotes("");
-    setFollowUpDate("");
-    setMeetingDate("");
-    setProspectValue("");
+      submitOutcome(pickup);
+      nextLead();
+      setResult(isTM ? "NO_ANSWER" : "COMPLETED");
+      setNotes("");
+      setFollowUpDate("");
+      setMeetingDate("");
+      setProspectValue("");
+    } catch (error) {
+      console.error("Failed to save call outcome", error);
+    }
   };
 
   // ── Helpers for label/placeholder ─────────────────────────────────────────

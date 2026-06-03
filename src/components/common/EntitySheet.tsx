@@ -1,6 +1,9 @@
 import { ExternalLink } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useCrmStore } from "@/store/useCrmStore";
+import { useUsers } from "@/hooks/useUsers";
+import { useLeads } from "@/hooks/useLeads";
+import { useActivities } from "@/hooks/useActivities";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -27,7 +30,10 @@ interface EntitySheetProps {
 }
 
 export function EntitySheet({ target, onClose }: EntitySheetProps) {
-  const { leads, contacts, deals, users, activities } = useCrmStore();
+  const { contacts, deals } = useCrmStore();
+  const { data: users = [] } = useUsers();
+  const { data: leads = [] } = useLeads({ includeAbandoned: true });
+  const { data: activities = [] } = useActivities();
 
   const title = getTitle(target, { leads, contacts, deals, users, activities });
   const href = target ? getHref(target) : "";
@@ -60,13 +66,16 @@ export function EntitySheet({ target, onClose }: EntitySheetProps) {
 }
 
 function EntitySheetBody({ target }: { target: EntitySheetTarget }) {
-  const { leads, contacts, deals, users, activities } = useCrmStore();
+  const { contacts, deals } = useCrmStore();
+  const { data: users = [] } = useUsers();
+  const { data: leads = [] } = useLeads({ includeAbandoned: true });
+  const { data: activities = [] } = useActivities();
 
   if (target.type === "lead") {
     const lead = leads.find((item) => item.id === target.id);
     if (!lead) return <MissingEntity />;
     const assignee = users.find((item) => item.id === lead.assigned_to_id);
-    const leadActivities = activities.filter((activity) => activity.lead_id === lead.id && !activity.deleted_at).slice(0, 4);
+    const leadActivities = activities.filter((activity) => activity.lead_id === lead.id).slice(0, 4);
     return (
       <>
         <InfoCard title="Lead Details">
@@ -110,7 +119,7 @@ function EntitySheetBody({ target }: { target: EntitySheetTarget }) {
     if (!deal) return <MissingEntity />;
     const contact = contacts.find((item) => item.id === deal.contact_id);
     const assignee = users.find((item) => item.id === deal.assigned_to_id);
-    const dealActivities = activities.filter((activity) => activity.deal_id === deal.id && !activity.deleted_at).slice(0, 4);
+    const dealActivities = activities.filter((activity) => activity.deal_id === deal.id).slice(0, 4);
     return (
       <>
         <InfoCard title="Deal Details">
@@ -134,7 +143,7 @@ function EntitySheetBody({ target }: { target: EntitySheetTarget }) {
   if (target.type === "user") {
     const user = users.find((item) => item.id === target.id);
     if (!user) return <MissingEntity />;
-    const userActivities = activities.filter((activity) => activity.created_by === user.id && !activity.deleted_at);
+    const userActivities = activities.filter((activity) => activity.created_by === user.id);
     const userDeals = deals.filter((deal) => deal.assigned_to_id === user.id && !deal.deleted_at);
     return (
       <>
@@ -258,11 +267,11 @@ function getHref(target: EntitySheetTarget): string {
 }
 
 function getTitle(target: EntitySheetTarget | null, store: {
-  leads: ReturnType<typeof useCrmStore.getState>["leads"];
+  leads: import("@/data/types").Lead[];
   contacts: ReturnType<typeof useCrmStore.getState>["contacts"];
   deals: ReturnType<typeof useCrmStore.getState>["deals"];
-  users: ReturnType<typeof useCrmStore.getState>["users"];
-  activities: ReturnType<typeof useCrmStore.getState>["activities"];
+  users: import("@/data/types").User[];
+  activities: import("@/data/types").Activity[];
 }) {
   if (!target) return "";
   if (target.type === "lead") {

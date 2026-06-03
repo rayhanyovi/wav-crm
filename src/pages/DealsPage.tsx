@@ -1,11 +1,16 @@
 import { useState, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Plus, Search, Phone, Calendar, TrendingUp, UserPlus } from "lucide-react";
-import { useCrmStore } from "@/store/useCrmStore";
 import { useAuthStore } from "@/store/useAuthStore";
+import { useActivities } from "@/hooks/useActivities";
+import { useUsers } from "@/hooks/useUsers";
+import { useLeads } from "@/hooks/useLeads";
+import { useContacts } from "@/hooks/useContacts";
+import { useCreateDeal, useDeals, useUpdateDeal } from "@/hooks/useDeals";
 import { isAdviser as isAdviserRole } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -33,7 +38,7 @@ import { DealStageBadge } from "@/components/common/StatusBadge";
 import { EmptyState } from "@/components/common/EmptyState";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { can } from "@/lib/permissions";
-import type { Deal, DealStage } from "@/data/types";
+import type { DealStage } from "@/data/types";
 
 // Stages visible to each role
 const ALL_STAGES: DealStage[] = ["CALLING", "APPOINTMENT", "PROPOSAL", "SUBMITTED", "WON", "LOST"];
@@ -58,7 +63,13 @@ const STAGE_DESC: Record<DealStage, string> = {
 };
 
 export function DealsPage() {
-  const { deals, leads, contacts, users, activities, createDeal, updateDeal } = useCrmStore();
+  const { data: activities = [] } = useActivities();
+  const { data: users = [] } = useUsers();
+  const { data: leads = [] } = useLeads({ includeAbandoned: true });
+  const { data: contacts = [], isLoading: contactsLoading, error: contactsError } = useContacts();
+  const { data: deals = [], isLoading: dealsLoading, error: dealsError } = useDeals();
+  const createDealMutation = useCreateDeal();
+  const updateDealMutation = useUpdateDeal();
   const { currentUser } = useAuthStore();
   const navigate = useNavigate();
 
@@ -69,6 +80,7 @@ export function DealsPage() {
     title: "",
     value: "",
     lead_id: "",
+    contact_id: "",
     assigned_to_id: "",
     stage: "CALLING" as DealStage,
   });
@@ -126,7 +138,7 @@ export function DealsPage() {
   const dealStats = useMemo(() => {
     const stats: Record<string, { calls: number; meetings: number; lastActivity?: string }> = {};
     activities
-      .filter((a) => !a.deleted_at && a.deal_id)
+      .filter((a) => !!a.deal_id)
       .forEach((a) => {
         if (!stats[a.deal_id!]) stats[a.deal_id!] = { calls: 0, meetings: 0 };
         if (a.type === "CALL") stats[a.deal_id!].calls++;
@@ -143,32 +155,33 @@ export function DealsPage() {
 
   const availableStages = currentUser?.role === "TELEMARKETER" ? ALL_STAGES : ADVISER_STAGES;
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (!currentUser || !form.title) return;
     const lead = leads.find((l) => l.id === form.lead_id);
-    createDeal(
-      {
-        title: form.title,
-        value: parseFloat(form.value) || 0,
-        stage: form.stage,
-        lead_id: form.lead_id || undefined,
-        contact_id: lead?.converted_contact_id || contacts[0]?.id || "",
-        telemarketer_id: isTelemarketer ? currentUser.id : undefined,
-        assigned_to_id: form.assigned_to_id || undefined,
-        created_by: currentUser.id,
-        lost_reason: undefined,
-        closed_at: undefined,
-      },
-      currentUser.id
-    );
+    const contactId = lead?.converted_contact_id || form.contact_id || "";
+    if (!contactId) return;
+
+    await createDealMutation.mutateAsync({
+      title: form.title,
+      value: parseFloat(form.value) || 0,
+      stage: form.stage,
+      lead_id: form.lead_id || undefined,
+      contact_id: contactId,
+      telemarketer_id: isTelemarketer ? currentUser.id : undefined,
+      assigned_to_id: form.assigned_to_id || undefined,
+      created_by: currentUser.id,
+    });
+
     setCreateOpen(false);
-    setForm({ title: "", value: "", lead_id: "", assigned_to_id: "", stage: "CALLING" });
+    setForm({ title: "", value: "", lead_id: "", contact_id: "", assigned_to_id: "", stage: "CALLING" });
   };
 
   const advisers = users.filter((u) => u.is_active && can(u, "ADVISER"));
   const unlinkedLeads = leads.filter(
     (l) => !l.deleted_at && !deals.some((d) => d.lead_id === l.id)
   );
+  const isLoading = dealsLoading || contactsLoading;
+  const errorMessage = dealsError?.message || contactsError?.message;
 
   return (
     <div className="space-y-5">
@@ -241,7 +254,17 @@ export function DealsPage() {
       </div>
 
       {/* Deal table */}
-      {filtered.length === 0 ? (
+      {isLoading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <Skeleton key={index} className="h-14 w-full" />
+          ))}
+        </div>
+      ) : errorMessage ? (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+          Failed to load deals: {errorMessage}
+        </div>
+      ) : filtered.length === 0 ? (
         <EmptyState
           icon={TrendingUp}
           title="No deals yet"
@@ -319,7 +342,12 @@ export function DealsPage() {
                           variant="outline"
                           className="gap-1 text-xs h-7 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400"
                           onClick={() => {
-                            if (currentUser) updateDeal(deal.id, { assigned_to_id: currentUser.id }, currentUser.id);
+                            if (currentUser) {
+                              updateDealMutation.mutate({
+                                id: deal.id,
+                                payload: { assigned_to_id: currentUser.id },
+                              });
+                            }
                           }}
                         >
                           <UserPlus className="h-3 w-3" /> Claim
@@ -351,7 +379,20 @@ export function DealsPage() {
             </div>
             <div className="space-y-1.5">
               <Label>Link to Lead (optional)</Label>
-              <Select value={form.lead_id || "none"} onValueChange={(v) => setForm((f) => ({ ...f, lead_id: v === "none" ? "" : v }))}>
+              <Select
+                value={form.lead_id || "none"}
+                onValueChange={(v) =>
+                  setForm((current) => {
+                    const leadId = v === "none" ? "" : v;
+                    const selectedLead = unlinkedLeads.find((lead) => lead.id === leadId);
+                    return {
+                      ...current,
+                      lead_id: leadId,
+                      contact_id: selectedLead?.converted_contact_id ?? current.contact_id,
+                    };
+                  })
+                }
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select lead" />
                 </SelectTrigger>
@@ -360,6 +401,20 @@ export function DealsPage() {
                   {unlinkedLeads.map((l) => (
                     <SelectItem key={l.id} value={l.id}>
                       {l.first_name} {l.last_name} ({l.phone ?? "no phone"})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+                </Select>
+              </div>
+            <div className="space-y-1.5">
+              <Label>Contact *</Label>
+              <Select value={form.contact_id || "none"} onValueChange={(v) => setForm((f) => ({ ...f, contact_id: v === "none" ? "" : v }))}>
+                <SelectTrigger><SelectValue placeholder="Select contact" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">— Select contact —</SelectItem>
+                  {contacts.map((contact) => (
+                    <SelectItem key={contact.id} value={contact.id}>
+                      {contact.first_name} {contact.last_name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -404,7 +459,12 @@ export function DealsPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
-            <Button onClick={handleCreate} disabled={!form.title}>Create Deal</Button>
+            <Button
+              onClick={() => void handleCreate()}
+              disabled={!form.title || !(form.contact_id || leads.find((lead) => lead.id === form.lead_id)?.converted_contact_id) || createDealMutation.isPending}
+            >
+              {createDealMutation.isPending ? "Creating..." : "Create Deal"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

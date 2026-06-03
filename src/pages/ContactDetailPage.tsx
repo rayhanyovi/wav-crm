@@ -1,8 +1,17 @@
 import { useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { ArrowLeft, Phone, Calendar, TrendingUp, MessageSquare, Plus, Trash2, ClipboardList } from "lucide-react";
-import { useCrmStore } from "@/store/useCrmStore";
 import { useAuthStore } from "@/store/useAuthStore";
+import { useActivities } from "@/hooks/useActivities";
+import { useUsers } from "@/hooks/useUsers";
+import {
+  useAddContactNote,
+  useContact,
+  useContactNotes,
+  useDeleteContactNote,
+  useUpdateContact,
+} from "@/hooks/useContacts";
+import { useCreateDeal, useDeals, useUpdateDeal } from "@/hooks/useDeals";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,6 +25,7 @@ import {
   ActivityTypeBadge,
   ActivityResultBadge,
 } from "@/components/common/StatusBadge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { formatDate, formatCurrency, formatDateTime } from "@/lib/format";
 import { getContactActivities } from "@/lib/selectors";
 import { canEdit, isAdviser, isMaster } from "@/lib/permissions";
@@ -44,12 +54,19 @@ const RISK_COLOR: Record<RiskTolerance, string> = {
 export function ContactDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const {
-    contacts, deals, activities, users,
-    contact_notes, addContactNote, deleteContactNote,
-    updateContact, updateDeal, createDeal,
-  } = useCrmStore();
   const { currentUser } = useAuthStore();
+  const { data: activities = [] } = useActivities();
+  const { data: users = [] } = useUsers();
+  const { data: contact, isLoading: contactLoading, error: contactError } = useContact(id);
+  const { data: contactDeals = [], isLoading: dealsLoading, error: dealsError } = useDeals(
+    id ? { contactId: id } : undefined,
+  );
+  const { data: contactNotes = [], isLoading: notesLoading, error: notesError } = useContactNotes(id);
+  const updateContactMutation = useUpdateContact();
+  const updateDealMutation = useUpdateDeal();
+  const createDealMutation = useCreateDeal();
+  const addContactNoteMutation = useAddContactNote();
+  const deleteContactNoteMutation = useDeleteContactNote();
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<Record<string, string>>({});
   const [noteText, setNoteText] = useState("");
@@ -66,15 +83,36 @@ export function ContactDetailPage() {
     fact_find_notes: "",
   });
 
-  const contact = contacts.find((c) => c.id === id);
-  if (!contact)
-    return <div className="p-6 text-muted-foreground">Contact not found.</div>;
-
-  const contactDeals = deals.filter((d) => d.contact_id === id && !d.deleted_at);
   const contactActivities = getContactActivities(id!, activities);
-  const thisNotes = contact_notes
+  const thisNotes = contactNotes
     .filter((n) => n.contact_id === id)
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+  if (contactLoading || dealsLoading || notesLoading) {
+    return (
+      <div className="space-y-6 max-w-7xl">
+        <Skeleton className="h-10 w-72" />
+        <div className="flex flex-wrap gap-3">
+          <Skeleton className="h-16 w-40" />
+          <Skeleton className="h-16 w-40" />
+          <Skeleton className="h-16 w-52" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Skeleton className="h-72" />
+          <Skeleton className="h-72" />
+        </div>
+        <Skeleton className="h-64" />
+      </div>
+    );
+  }
+
+  if (!contact || contactError || dealsError || notesError) {
+    return (
+      <div className="p-6 text-sm text-destructive">
+        {contactError?.message || dealsError?.message || notesError?.message || "Contact not found."}
+      </div>
+    );
+  }
 
   // ── Stats ──────────────────────────────────────────────────────────────────
   const callCount = contactActivities.filter((a) => a.type === "CALL").length;
@@ -108,7 +146,7 @@ export function ContactDetailPage() {
     setEditingFF(true);
   };
 
-  const saveFF = () => {
+  const saveFF = async () => {
     if (!currentUser) return;
     const investable = ffForm.monthly_investable
       ? (investPeriod === "annually"
@@ -126,33 +164,37 @@ export function ContactDetailPage() {
     };
 
     if (ffTargetDeal) {
-      updateDeal(ffTargetDeal.id, ffData, currentUser.id);
+      await updateDealMutation.mutateAsync({
+        id: ffTargetDeal.id,
+        payload: ffData,
+      });
     } else {
-      // No deal yet — auto-create one so we have somewhere to save the fact-find
-      const newDeal = createDeal({
+      await createDealMutation.mutateAsync({
         title: `${contact.first_name} ${contact.last_name}`,
         value: 0,
         stage: "APPOINTMENT",
         contact_id: contact.id,
         assigned_to_id: currentUser.id,
         created_by: currentUser.id,
-        deleted_at: undefined,
         ...ffData,
-      }, currentUser.id);
-      void newDeal; // deal is saved in store
+      });
     }
     setEditingFF(false);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!currentUser) return;
-    updateContact(contact.id, form, currentUser.id);
+    await updateContactMutation.mutateAsync({ id: contact.id, payload: form });
     setEditing(false);
   };
 
-  const handleAddNote = () => {
+  const handleAddNote = async () => {
     if (!noteText.trim() || !currentUser) return;
-    addContactNote(contact.id, noteText.trim(), currentUser.id);
+    await addContactNoteMutation.mutateAsync({
+      contactId: contact.id,
+      content: noteText.trim(),
+      userId: currentUser.id,
+    });
     setNoteText("");
   };
 
@@ -382,7 +424,7 @@ export function ContactDetailPage() {
 
                 <div className="flex gap-2 justify-end pt-1">
                   <Button variant="outline" size="sm" onClick={() => setEditingFF(false)}>Cancel</Button>
-                  <Button size="sm" onClick={saveFF}>Save Fact Find</Button>
+              <Button size="sm" onClick={() => void saveFF()}>Save Fact Find</Button>
                 </div>
               </div>
             ) : !dealWithFF ? (
@@ -459,7 +501,7 @@ export function ContactDetailPage() {
                 .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
                 .map((d) => {
                   const adviser = users.find((u) => u.id === d.assigned_to_id);
-                  const dealActivities = activities.filter((a) => a.deal_id === d.id && !a.deleted_at);
+                  const dealActivities = activities.filter((a) => a.deal_id === d.id);
                   const dCalls = dealActivities.filter((a) => a.type === "CALL").length;
                   const dMeetings = dealActivities.filter((a) => a.type === "MEETING").length;
                   return (
@@ -514,7 +556,7 @@ export function ContactDetailPage() {
                   }
                 }}
               />
-              <Button size="sm" className="self-end" disabled={!noteText.trim()} onClick={handleAddNote}>
+              <Button size="sm" className="self-end" disabled={!noteText.trim()} onClick={() => void handleAddNote()}>
                 <Plus className="h-3.5 w-3.5 mr-1" />
                 Add
               </Button>
@@ -539,7 +581,7 @@ export function ContactDetailPage() {
                     </div>
                     {canDelete && (
                       <button
-                        onClick={() => deleteContactNote(note.id)}
+                        onClick={() => deleteContactNoteMutation.mutate({ id: note.id, contactId: contact.id })}
                         className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive p-0.5 rounded"
                         title="Delete note"
                       >

@@ -16,6 +16,9 @@ import { CalendarDays, ChevronLeft, ChevronRight, Plus, RefreshCw } from "lucide
 import { Link } from "react-router-dom";
 import { useCrmStore } from "@/store/useCrmStore";
 import { useAuthStore } from "@/store/useAuthStore";
+import { useUsers } from "@/hooks/useUsers";
+import { useLeads } from "@/hooks/useLeads";
+import { useActivities, useCreateActivity } from "@/hooks/useActivities";
 import { isMaster, isTelemarketer } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -75,9 +78,12 @@ function toDateTimeLocalValue(date: Date): string {
 }
 
 export function CalendarPage() {
-  const { activities, users, deals, leads, contacts, createActivity } =
-    useCrmStore();
+  const { deals, contacts } = useCrmStore();
   const { currentUser } = useAuthStore();
+  const { data: users = [] } = useUsers();
+  const { data: leads = [] } = useLeads({ includeAbandoned: true });
+  const { data: activities = [], isLoading: activitiesLoading } = useActivities();
+  const createActivityMutation = useCreateActivity();
 
   const [visibleMonth, setVisibleMonth] = useState(() =>
     startOfMonth(new Date()),
@@ -133,7 +139,6 @@ export function CalendarPage() {
 
   const filteredActivities = useMemo(() => {
     return activities
-      .filter((activity) => !activity.deleted_at)
       // Base ownership gate — non-MASTER users can only see their allowed set
       .filter((activity) => {
         if (allowedUserIds === null) return true; // MASTER sees all
@@ -240,7 +245,7 @@ export function CalendarPage() {
   const handleCreateActivity = () => {
     if (!currentUser || !form.subject.trim()) return;
 
-    createActivity(
+    createActivityMutation.mutate(
       {
         type: form.type,
         subject: form.subject.trim(),
@@ -255,11 +260,23 @@ export function CalendarPage() {
           form.related_type === "CONTACT" ? form.related_id : undefined,
         created_by: currentUser.id,
       },
-      currentUser.id,
+      {
+        onSuccess: () => {
+          setCreateOpen(false);
+          resetForm();
+        },
+      },
     );
-    setCreateOpen(false);
-    resetForm();
   };
+
+  if (activitiesLoading) {
+    return (
+      <div className="space-y-4">
+        <h1 className="text-2xl font-bold">Calendar</h1>
+        <div className="h-[600px] rounded-lg bg-muted animate-pulse" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -707,10 +724,11 @@ export function CalendarPage() {
               onClick={handleCreateActivity}
               disabled={
                 !form.subject.trim() ||
-                (form.related_type !== "NONE" && !form.related_id)
+                (form.related_type !== "NONE" && !form.related_id) ||
+                createActivityMutation.isPending
               }
             >
-              Create Activity
+              {createActivityMutation.isPending ? "Creating…" : "Create Activity"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -1,9 +1,12 @@
 import { useState } from "react";
 import { ExternalLink, Plus, UserCheck } from "lucide-react";
-import { useCrmStore } from "@/store/useCrmStore";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuthStore } from "@/store/useAuthStore";
+import { useContacts, useCreateContact } from "@/hooks/useContacts";
+import { useDeals } from "@/hooks/useDeals";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -22,13 +25,6 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Sheet,
   SheetContent,
   SheetHeader,
@@ -37,17 +33,35 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { canEdit } from "@/lib/permissions";
-import { Link, useNavigate } from "react-router-dom";
+
+function ContactsTableSkeleton() {
+  return (
+    <div className="border rounded-lg overflow-hidden">
+      <div className="space-y-2 p-4">
+        {Array.from({ length: 6 }).map((_, index) => (
+          <div key={index} className="grid grid-cols-5 gap-4">
+            <Skeleton className="h-5" />
+            <Skeleton className="h-5" />
+            <Skeleton className="h-5" />
+            <Skeleton className="h-5" />
+            <Skeleton className="h-5" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export function ContactsPage() {
-  const { contacts, deals, createContact } = useCrmStore();
   const { currentUser } = useAuthStore();
   const navigate = useNavigate();
+  const { data: contacts = [], isLoading: contactsLoading, error: contactsError } = useContacts();
+  const { data: deals = [], isLoading: dealsLoading, error: dealsError } = useDeals();
+  const createContactMutation = useCreateContact();
+
   const [search, setSearch] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
-  const [selectedContactId, setSelectedContactId] = useState<string | null>(
-    null,
-  );
+  const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
   const [form, setForm] = useState({
     first_name: "",
     last_name: "",
@@ -56,25 +70,29 @@ export function ContactsPage() {
     title: "",
   });
 
-  const liveContacts = contacts.filter((c) => !c.deleted_at);
-  const filtered = liveContacts.filter((c) => {
-    const name = `${c.first_name} ${c.last_name}`.toLowerCase();
+  const filtered = contacts.filter((contact) => {
+    const name = `${contact.first_name} ${contact.last_name}`.toLowerCase();
     return (
       !search ||
       name.includes(search.toLowerCase()) ||
-      c.email?.includes(search.toLowerCase())
+      contact.email?.toLowerCase().includes(search.toLowerCase())
     );
   });
 
-  const handleCreate = () => {
+  const selectedContact = contacts.find((contact) => contact.id === selectedContactId);
+  const selectedDeals = selectedContact
+    ? deals.filter((deal) => deal.contact_id === selectedContact.id && !deal.deleted_at)
+    : [];
+
+  const handleCreate = async () => {
     if (!form.first_name || !form.last_name || !currentUser) return;
-    createContact(
-      {
-        ...form,
-        created_by: currentUser.id,
-      },
-      currentUser.id,
-    );
+
+    await createContactMutation.mutateAsync({
+      ...form,
+      source: "OWN_SOURCE",
+      created_by: currentUser.id,
+    });
+
     setCreateOpen(false);
     setForm({
       first_name: "",
@@ -82,13 +100,11 @@ export function ContactsPage() {
       email: "",
       phone: "",
       title: "",
-      });
+    });
   };
 
-  const selectedContact = contacts.find((c) => c.id === selectedContactId);
-  const selectedDeals = selectedContact
-    ? deals.filter((d) => d.contact_id === selectedContact.id && !d.deleted_at)
-    : [];
+  const isLoading = contactsLoading || dealsLoading;
+  const errorMessage = contactsError?.message || dealsError?.message;
 
   return (
     <div className="space-y-4">
@@ -98,7 +114,7 @@ export function ContactsPage() {
         <Input
           placeholder="Search contacts..."
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(event) => setSearch(event.target.value)}
           className="w-72"
         />
         {canEdit(currentUser) && (
@@ -109,7 +125,13 @@ export function ContactsPage() {
         )}
       </div>
 
-      {filtered.length === 0 ? (
+      {isLoading ? (
+        <ContactsTableSkeleton />
+      ) : errorMessage ? (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+          Failed to load contacts: {errorMessage}
+        </div>
+      ) : filtered.length === 0 ? (
         <EmptyState
           icon={UserCheck}
           title="No contacts found"
@@ -132,28 +154,27 @@ export function ContactsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((c) => {
+              {filtered.map((contact) => {
                 const dealCount = deals.filter(
-                  (d) => d.contact_id === c.id && !d.deleted_at,
+                  (deal) => deal.contact_id === contact.id && !deal.deleted_at,
                 ).length;
+
                 return (
                   <TableRow
-                    key={c.id}
+                    key={contact.id}
                     className="cursor-pointer"
-                    onClick={() => navigate(`/contacts/${c.id}`)}
+                    onClick={() => navigate(`/contacts/${contact.id}`)}
                   >
                     <TableCell className="font-medium">
-                      {c.first_name} {c.last_name}
+                      {contact.first_name} {contact.last_name}
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
-                      {c.email || "..."}
+                      {contact.email || "..."}
                     </TableCell>
                     <TableCell className="text-xs font-mono text-muted-foreground">
-                      {c.phone || "..."}
+                      {contact.phone || "..."}
                     </TableCell>
-                    <TableCell className="text-xs">
-                      {c.title || "..."}
-                    </TableCell>
+                    <TableCell className="text-xs">{contact.title || "..."}</TableCell>
                     <TableCell className="text-xs">{dealCount}</TableCell>
                   </TableRow>
                 );
@@ -216,7 +237,6 @@ export function ContactsPage() {
                 </div>
               </div>
 
-
               <div className="rounded-lg border p-3 text-sm space-y-2">
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                   Deals
@@ -264,8 +284,8 @@ export function ContactsPage() {
               <Label>First Name *</Label>
               <Input
                 value={form.first_name}
-                onChange={(e) =>
-                  setForm({ ...form, first_name: e.target.value })
+                onChange={(event) =>
+                  setForm({ ...form, first_name: event.target.value })
                 }
               />
             </div>
@@ -273,8 +293,8 @@ export function ContactsPage() {
               <Label>Last Name *</Label>
               <Input
                 value={form.last_name}
-                onChange={(e) =>
-                  setForm({ ...form, last_name: e.target.value })
+                onChange={(event) =>
+                  setForm({ ...form, last_name: event.target.value })
                 }
               />
             </div>
@@ -283,21 +303,21 @@ export function ContactsPage() {
               <Input
                 type="email"
                 value={form.email}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                onChange={(event) => setForm({ ...form, email: event.target.value })}
               />
             </div>
             <div className="space-y-1">
               <Label>Phone</Label>
               <Input
                 value={form.phone}
-                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                onChange={(event) => setForm({ ...form, phone: event.target.value })}
               />
             </div>
             <div className="space-y-1">
               <Label>Title</Label>
               <Input
                 value={form.title}
-                onChange={(e) => setForm({ ...form, title: e.target.value })}
+                onChange={(event) => setForm({ ...form, title: event.target.value })}
               />
             </div>
           </div>
@@ -306,10 +326,10 @@ export function ContactsPage() {
               Cancel
             </Button>
             <Button
-              onClick={handleCreate}
-              disabled={!form.first_name || !form.last_name}
+              onClick={() => void handleCreate()}
+              disabled={!form.first_name || !form.last_name || createContactMutation.isPending}
             >
-              Create
+              {createContactMutation.isPending ? "Creating..." : "Create"}
             </Button>
           </DialogFooter>
         </DialogContent>
