@@ -25,8 +25,12 @@ export function useNotifications(userId: string | undefined, limit = 20) {
   useEffect(() => {
     if (!userId) return;
 
+    // Append a unique suffix so Supabase never returns a cached already-subscribed
+    // channel when this effect re-runs (e.g. two callers with same userId, StrictMode
+    // double-invoke, or fast remount where removeChannel hasn't flushed yet).
+    const channelName = `notifications:${userId}:${Math.random().toString(36).slice(2, 9)}`;
     const channel = supabase
-      .channel(`notifications:${userId}`)
+      .channel(channelName)
       .on(
         "postgres_changes",
         {
