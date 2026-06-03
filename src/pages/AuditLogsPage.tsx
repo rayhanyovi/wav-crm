@@ -33,8 +33,44 @@ function formatValue(value: unknown): string {
   return String(value).replaceAll("_", " ");
 }
 
+function pickLabel(obj: unknown): string | undefined {
+  if (!obj || typeof obj !== "object") return undefined;
+  const o = obj as Record<string, unknown>;
+  return typeof o.name === "string" ? o.name
+    : typeof o.title === "string" ? o.title
+    : typeof o.email === "string" ? o.email
+    : typeof o.id === "string" ? `#${o.id.slice(0, 8)}` : undefined;
+}
+
 function formatAuditDetails(metadata: Record<string, unknown> | undefined): string {
   if (!metadata || Object.keys(metadata).length === 0) return "No additional details";
+
+  // DB trigger pattern: { new: {...} | null, old: {...} | null }
+  if ("new" in metadata || "old" in metadata) {
+    const newRec = metadata.new as Record<string, unknown> | null;
+    const oldRec = metadata.old as Record<string, unknown> | null;
+    if (newRec && !oldRec) {
+      const label = pickLabel(newRec);
+      return label ? `Created: ${label}` : "Created";
+    }
+    if (!newRec && oldRec) {
+      const label = pickLabel(oldRec);
+      return label ? `Deleted: ${label}` : "Deleted";
+    }
+    if (newRec && oldRec) {
+      // Show the first field that actually changed
+      const changed = Object.keys(newRec).filter(
+        (k) => JSON.stringify(newRec[k]) !== JSON.stringify(oldRec[k])
+      );
+      if (changed.length === 0) return pickLabel(newRec) ?? "Updated";
+      const label = pickLabel(newRec);
+      const diff = changed
+        .slice(0, 3)
+        .map((k) => `${k.replaceAll("_", " ")}: ${formatValue(oldRec[k])} → ${formatValue(newRec[k])}`)
+        .join(" · ");
+      return label ? `${label} — ${diff}` : diff;
+    }
+  }
 
   const name = typeof metadata.name === "string" ? metadata.name : undefined;
   const title = typeof metadata.title === "string" ? metadata.title : undefined;
@@ -57,8 +93,9 @@ function formatAuditDetails(metadata: Record<string, unknown> | undefined): stri
   if (metadata.contact_id) return `Converted to contact ${formatValue(metadata.contact_id)}`;
 
   return Object.entries(metadata)
+    .filter(([, v]) => v !== null && v !== undefined && typeof v !== "object")
     .map(([key, value]) => `${key.replaceAll("_", " ")}: ${formatValue(value)}`)
-    .join(" · ");
+    .join(" · ") || "Updated";
 }
 
 function getEntityHref(entityType: string, entityId: string): string | null {
