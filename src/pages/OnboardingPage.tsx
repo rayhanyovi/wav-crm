@@ -15,13 +15,12 @@ import {
 import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/store/useAuthStore";
 import { completeOnboarding, activateSuperAdmin } from "@/services/users";
-import { SUPER_ADMIN_EMAIL } from "@/lib/auth-domain";
 
 type Step = "password" | "profile";
 
 export function OnboardingPage() {
   const navigate = useNavigate();
-  const { currentUser, accountStatus, authEmail, loadSession } = useAuthStore();
+  const { currentUser, accountStatus, authEmail, preConfiguredRole, loadSession } = useAuthStore();
 
   const [step, setStep] = useState<Step>("password");
   const [password, setPassword] = useState("");
@@ -45,7 +44,9 @@ export function OnboardingPage() {
     return <Navigate to="/pending" replace />;
   if (accountStatus !== "PENDING_PROFILE") return <Navigate to="/login" replace />;
 
-  const isSuperAdmin = authEmail?.toLowerCase() === SUPER_ADMIN_EMAIL;
+  // True when the account is a pre-configured admin (role + is_active pre-set).
+  // These users skip the role-selection step and self-activate after password setup.
+  const isPreConfiguredAdmin = preConfiguredRole !== null;
 
   const submitPassword = async (event?: FormEvent) => {
     event?.preventDefault();
@@ -66,8 +67,8 @@ export function OnboardingPage() {
       return;
     }
 
-    // Super admin skips the role-selection step — activate immediately.
-    if (isSuperAdmin) {
+    // Pre-configured admins skip the role-selection step — activate immediately.
+    if (isPreConfiguredAdmin) {
       try {
         await activateSuperAdmin();
         await loadSession();
@@ -123,7 +124,7 @@ export function OnboardingPage() {
           {authEmail && (
             <p className="mt-1 text-sm text-muted-foreground">{authEmail}</p>
           )}
-          {!isSuperAdmin && (
+          {!isPreConfiguredAdmin && (
             <p className="mt-2 text-xs text-muted-foreground">Step {step === "password" ? "1" : "2"} of 2</p>
           )}
         </div>

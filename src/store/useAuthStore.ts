@@ -31,6 +31,12 @@ interface AuthState {
   authEmail: string | null;
   /** Requested role captured during onboarding (for the pending screen). */
   requestedRole: string | null;
+  /**
+   * Set when a PENDING_PROFILE user already has a role + is_active=true
+   * (i.e. a pre-configured master admin). OnboardingPage uses this to skip
+   * the role-selection step and self-activate via activate_super_admin().
+   */
+  preConfiguredRole: User["role"] | null;
   authReady: boolean;
   login: (user: User) => void;
   loadSession: () => Promise<void>;
@@ -62,9 +68,10 @@ export const useAuthStore = create<AuthState>()(
       accountStatus: null,
       authEmail: null,
       requestedRole: null,
+      preConfiguredRole: null,
       authReady: false,
       login: (user) =>
-        set({ currentUser: user, accountStatus: "ACTIVE", authEmail: user.email }),
+        set({ currentUser: user, accountStatus: "ACTIVE", authEmail: user.email, preConfiguredRole: null }),
       loadSession: async () => {
         const { data: sessionData } = await supabase.auth.getSession();
         const authUser = sessionData.session?.user;
@@ -74,6 +81,7 @@ export const useAuthStore = create<AuthState>()(
             accountStatus: null,
             authEmail: null,
             requestedRole: null,
+            preConfiguredRole: null,
             authReady: true,
           });
           return;
@@ -93,6 +101,7 @@ export const useAuthStore = create<AuthState>()(
             accountStatus: null,
             authEmail: null,
             requestedRole: null,
+            preConfiguredRole: null,
             authReady: true,
           });
           return;
@@ -108,6 +117,7 @@ export const useAuthStore = create<AuthState>()(
             accountStatus: "ACTIVE",
             authEmail: email,
             requestedRole: (profile.requested_role as string | null) ?? null,
+            preConfiguredRole: null,
             authReady: true,
           });
           return;
@@ -115,11 +125,19 @@ export const useAuthStore = create<AuthState>()(
 
         // Pending / rejected users keep their session (needed for onboarding
         // and the pending screen) but are NOT granted currentUser access.
+        // preConfiguredRole is set when the profile already has a role + is_active
+        // (i.e. a pre-configured master admin awaiting password setup).
+        const preConfiguredRole =
+          status === "PENDING_PROFILE" && profile.is_active && profile.role
+            ? (profile.role as User["role"])
+            : null;
+
         set({
           currentUser: null,
           accountStatus: status,
           authEmail: email,
           requestedRole: (profile.requested_role as string | null) ?? null,
+          preConfiguredRole,
           authReady: true,
         });
       },
@@ -130,6 +148,7 @@ export const useAuthStore = create<AuthState>()(
           accountStatus: null,
           authEmail: null,
           requestedRole: null,
+          preConfiguredRole: null,
           authReady: true,
         });
       },
