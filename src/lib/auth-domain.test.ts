@@ -4,6 +4,7 @@ import {
   isSuperAdminEmail,
   normalizeEmail,
   ALLOWED_REGISTRATION_DOMAIN,
+  ALLOWED_TEST_EMAILS,
   SUPER_ADMIN_EMAIL,
 } from "./auth-domain";
 
@@ -32,6 +33,14 @@ describe("isAllowedRegistrationEmail", () => {
 
   it("allows the single super-admin exception", () => {
     expect(isAllowedRegistrationEmail("tech@wav.sg")).toBe(true);
+  });
+
+  it("allows explicitly whitelisted test emails", () => {
+    for (const email of ALLOWED_TEST_EMAILS) {
+      expect(isAllowedRegistrationEmail(email)).toBe(true);
+    }
+    // Spot-check: yovihan@gmail.com is the current test account
+    expect(isAllowedRegistrationEmail("yovihan@gmail.com")).toBe(true);
   });
 
   it("rejects other domains, including look-alikes", () => {
