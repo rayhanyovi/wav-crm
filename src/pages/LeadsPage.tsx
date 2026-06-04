@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ExternalLink, MoreHorizontal, Plus, Upload, Users } from "lucide-react";
+import { CalendarCheck, ExternalLink, MoreHorizontal, Plus, Upload, Users } from "lucide-react";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useActivities } from "@/hooks/useActivities";
 import { useUsers } from "@/hooks/useUsers";
@@ -47,10 +47,12 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { LeadImportDialog } from "@/components/leads/LeadImportDialog";
 import { StatusUpdateModal } from "@/components/leads/StatusUpdateModal";
+import { AppointmentModal } from "@/components/leads/AppointmentModal";
 
 // APPOINTMENT is excluded — once a lead reaches that status it lives in Deals
 const STATUSES: LeadStatus[] = [
@@ -95,6 +97,8 @@ export function LeadsPage() {
 
   // Pending status change — set when user picks a new status; clears after modal closes
   const [pendingStatus, setPendingStatus] = useState<{ lead: typeof leads[0]; status: LeadStatus } | null>(null);
+  // Pending appointment — separate modal for the convert-lead flow
+  const [appointmentLead, setAppointmentLead] = useState<typeof leads[0] | null>(null);
 
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("ALL");
@@ -379,6 +383,18 @@ export function LeadsPage() {
                                 <LeadStatusBadge status={s} />
                               </DropdownMenuItem>
                             ))}
+                            {lead.status !== "APPOINTMENT" && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  className="gap-2 font-medium text-primary focus:text-primary"
+                                  onClick={() => setAppointmentLead(lead)}
+                                >
+                                  <CalendarCheck className="h-3.5 w-3.5" />
+                                  Move to Appointment
+                                </DropdownMenuItem>
+                              </>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -619,6 +635,15 @@ export function LeadsPage() {
           newStatus={pendingStatus.status}
           open={!!pendingStatus}
           onClose={() => setPendingStatus(null)}
+        />
+      )}
+
+      {/* Appointment modal — convert lead to contact + deal */}
+      {appointmentLead && (
+        <AppointmentModal
+          lead={appointmentLead}
+          open={!!appointmentLead}
+          onClose={() => setAppointmentLead(null)}
         />
       )}
     </div>
