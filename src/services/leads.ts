@@ -87,17 +87,22 @@ export async function createLead(payload: CreateLeadPayload): Promise<Lead> {
   return mapLeadRow(data);
 }
 
-export async function updateLead(id: string, payload: UpdateLeadPayload): Promise<Lead> {
-  // Set crm_user_id session var for audit trigger
-  const { data, error } = await supabase
-    .from("leads")
-    .update({ ...payload, updated_at: new Date().toISOString() })
-    .eq("id", id)
-    .select(LEAD_COLS)
-    .single();
+export async function updateLead(
+  id: string,
+  payload: UpdateLeadPayload,
+  userId: string,
+): Promise<Lead> {
+  // Use rpc_update_lead so that app.crm_user_id is set *in the same DB transaction*
+  // as the UPDATE — this satisfies the NOT NULL constraint on lead_status_history.changed_by
+  // that the fn_lead_status_side_effects trigger writes whenever status changes.
+  const { data, error } = await supabase.rpc("rpc_update_lead", {
+    p_id: id,
+    p_payload: payload,
+    p_user_id: userId,
+  });
 
   if (error) throw new Error(error.message);
-  return mapLeadRow(data);
+  return mapLeadRow(data as Record<string, unknown>);
 }
 
 export async function deleteLead(id: string): Promise<void> {

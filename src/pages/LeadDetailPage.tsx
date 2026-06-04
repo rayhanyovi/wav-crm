@@ -117,7 +117,7 @@ export function LeadDetailPage() {
 
   const handleSave = () => {
     if (!currentUser) return;
-    updateLeadMutation.mutate({ id: lead.id, payload: form as Parameters<typeof updateLeadMutation.mutate>[0]["payload"] });
+    updateLeadMutation.mutate({ id: lead.id, payload: form as Parameters<typeof updateLeadMutation.mutate>[0]["payload"], userId: currentUser.id });
     setEditing(false);
   };
 
@@ -163,7 +163,7 @@ export function LeadDetailPage() {
       base.appointment_date = undefined;
       base.appointment_time = undefined;
     }
-    updateLeadMutation.mutate({ id: lead.id, payload: base });
+    updateLeadMutation.mutate({ id: lead.id, payload: base, userId: currentUser.id });
     setOutcomeOpen(false);
   };
 
@@ -647,6 +647,7 @@ export function LeadDetailPage() {
                           updateLeadMutation.mutate({
                             id: lead.id,
                             payload: { products_discussed: next },
+                            userId: currentUser.id,
                           });
                         }}
                         title={p.name}

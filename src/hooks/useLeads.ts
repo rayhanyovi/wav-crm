@@ -56,8 +56,8 @@ export function useCreateLead() {
 export function useUpdateLead() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, payload }: { id: string; payload: UpdateLeadPayload }) =>
-      updateLead(id, payload),
+    mutationFn: ({ id, payload, userId }: { id: string; payload: UpdateLeadPayload; userId: string }) =>
+      updateLead(id, payload, userId),
 
     // Optimistic update for the list cache
     onMutate: async ({ id, payload }) => {

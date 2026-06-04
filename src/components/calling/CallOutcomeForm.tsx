@@ -149,6 +149,7 @@ export function CallOutcomeForm({ lead }: CallOutcomeFormProps) {
             appointment_date: dateParts[0],
             appointment_time: dateParts[1]?.slice(0, 5) || undefined,
           },
+          userId: currentUser.id,
         });
 
         const existingDeal = deals.find((d) => d.lead_id === lead.id && !d.deleted_at);
@@ -167,6 +168,7 @@ export function CallOutcomeForm({ lead }: CallOutcomeFormProps) {
             await updateLeadMutation.mutateAsync({
               id: lead.id,
               payload: { converted_contact_id: contactId },
+              userId: currentUser.id,
             });
           }
           await createDealMutation.mutateAsync({

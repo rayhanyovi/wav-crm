@@ -373,7 +373,7 @@ export function LeadsPage() {
                                 key={s}
                                 onClick={() => {
                                   if (!currentUser) return;
-                                  updateLeadMutation.mutate({ id: lead.id, payload: { status: s } });
+                                  updateLeadMutation.mutate({ id: lead.id, payload: { status: s }, userId: currentUser.id });
                                 }}
                               >
                                 <LeadStatusBadge status={s} />
