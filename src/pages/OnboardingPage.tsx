@@ -14,7 +14,8 @@ import {
 } from "@/components/ui/select";
 import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/store/useAuthStore";
-import { completeOnboarding } from "@/services/users";
+import { completeOnboarding, activateSuperAdmin } from "@/services/users";
+import { SUPER_ADMIN_EMAIL } from "@/lib/auth-domain";
 
 type Step = "password" | "profile";
 
@@ -44,6 +45,8 @@ export function OnboardingPage() {
     return <Navigate to="/pending" replace />;
   if (accountStatus !== "PENDING_PROFILE") return <Navigate to="/login" replace />;
 
+  const isSuperAdmin = authEmail?.toLowerCase() === SUPER_ADMIN_EMAIL;
+
   const submitPassword = async (event?: FormEvent) => {
     event?.preventDefault();
     setError(null);
@@ -57,11 +60,26 @@ export function OnboardingPage() {
     }
     setSubmitting(true);
     const { error: updateError } = await supabase.auth.updateUser({ password });
-    setSubmitting(false);
     if (updateError) {
+      setSubmitting(false);
       setError(updateError.message);
       return;
     }
+
+    // Super admin skips the role-selection step — activate immediately.
+    if (isSuperAdmin) {
+      try {
+        await activateSuperAdmin();
+        await loadSession();
+        navigate("/", { replace: true });
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Something went wrong.");
+        setSubmitting(false);
+      }
+      return;
+    }
+
+    setSubmitting(false);
     setStep("profile");
   };
 
@@ -105,7 +123,9 @@ export function OnboardingPage() {
           {authEmail && (
             <p className="mt-1 text-sm text-muted-foreground">{authEmail}</p>
           )}
-          <p className="mt-2 text-xs text-muted-foreground">Step {step === "password" ? "1" : "2"} of 2</p>
+          {!isSuperAdmin && (
+            <p className="mt-2 text-xs text-muted-foreground">Step {step === "password" ? "1" : "2"} of 2</p>
+          )}
         </div>
 
         {step === "password" ? (

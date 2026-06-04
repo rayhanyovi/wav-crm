@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Lock, Mail, TrendingUp } from "lucide-react";
+import { Lock, Mail, TrendingUp, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +15,32 @@ export function LoginPage() {
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Magic-link recovery mode (for users who haven't set a password yet)
+  const [linkMode, setLinkMode] = useState(false);
+  const [linkEmail, setLinkEmail] = useState("");
+  const [linkSent, setLinkSent] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
+  const [linkSubmitting, setLinkSubmitting] = useState(false);
+
+  const sendMagicLink = async (event?: FormEvent) => {
+    event?.preventDefault();
+    setLinkSubmitting(true);
+    setLinkError(null);
+    const { error: otpError } = await supabase.auth.signInWithOtp({
+      email: linkEmail.trim().toLowerCase(),
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        shouldCreateUser: false, // Only allows existing accounts
+      },
+    });
+    setLinkSubmitting(false);
+    if (otpError) {
+      setLinkError(otpError.message);
+    } else {
+      setLinkSent(true);
+    }
+  };
 
   const submit = async (event?: FormEvent) => {
     event?.preventDefault();
@@ -121,6 +147,69 @@ export function LoginPage() {
               Create an account
             </Link>
           </p>
+
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-background px-2 text-muted-foreground">or</span>
+            </div>
+          </div>
+
+          {!linkMode ? (
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full gap-2"
+              onClick={() => setLinkMode(true)}
+            >
+              <Send className="h-4 w-4" />
+              Sign in with a magic link
+            </Button>
+          ) : linkSent ? (
+            <div className="rounded-md border border-green-500/25 bg-green-500/10 px-3 py-3 text-sm text-green-700 dark:text-green-300 text-center">
+              Check your inbox — a sign-in link is on its way.
+            </div>
+          ) : (
+            <form onSubmit={sendMagicLink} className="space-y-3">
+              <div className="space-y-2">
+                <Label htmlFor="link-email">Your email</Label>
+                <div className="relative">
+                  <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="link-email"
+                    type="email"
+                    value={linkEmail}
+                    onChange={(e) => setLinkEmail(e.target.value)}
+                    className="pl-9"
+                    autoComplete="email"
+                    placeholder="you@example.com"
+                    required
+                  />
+                </div>
+              </div>
+              {linkError && (
+                <div className="rounded-md border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                  {linkError}
+                </div>
+              )}
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setLinkMode(false)}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" className="flex-1 gap-2" disabled={linkSubmitting}>
+                  <Send className="h-4 w-4" />
+                  {linkSubmitting ? "Sending…" : "Send link"}
+                </Button>
+              </div>
+            </form>
+          )}
         </form>
       </div>
     </div>

@@ -117,6 +117,15 @@ export async function completeOnboarding(
   if (error) throw new Error(error.message);
 }
 
+/**
+ * Called by the super admin (tech@wav.sg) after setting their password.
+ * Skips the approval queue — activates the account immediately.
+ */
+export async function activateSuperAdmin(): Promise<void> {
+  const { error } = await supabase.rpc("activate_super_admin");
+  if (error) throw new Error(error.message);
+}
+
 /** MASTER-only: assign a role + activate a pending account. */
 export async function approveUser(
   id: string,
