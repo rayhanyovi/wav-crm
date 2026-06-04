@@ -88,9 +88,7 @@ export function StatusUpdateModal({
     `Status changed to ${STATUS_LABELS[newStatus]}`,
   );
   const [notes, setNotes] = useState("");
-  const [result, setResult] = useState<ActivityResult>(
-    SUGGESTED_RESULT[newStatus] ?? "COMPLETED",
-  );
+  const [result, setResult] = useState<ActivityResult | "">("");
   const [followUpDate, setFollowUpDate] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -106,12 +104,12 @@ export function StatusUpdateModal({
     setActivityType("CALL");
     setSubject(`Status changed to ${STATUS_LABELS[newStatus]}`);
     setNotes("");
-    setResult(SUGGESTED_RESULT[newStatus] ?? "COMPLETED");
+    setResult("");
     setFollowUpDate("");
   };
 
   const handleSubmit = async () => {
-    if (!currentUser || !subject.trim()) return;
+    if (!currentUser || !subject.trim() || !result) return;
     setSubmitting(true);
 
     try {
@@ -228,13 +226,15 @@ export function StatusUpdateModal({
 
           {/* Result */}
           <div className="space-y-1.5">
-            <Label className="text-xs">Outcome</Label>
+            <Label className="text-xs">
+              Outcome <span className="text-destructive">*</span>
+            </Label>
             <Select
               value={result}
               onValueChange={(v) => setResult(v as ActivityResult)}
             >
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue />
+              <SelectTrigger className={`h-8 text-xs ${!result ? "text-muted-foreground" : ""}`}>
+                <SelectValue placeholder="Select an outcome…" />
               </SelectTrigger>
               <SelectContent>
                 {(Object.keys(RESULT_LABELS) as ActivityResult[]).map((r) => (
@@ -272,7 +272,7 @@ export function StatusUpdateModal({
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={!subject.trim() || submitting}
+            disabled={!subject.trim() || !result || submitting}
             variant={isAvoid ? "destructive" : "default"}
           >
             {submitting
