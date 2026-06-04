@@ -3,7 +3,7 @@ import { ExternalLink, MoreHorizontal, Plus, Upload, Users } from "lucide-react"
 import { useAuthStore } from "@/store/useAuthStore";
 import { useActivities } from "@/hooks/useActivities";
 import { useUsers } from "@/hooks/useUsers";
-import { useLeads, useCreateLead, useUpdateLead } from "@/hooks/useLeads";
+import { useLeads, useCreateLead } from "@/hooks/useLeads";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -50,6 +50,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { LeadImportDialog } from "@/components/leads/LeadImportDialog";
+import { StatusUpdateModal } from "@/components/leads/StatusUpdateModal";
 
 // APPOINTMENT is excluded — once a lead reaches that status it lives in Deals
 const STATUSES: LeadStatus[] = [
@@ -91,7 +92,9 @@ export function LeadsPage() {
   // Real Supabase data — RLS scopes by role automatically
   const { data: leads = [] } = useLeads({ includeAbandoned: true });
   const createLeadMutation = useCreateLead();
-  const updateLeadMutation = useUpdateLead();
+
+  // Pending status change — set when user picks a new status; clears after modal closes
+  const [pendingStatus, setPendingStatus] = useState<{ lead: typeof leads[0]; status: LeadStatus } | null>(null);
 
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("ALL");
@@ -371,10 +374,7 @@ export function LeadsPage() {
                             {STATUSES.filter((s) => s !== lead.status).map((s) => (
                               <DropdownMenuItem
                                 key={s}
-                                onClick={() => {
-                                  if (!currentUser) return;
-                                  updateLeadMutation.mutate({ id: lead.id, payload: { status: s }, userId: currentUser.id });
-                                }}
+                                onClick={() => setPendingStatus({ lead, status: s })}
                               >
                                 <LeadStatusBadge status={s} />
                               </DropdownMenuItem>
@@ -611,6 +611,16 @@ export function LeadsPage() {
 
       {/* Import dialog (Task #14) */}
       <LeadImportDialog open={importOpen} onClose={() => setImportOpen(false)} />
+
+      {/* Status update modal — opens when user picks a new status from the action dropdown */}
+      {pendingStatus && (
+        <StatusUpdateModal
+          lead={pendingStatus.lead}
+          newStatus={pendingStatus.status}
+          open={!!pendingStatus}
+          onClose={() => setPendingStatus(null)}
+        />
+      )}
     </div>
   );
 }
