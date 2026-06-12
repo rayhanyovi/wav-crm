@@ -4,9 +4,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from "@/components/ui/button";
 import { useCrmStore } from "@/store/useCrmStore";
 import { useAuthStore } from "@/store/useAuthStore";
-import { useLeads } from "@/hooks/useLeads";
+import { useLeads, useClaimLeadsForCall } from "@/hooks/useLeads";
 import { useCallSessionStore } from "@/store/useCallSessionStore";
 import { isTelemarketer, isAdviser } from "@/lib/permissions";
+import { CALL_SESSION_SIZE } from "@/lib/callQueue";
 import type { Lead } from "@/data/types";
 
 interface StartCallingModalProps {
@@ -22,25 +23,41 @@ export function StartCallingModal({ open, onClose }: StartCallingModalProps) {
   const { data: leads = [] } = useLeads({ includeAbandoned: false });
   const { currentUser } = useAuthStore();
   const { startSession } = useCallSessionStore();
+  const claimLeadsForCall = useClaimLeadsForCall();
 
-  /** TM queue: their owned leads that are still workable, bounced leads float to the top */
+  /**
+   * TM queue: a shared pool of cold-call-ready leads — status NA, plus
+   * COOLDOWN leads whose cooldown period has elapsed. Not restricted to
+   * leads already assigned to this TM, so they don't have to wait for an
+   * assignment first. Capped to CALL_SESSION_SIZE; bounced-back and
+   * cooldown-expired leads float to the top.
+   */
   const tmQueue = useMemo<Lead[]>(() => {
     if (!currentUser || !isTelemarketer(currentUser)) return [];
+    const now = Date.now();
     return leads
-      .filter(
-        (l) =>
-          !l.deleted_at &&
-          !DEAD_STATUSES.has(l.status) &&
-          (l.telemarketer_owner_id === currentUser.id ||
-            l.assigned_to_id === currentUser.id)
-      )
+      .filter((l) => {
+        if (l.deleted_at || DEAD_STATUSES.has(l.status)) return false;
+        if (l.status === "NA") return true;
+        if (l.status === "COOLDOWN") {
+          return !l.cooldown_until || new Date(l.cooldown_until).getTime() <= now;
+        }
+        return false;
+      })
       .sort((a, b) => {
         // Recently bounced leads (no-show returned) float to the top
         const aBounced = a.last_bounced_at && a.status === "NA" ? new Date(a.last_bounced_at).getTime() : 0;
         const bBounced = b.last_bounced_at && b.status === "NA" ? new Date(b.last_bounced_at).getTime() : 0;
         if (aBounced !== bBounced) return bBounced - aBounced;
+
+        // Cooldown-expired leads come next
+        const aCooldown = a.status === "COOLDOWN" ? 1 : 0;
+        const bCooldown = b.status === "COOLDOWN" ? 1 : 0;
+        if (aCooldown !== bCooldown) return bCooldown - aCooldown;
+
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-      });
+      })
+      .slice(0, CALL_SESSION_SIZE);
   }, [leads, currentUser]);
 
   /**
@@ -88,13 +105,19 @@ export function StartCallingModal({ open, onClose }: StartCallingModalProps) {
   const queue = isTM ? tmQueue : adviserQueue;
 
   const handleStart = () => {
-    if (queue.length === 0) return;
+    if (queue.length === 0 || !currentUser) return;
+    if (isTM) {
+      claimLeadsForCall.mutate({
+        leadIds: queue.map((l) => l.id),
+        userId: currentUser.id,
+      });
+    }
     startSession(queue);
     onClose();
   };
 
   const queueDescription = isTM
-    ? "All your workable leads, with recently bounced prospects at the top."
+    ? `Up to ${CALL_SESSION_SIZE} leads from the shared NA pool, with bounced and cooldown-expired prospects first.`
     : "Leads past the TM cold-call phase — appointments to confirm and follow ups to close.";
 
   const emptyMessage = isTM
@@ -137,6 +160,8 @@ export function StartCallingModal({ open, onClose }: StartCallingModalProps) {
                     <span className="text-xs text-muted-foreground capitalize">
                       {l.last_bounced_at && l.status === "NA"
                         ? "↑ bounced back"
+                        : l.status === "COOLDOWN"
+                        ? "↻ cooldown expired"
                         : l.status === "APPOINTMENT"
                         ? "📅 appointment"
                         : l.status.toLowerCase()}

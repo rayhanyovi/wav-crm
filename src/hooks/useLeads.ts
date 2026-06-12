@@ -4,7 +4,7 @@ import {
   createLead, updateLead, deleteLead,
   fetchLeadNotes, addLeadNote, deleteLeadNote,
   bulkCreateLeads,
-  claimLead, returnLead, convertLead,
+  claimLead, returnLead, convertLead, claimLeadsForCall,
 } from "@/services/leads";
 import type { LeadFilters, CreateLeadPayload, UpdateLeadPayload, ConvertLeadPayload } from "@/services/leads";
 import type { Lead, LeadNote } from "@/data/types";
@@ -159,6 +159,18 @@ export function useClaimLead() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["leads"] });
       qc.invalidateQueries({ queryKey: ["users"] });
+    },
+  });
+}
+
+/** Claim a batch of pooled leads for a TM calling session (best-effort, no locking). */
+export function useClaimLeadsForCall() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ leadIds, userId }: { leadIds: string[]; userId: string }) =>
+      claimLeadsForCall(leadIds, userId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["leads"] });
     },
   });
 }

@@ -9,7 +9,8 @@ import { useAuthStore } from "@/store/useAuthStore";
 import { useUsers } from "@/hooks/useUsers";
 import { useLeads } from "@/hooks/useLeads";
 import { useContact } from "@/hooks/useContacts";
-import { useActivities } from "@/hooks/useActivities";
+import { useActivities, useCreateActivity } from "@/hooks/useActivities";
+import { toast } from "@/store/useToastStore";
 import {
   useCreateDealProposal,
   useDeal,
@@ -283,6 +284,9 @@ export function DealDetailPage() {
   const createDealProposalMutation = useCreateDealProposal();
   const updateDealProposalMutation = useUpdateDealProposal();
   const deleteDealProposalMutation = useDeleteDealProposal();
+  const createActivityMutation = useCreateActivity();
+
+  const [comment, setComment] = useState("");
 
   const [stageModalOpen, setStageModalOpen] = useState(false);
   const [newStage, setNewStage] = useState<DealStage | "">("");
@@ -433,6 +437,28 @@ export function DealDetailPage() {
       },
     });
     setEditingFactFind(false);
+  };
+
+  const handlePostComment = () => {
+    const text = comment.trim();
+    if (!text || !currentUser) return;
+    setComment("");
+    createActivityMutation.mutate(
+      {
+        type:         "NOTE",
+        subject:      text,
+        result:       "COMPLETED",
+        deal_id:      id!,
+        lead_id:      deal.lead_id ?? undefined,
+        created_by:   currentUser.id,
+        completed_at: new Date().toISOString(),
+        metadata:     { comment: true },
+      },
+      {
+        onError: (err) =>
+          toast.error(`Couldn't post comment: ${err instanceof Error ? err.message : "unknown error"}`),
+      },
+    );
   };
 
   return (
@@ -716,25 +742,57 @@ export function DealDetailPage() {
             )}
           </div>
 
-          {/* Activity timeline */}
+          {/* Comments & activity timeline */}
           <div className="rounded-lg border overflow-hidden">
             <div className="px-3 py-2.5 bg-muted/50 border-b flex items-center justify-between">
-              <span className="text-xs font-medium">Activity Log</span>
+              <span className="text-xs font-medium">Comments & Activity</span>
               <span className="text-[11px] text-muted-foreground">{dealActivities.length} entries</span>
             </div>
+
+            {/* Comment composer — notes from calls, meetings & status changes all land here */}
+            {canEdit && (
+              <div className="flex items-start gap-2 border-b p-3">
+                <Textarea
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  placeholder="Add a comment about this deal…"
+                  rows={2}
+                  className="text-xs"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                      e.preventDefault();
+                      handlePostComment();
+                    }
+                  }}
+                />
+                <Button
+                  size="sm"
+                  className="shrink-0"
+                  onClick={handlePostComment}
+                  disabled={!comment.trim() || createActivityMutation.isPending}
+                >
+                  Post
+                </Button>
+              </div>
+            )}
+
             {dealActivities.length === 0 ? (
-              <p className="text-xs text-muted-foreground text-center py-6">No activities yet</p>
+              <p className="text-xs text-muted-foreground text-center py-6">No comments or activity yet</p>
             ) : (
-              <div className="divide-y max-h-64 overflow-y-auto">
+              <div className="divide-y max-h-80 overflow-y-auto">
                 {dealActivities.map((a) => {
                   const by = users.find((u) => u.id === a.assigned_to_id || u.id === a.created_by);
+                  const isComment = !!a.metadata?.comment;
                   return (
                     <div key={a.id} className="px-3 py-2.5 text-xs">
                       <div className="flex items-center gap-2">
                         <ActivityTypeBadge type={a.type} />
                         <span className="font-medium flex-1 truncate">{a.subject}</span>
-                        {a.result && <ActivityResultBadge result={a.result} />}
+                        {a.result && !isComment && <ActivityResultBadge result={a.result} />}
                       </div>
+                      {a.description && (
+                        <p className="text-foreground/80 mt-1 whitespace-pre-wrap">{a.description}</p>
+                      )}
                       <p className="text-muted-foreground mt-0.5">
                         {formatDateTime(a.scheduled_at ?? a.created_at)}
                         {by && ` · ${by.name.split(" ")[0]}`}

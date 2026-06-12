@@ -22,45 +22,9 @@ import { LeadStatusBadge } from "@/components/common/StatusBadge";
 import { useUpdateLead } from "@/hooks/useLeads";
 import { useCreateActivity } from "@/hooks/useActivities";
 import { useAuthStore } from "@/store/useAuthStore";
-import type { Lead, LeadStatus, ActivityType, ActivityResult } from "@/data/types";
-
-// ─── Config maps ─────────────────────────────────────────────────────────────
-
-const ACTIVITY_TYPES: { value: ActivityType; label: string }[] = [
-  { value: "CALL",      label: "Phone Call" },
-  { value: "EMAIL",     label: "Email" },
-  { value: "MEETING",   label: "Meeting" },
-  { value: "NOTE",      label: "Note / Manual entry" },
-  { value: "FOLLOW_UP", label: "Follow-up" },
-];
-
-const RESULT_LABELS: Record<ActivityResult, string> = {
-  COMPLETED:        "Completed",
-  NO_ANSWER:        "No Answer",
-  FOLLOW_UP_NEEDED: "Follow-up Needed",
-  MEETING_SCHEDULED:"Meeting Scheduled",
-  CANCELLED:        "Cancelled",
-  FAILED:           "Failed / Unreachable",
-};
-
-/** Suggested defaults per target status */
-const SUGGESTED_RESULT: Record<LeadStatus, ActivityResult> = {
-  NA:             "NO_ANSWER",
-  KIV:            "FOLLOW_UP_NEEDED",
-  NOT_INTERESTED: "COMPLETED",
-  AVOID:          "FAILED",
-  OTHERS:         "COMPLETED",
-  APPOINTMENT:    "MEETING_SCHEDULED",
-};
-
-const STATUS_LABELS: Record<LeadStatus, string> = {
-  NA:             "NA",
-  KIV:            "KIV",
-  NOT_INTERESTED: "Not Interested",
-  AVOID:          "Avoid",
-  OTHERS:         "Others",
-  APPOINTMENT:    "Appointment",
-};
+import { toast } from "@/store/useToastStore";
+import { STATUS_REASONS, AUTO_RESULT, STATUS_LABELS } from "@/lib/leadStatusReasons";
+import type { Lead, LeadStatus } from "@/data/types";
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -83,66 +47,74 @@ export function StatusUpdateModal({
   const updateLead     = useUpdateLead();
   const createActivity = useCreateActivity();
 
-  const [activityType, setActivityType] = useState<ActivityType>("CALL");
-  const [subject, setSubject] = useState(
-    `Status changed to ${STATUS_LABELS[newStatus]}`,
-  );
-  const [notes, setNotes] = useState("");
-  const [result, setResult] = useState<ActivityResult | "">("");
+  const [notes, setNotes]               = useState("");
+  const [reason, setReason]             = useState("");
   const [followUpDate, setFollowUpDate] = useState("");
-  const [submitting, setSubmitting] = useState(false);
 
-  const isKiv    = newStatus === "KIV";
-  const isAvoid  = newStatus === "AVOID";
+  const isKiv   = newStatus === "KIV";
+  const isAvoid = newStatus === "AVOID";
 
-  // Reset form when the modal opens for a new status
-  const handleOpenChange = (open: boolean) => {
-    if (!open) {
+  const reasonOptions = STATUS_REASONS[newStatus] ?? [];
+
+  const handleOpenChange = (isOpen: boolean) => {
+    if (!isOpen) {
       onClose();
       return;
     }
-    setActivityType("CALL");
-    setSubject(`Status changed to ${STATUS_LABELS[newStatus]}`);
     setNotes("");
-    setResult("");
+    setReason("");
     setFollowUpDate("");
   };
 
-  const handleSubmit = async () => {
-    if (!currentUser || !subject.trim() || !result) return;
-    setSubmitting(true);
+  // Fire-and-close: the status flips instantly in the table via the optimistic
+  // cache update in useUpdateLead. On failure the hook rolls the row back and we
+  // surface a toast. Activity logging is best-effort and never blocks the UX.
+  const handleSubmit = () => {
+    if (!currentUser || !reason) return;
 
-    try {
-      // 1. Update lead status
-      await updateLead.mutateAsync({
-        id:      lead.id,
-        payload: { status: newStatus },
-        userId:  currentUser.id,
-      });
+    const userId = currentUser.id;
+    const trimmedNotes = notes.trim() || undefined;
 
-      // 2. Create an activity log so there's a paper trail
-      const now = new Date().toISOString();
-      await createActivity.mutateAsync({
-        type:         activityType,
-        subject:      subject.trim(),
-        description:  notes.trim() || undefined,
-        result,
-        lead_id:      lead.id,
-        created_by:   currentUser.id,
-        completed_at: now,
-        scheduled_at: isKiv && followUpDate ? followUpDate : undefined,
-        metadata: {
-          previous_status: lead.status,
-          new_status:      newStatus,
+    updateLead.mutate(
+      { id: lead.id, payload: { status: newStatus }, userId },
+      {
+        onError: (err) =>
+          toast.error(
+            `Couldn't update status: ${err instanceof Error ? err.message : "unknown error"}`,
+          ),
+        onSuccess: () => {
+          const now = new Date().toISOString();
+          createActivity.mutate({
+            type:         "CALL",
+            subject:      `Status changed to ${STATUS_LABELS[newStatus]} — ${reason}`,
+            description:  trimmedNotes,
+            result:       AUTO_RESULT[newStatus],
+            lead_id:      lead.id,
+            created_by:   userId,
+            completed_at: now,
+            metadata: {
+              previous_status: lead.status,
+              new_status:      newStatus,
+              reason,
+            },
+          });
+
+          if (isKiv && followUpDate) {
+            createActivity.mutate({
+              type:           "FOLLOW_UP",
+              subject:        `Follow-up — ${lead.first_name} ${lead.last_name}`,
+              description:    trimmedNotes,
+              scheduled_at:   new Date(followUpDate).toISOString(),
+              lead_id:        lead.id,
+              assigned_to_id: userId,
+              created_by:     userId,
+            });
+          }
         },
-      });
+      },
+    );
 
-      onClose();
-    } catch {
-      // errors surface via TanStack Query toasts; don't block UI
-    } finally {
-      setSubmitting(false);
-    }
+    onClose();
   };
 
   return (
@@ -170,38 +142,23 @@ export function StatusUpdateModal({
             </div>
           )}
 
-          {/* Contact method */}
+          {/* Reason */}
           <div className="space-y-1.5">
-            <Label className="text-xs">How did you reach out?</Label>
-            <div className="flex flex-wrap gap-1.5">
-              {ACTIVITY_TYPES.map(({ value, label }) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setActivityType(value)}
-                  className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
-                    activityType === value
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-border bg-background hover:bg-muted"
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Subject */}
-          <div className="space-y-1.5">
-            <Label htmlFor="su-subject" className="text-xs">
-              Subject <span className="text-destructive">*</span>
+            <Label className="text-xs">
+              Reason <span className="text-destructive">*</span>
             </Label>
-            <Input
-              id="su-subject"
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              placeholder="Brief description of the interaction"
-            />
+            <Select value={reason} onValueChange={setReason}>
+              <SelectTrigger className={`text-xs ${!reason ? "text-muted-foreground" : ""}`}>
+                <SelectValue placeholder="Select a reason…" />
+              </SelectTrigger>
+              <SelectContent>
+                {reasonOptions.map((r) => (
+                  <SelectItem key={r} value={r} className="text-xs">
+                    {r}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Notes */}
@@ -215,35 +172,13 @@ export function StatusUpdateModal({
               onChange={(e) => setNotes(e.target.value)}
               placeholder={
                 isAvoid
-                  ? "Reason for avoiding this lead…"
+                  ? "Any additional context…"
                   : isKiv
-                  ? "What did they say? Any context for the follow-up…"
-                  : "What happened during the interaction…"
+                  ? "What did they say? Context for the follow-up…"
+                  : "What happened during the call…"
               }
               rows={3}
             />
-          </div>
-
-          {/* Result */}
-          <div className="space-y-1.5">
-            <Label className="text-xs">
-              Outcome <span className="text-destructive">*</span>
-            </Label>
-            <Select
-              value={result}
-              onValueChange={(v) => setResult(v as ActivityResult)}
-            >
-              <SelectTrigger className={`h-8 text-xs ${!result ? "text-muted-foreground" : ""}`}>
-                <SelectValue placeholder="Select an outcome…" />
-              </SelectTrigger>
-              <SelectContent>
-                {(Object.keys(RESULT_LABELS) as ActivityResult[]).map((r) => (
-                  <SelectItem key={r} value={r} className="text-xs">
-                    {RESULT_LABELS[r]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
 
           {/* KIV: follow-up date */}
@@ -267,19 +202,15 @@ export function StatusUpdateModal({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={submitting}>
+          <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={!subject.trim() || !result || submitting}
+            disabled={!reason}
             variant={isAvoid ? "destructive" : "default"}
           >
-            {submitting
-              ? "Saving…"
-              : isAvoid
-              ? "Mark as Avoid"
-              : "Save & Update Status"}
+            {isAvoid ? "Mark as Avoid" : "Save & Update Status"}
           </Button>
         </DialogFooter>
       </DialogContent>

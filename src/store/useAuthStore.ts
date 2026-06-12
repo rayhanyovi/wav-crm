@@ -19,6 +19,7 @@ interface AuthProfileRow {
   credit_balance: number | null;
   telemarketer_access: boolean | null;
   telemarketer_id: string | null;
+  leads_access: boolean | null;
   created_at: string;
 }
 
@@ -54,12 +55,13 @@ export function mapAuthProfile(profile: AuthProfileRow): User {
     credit_balance: profile.credit_balance ?? 0,
     telemarketer_access: profile.telemarketer_access ?? false,
     telemarketer_id: profile.telemarketer_id ?? undefined,
+    leads_access: profile.leads_access ?? true,
     created_at: profile.created_at,
   };
 }
 
 const PROFILE_COLS =
-  "id,name,email,role,avatar,is_active,credit_balance,telemarketer_access,telemarketer_id,created_at,account_status,requested_role";
+  "id,name,email,role,avatar,is_active,credit_balance,telemarketer_access,telemarketer_id,leads_access,created_at,account_status,requested_role";
 
 export const useAuthStore = create<AuthState>()(
   persist(

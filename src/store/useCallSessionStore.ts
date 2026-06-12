@@ -27,6 +27,7 @@ interface CallSessionState {
   tickCallDuration: () => void;
   submitOutcome: (pickup: boolean) => void;
   nextLead: () => void;
+  updateCurrentLead: (patch: Partial<Lead>) => void;
   setPhase: (phase: "sheet" | "calling" | "outcome" | "done") => void;
 }
 
@@ -124,6 +125,15 @@ export const useCallSessionStore = create<CallSessionState>((set, get) => ({
         return { phase: "done", currentIndex: next };
       }
       return { currentIndex: next, phase: "sheet" };
+    }),
+
+  updateCurrentLead: (patch) =>
+    set((s) => {
+      const queue = [...s.queue];
+      const lead = queue[s.currentIndex];
+      if (!lead) return {};
+      queue[s.currentIndex] = { ...lead, ...patch };
+      return { queue };
     }),
 
   setPhase: (phase) => set({ phase }),

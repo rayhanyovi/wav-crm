@@ -485,6 +485,7 @@ export function TopBar({
           <div className="flex-1">
             {renderSearchButton("w-full justify-start")}
           </div>
+          {startCallingButton}
           <NotificationBell />
           {profileMenu}
         </div>

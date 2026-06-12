@@ -23,7 +23,7 @@ import { DealDetailPage } from "@/pages/DealDetailPage";
 import { ToolsPage } from "@/pages/ToolsPage";
 import { PortfolioRiskCalculatorPage } from "@/pages/PortfolioRiskCalculatorPage";
 import { NoAccessPage } from "@/pages/NoAccessPage";
-import { canManage, roleLevel } from "@/lib/permissions";
+import { canManage, roleLevel, hasLeadsAccess } from "@/lib/permissions";
 
 function ProtectedRoute({ children, minRole }: { children: React.ReactNode; minRole?: number }) {
   const { currentUser, accountStatus } = useAuthStore();
@@ -34,6 +34,12 @@ function ProtectedRoute({ children, minRole }: { children: React.ReactNode; minR
     return <Navigate to="/login" replace />;
   }
   if (minRole !== undefined && roleLevel(currentUser.role) < minRole) return <NoAccessPage />;
+  return <>{children}</>;
+}
+
+function LeadsRoute({ children }: { children: React.ReactNode }) {
+  const { currentUser } = useAuthStore();
+  if (!hasLeadsAccess(currentUser)) return <NoAccessPage />;
   return <>{children}</>;
 }
 
@@ -76,8 +82,8 @@ export default function App() {
         }
       >
         <Route index element={<DashboardPage />} />
-        <Route path="leads" element={<LeadsPage />} />
-        <Route path="leads/:id" element={<LeadDetailPage />} />
+        <Route path="leads" element={<LeadsRoute><LeadsPage /></LeadsRoute>} />
+        <Route path="leads/:id" element={<LeadsRoute><LeadDetailPage /></LeadsRoute>} />
         <Route path="contacts" element={<ContactsPage />} />
         <Route path="contacts/:id" element={<ContactDetailPage />} />
         <Route path="activities" element={<ActivitiesPage />} />

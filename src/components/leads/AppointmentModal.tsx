@@ -11,52 +11,48 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
 import { useConvertLead } from "@/hooks/useLeads";
 import { useCreateActivity } from "@/hooks/useActivities";
+import { useUpdateContact } from "@/hooks/useContacts";
+import { useUpdateDeal } from "@/hooks/useDeals";
+import { useUpdateUser, useUsers } from "@/hooks/useUsers";
 import { useAuthStore } from "@/store/useAuthStore";
+import {
+  nextCreditBalanceAfterAppointmentClaim,
+  resolveAppointmentDealAdviser,
+} from "@/lib/dealAssignment";
+import { hasFactFind, pickFactFind } from "@/lib/factFind";
 import type { Lead } from "@/data/types";
 
 interface AppointmentModalProps {
   lead: Lead;
   open: boolean;
   onClose: () => void;
+  /** Fired after a successful conversion (lead → contact + deal). */
+  onConverted?: (leadId: string) => void;
 }
 
-export function AppointmentModal({ lead, open, onClose }: AppointmentModalProps) {
+export function AppointmentModal({ lead, open, onClose, onConverted }: AppointmentModalProps) {
   const { currentUser } = useAuthStore();
   const convertLead    = useConvertLead();
   const createActivity = useCreateActivity();
-
-  // Contact fields — pre-filled from lead
-  const [firstName, setFirstName] = useState(lead.first_name);
-  const [lastName,  setLastName]  = useState(lead.last_name);
-  const [email,     setEmail]     = useState(lead.email ?? "");
-  const [phone,     setPhone]     = useState(lead.phone ?? "");
-
-  // Deal creation (optional but recommended)
-  const [createDeal, setCreateDeal] = useState(true);
-  const [dealTitle,  setDealTitle]  = useState(
-    `${lead.first_name} ${lead.last_name} – Appointment`,
-  );
-  const [dealValue, setDealValue] = useState("");
+  const updateContact  = useUpdateContact();
+  const updateDeal     = useUpdateDeal();
+  const updateUser     = useUpdateUser();
+  const { data: users = [], isLoading: usersLoading } = useUsers();
 
   // Appointment details
   const [appointmentDate, setAppointmentDate] = useState("");
+  const [appointmentTime, setAppointmentTime] = useState("");
+  const appointmentDateTime = appointmentDate && appointmentTime ? `${appointmentDate}T${appointmentTime}` : "";
   const [notes, setNotes] = useState("");
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError]           = useState<string | null>(null);
 
   const reset = () => {
-    setFirstName(lead.first_name);
-    setLastName(lead.last_name);
-    setEmail(lead.email ?? "");
-    setPhone(lead.phone ?? "");
-    setCreateDeal(true);
-    setDealTitle(`${lead.first_name} ${lead.last_name} – Appointment`);
-    setDealValue("");
     setAppointmentDate("");
+    setAppointmentTime("");
     setNotes("");
     setError(null);
   };
@@ -67,63 +63,78 @@ export function AppointmentModal({ lead, open, onClose }: AppointmentModalProps)
 
   const handleSubmit = async () => {
     if (!currentUser) return;
-    if (!firstName.trim() || !lastName.trim()) {
-      setError("First and last name are required.");
-      return;
-    }
-    if (createDeal && !dealTitle.trim()) {
-      setError("Deal title is required when creating a deal.");
-      return;
-    }
 
     setSubmitting(true);
     setError(null);
 
     try {
+      const assignedAdviser = resolveAppointmentDealAdviser({
+        actor: currentUser,
+        lead,
+        users,
+      });
+
       const { contact_id, deal_id } = await convertLead.mutateAsync({
         leadId: lead.id,
         userId: currentUser.id,
         payload: {
           contact: {
-            first_name: firstName.trim(),
-            last_name:  lastName.trim(),
-            email:      email.trim() || undefined,
-            phone:      phone.trim() || undefined,
+            first_name: lead.first_name,
+            last_name:  lead.last_name,
+            email:      lead.email ?? undefined,
+            phone:      lead.phone ?? undefined,
             source:     lead.source,
             created_by: currentUser.id,
           },
-          deal: createDeal
-            ? {
-                title:          dealTitle.trim(),
-                value:          dealValue ? parseFloat(dealValue) : 0,
-                stage:          "APPOINTMENT",
-                assigned_to_id: lead.assigned_to_id ?? currentUser.id,
-                created_by:     currentUser.id,
-                contact_id,     // filled in by RPC; placeholder here
-              }
-            : null,
+          deal: {
+            title:          `${lead.first_name} ${lead.last_name} – Appointment`,
+            value:          0,
+            stage:          "APPOINTMENT",
+            assigned_to_id: assignedAdviser?.id ?? null,
+            created_by:     currentUser.id,
+          },
         },
       });
 
+      if (assignedAdviser && deal_id) {
+        await updateUser.mutateAsync({
+          id: assignedAdviser.id,
+          payload: {
+            credit_balance: nextCreditBalanceAfterAppointmentClaim(assignedAdviser),
+          },
+        });
+      }
+
+      // Carry over any fact-find data already collected on the lead
+      if (hasFactFind(lead)) {
+        const factFind = pickFactFind(lead);
+        if (contact_id) {
+          await updateContact.mutateAsync({ id: contact_id, payload: factFind });
+        }
+        if (deal_id) {
+          await updateDeal.mutateAsync({ id: deal_id, payload: factFind });
+        }
+      }
+
       // Schedule an appointment activity if a date was given
-      if (appointmentDate) {
+      if (appointmentDateTime) {
         await createActivity.mutateAsync({
           type:        "MEETING",
-          subject:     `Appointment — ${firstName.trim()} ${lastName.trim()}`,
+          subject:     `Appointment — ${lead.first_name} ${lead.last_name}`,
           description: notes.trim() || undefined,
           result:      "MEETING_SCHEDULED",
           lead_id:     lead.id,
           contact_id:  contact_id ?? undefined,
           deal_id:     deal_id ?? undefined,
           created_by:  currentUser.id,
-          scheduled_at: new Date(appointmentDate).toISOString(),
+          scheduled_at: new Date(appointmentDateTime).toISOString(),
           metadata: { converted_from_lead: lead.id },
         });
       } else if (notes.trim()) {
         // No date but user left notes — log as a note activity anyway
         await createActivity.mutateAsync({
           type:        "NOTE",
-          subject:     `Appointment booked — ${firstName.trim()} ${lastName.trim()}`,
+          subject:     `Appointment booked — ${lead.first_name} ${lead.last_name}`,
           description: notes.trim(),
           result:      "MEETING_SCHEDULED",
           lead_id:     lead.id,
@@ -136,6 +147,7 @@ export function AppointmentModal({ lead, open, onClose }: AppointmentModalProps)
       }
 
       reset();
+      onConverted?.(lead.id);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
@@ -153,97 +165,12 @@ export function AppointmentModal({ lead, open, onClose }: AppointmentModalProps)
             Move to Appointment
           </DialogTitle>
           <p className="text-sm text-muted-foreground">
-            This converts the lead into a contact and moves them to your deals pipeline.
+            {lead.first_name} {lead.last_name} will be converted to a contact and a deal
+            will be created in the pipeline automatically.
           </p>
         </DialogHeader>
 
         <div className="space-y-5 py-1">
-          {/* ── Contact details ── */}
-          <div className="space-y-3">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Contact details
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="ap-fname" className="text-xs">First name <span className="text-destructive">*</span></Label>
-                <Input
-                  id="ap-fname"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="ap-lname" className="text-xs">Last name <span className="text-destructive">*</span></Label>
-                <Input
-                  id="ap-lname"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="ap-email" className="text-xs">Email</Label>
-                <Input
-                  id="ap-email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="optional"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="ap-phone" className="text-xs">Phone</Label>
-                <Input
-                  id="ap-phone"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="optional"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* ── Deal creation ── */}
-          <div className="space-y-3 rounded-lg border p-3">
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="ap-create-deal"
-                checked={createDeal}
-                onCheckedChange={(v) => setCreateDeal(!!v)}
-              />
-              <Label htmlFor="ap-create-deal" className="text-sm font-medium cursor-pointer">
-                Create a deal in the pipeline
-              </Label>
-            </div>
-
-            {createDeal && (
-              <div className="grid grid-cols-2 gap-3 pt-1">
-                <div className="col-span-2 space-y-1.5">
-                  <Label htmlFor="ap-deal-title" className="text-xs">
-                    Deal title <span className="text-destructive">*</span>
-                  </Label>
-                  <Input
-                    id="ap-deal-title"
-                    value={dealTitle}
-                    onChange={(e) => setDealTitle(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="ap-deal-value" className="text-xs">
-                    Estimated value (SGD)
-                  </Label>
-                  <Input
-                    id="ap-deal-value"
-                    type="number"
-                    min="0"
-                    value={dealValue}
-                    onChange={(e) => setDealValue(e.target.value)}
-                    placeholder="0"
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-
           {/* ── Appointment scheduling ── */}
           <div className="space-y-3">
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -253,12 +180,22 @@ export function AppointmentModal({ lead, open, onClose }: AppointmentModalProps)
               <Label htmlFor="ap-date" className="text-xs">
                 Appointment date &amp; time
               </Label>
-              <Input
-                id="ap-date"
-                type="datetime-local"
-                value={appointmentDate}
-                onChange={(e) => setAppointmentDate(e.target.value)}
-              />
+              <div className="flex gap-2">
+                <Input
+                  id="ap-date"
+                  type="date"
+                  value={appointmentDate}
+                  onChange={(e) => setAppointmentDate(e.target.value)}
+                  className="flex-1"
+                />
+                <Input
+                  id="ap-time"
+                  type="time"
+                  value={appointmentTime}
+                  onChange={(e) => setAppointmentTime(e.target.value)}
+                  className="flex-1"
+                />
+              </div>
               <p className="text-[11px] text-muted-foreground">
                 Leave blank if not yet scheduled — you can add it from the deal later.
               </p>
@@ -288,7 +225,7 @@ export function AppointmentModal({ lead, open, onClose }: AppointmentModalProps)
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={submitting || !firstName.trim() || !lastName.trim()}
+            disabled={submitting || usersLoading}
             className="gap-2"
           >
             <CalendarCheck className="h-4 w-4" />

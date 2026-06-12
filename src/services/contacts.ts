@@ -1,13 +1,14 @@
 import { nanoid } from "nanoid";
 import { supabase } from "@/lib/supabase";
-import type { Contact, ContactNote, LeadSource } from "@/data/types";
+import type { Contact, ContactNote, LeadSource, FactFindFields } from "@/data/types";
 
 const CONTACT_SELECT =
-  "id,first_name,last_name,email,phone,title,source,created_by,created_at,updated_at,deleted_at";
+  "id,first_name,last_name,email,phone,title,source,created_by,created_at,updated_at,deleted_at," +
+  "financial_goal,risk_tolerance,investment_horizon,monthly_investable,existing_investments,fact_find_notes,fact_find_done";
 const CONTACT_NOTE_SELECT =
   "id,contact_id,content,created_by,created_at";
 
-interface ContactRow {
+interface ContactRow extends FactFindFields {
   id: string;
   first_name: string;
   last_name: string;
@@ -34,7 +35,7 @@ export interface ContactFilters {
   ids?: string[];
 }
 
-export interface CreateContactPayload {
+export interface CreateContactPayload extends FactFindFields {
   first_name: string;
   last_name: string;
   email?: string;
@@ -44,7 +45,7 @@ export interface CreateContactPayload {
   created_by: string;
 }
 
-export interface UpdateContactPayload {
+export interface UpdateContactPayload extends FactFindFields {
   first_name?: string;
   last_name?: string;
   email?: string;
@@ -66,6 +67,13 @@ function mapContactRow(row: ContactRow): Contact {
     created_at: row.created_at,
     updated_at: row.updated_at,
     deleted_at: row.deleted_at ?? undefined,
+    financial_goal: row.financial_goal ?? undefined,
+    risk_tolerance: row.risk_tolerance ?? undefined,
+    investment_horizon: row.investment_horizon ?? undefined,
+    monthly_investable: row.monthly_investable ?? undefined,
+    existing_investments: row.existing_investments ?? undefined,
+    fact_find_notes: row.fact_find_notes ?? undefined,
+    fact_find_done: row.fact_find_done ?? undefined,
   };
 }
 
@@ -91,7 +99,7 @@ export async function fetchContacts(filters?: ContactFilters): Promise<Contact[]
 
   const { data, error } = await query;
   if (error) throw new Error(error.message);
-  return (data as ContactRow[]).map(mapContactRow);
+  return (data as unknown as ContactRow[]).map(mapContactRow);
 }
 
 export async function fetchContactById(id: string): Promise<Contact> {
@@ -103,7 +111,7 @@ export async function fetchContactById(id: string): Promise<Contact> {
     .single();
 
   if (error) throw new Error(error.message);
-  return mapContactRow(data as ContactRow);
+  return mapContactRow(data as unknown as ContactRow);
 }
 
 export async function createContact(payload: CreateContactPayload): Promise<Contact> {
@@ -118,6 +126,13 @@ export async function createContact(payload: CreateContactPayload): Promise<Cont
     created_by: payload.created_by,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
+    financial_goal: payload.financial_goal ?? null,
+    risk_tolerance: payload.risk_tolerance ?? null,
+    investment_horizon: payload.investment_horizon ?? null,
+    monthly_investable: payload.monthly_investable ?? null,
+    existing_investments: payload.existing_investments ?? null,
+    fact_find_notes: payload.fact_find_notes ?? null,
+    fact_find_done: payload.fact_find_done ?? null,
   };
 
   const { data, error } = await supabase
@@ -127,7 +142,7 @@ export async function createContact(payload: CreateContactPayload): Promise<Cont
     .single();
 
   if (error) throw new Error(error.message);
-  return mapContactRow(data as ContactRow);
+  return mapContactRow(data as unknown as ContactRow);
 }
 
 export async function updateContact(id: string, payload: UpdateContactPayload): Promise<Contact> {
@@ -145,7 +160,7 @@ export async function updateContact(id: string, payload: UpdateContactPayload): 
     .single();
 
   if (error) throw new Error(error.message);
-  return mapContactRow(data as ContactRow);
+  return mapContactRow(data as unknown as ContactRow);
 }
 
 export async function deleteContact(id: string): Promise<Contact> {
@@ -157,7 +172,7 @@ export async function deleteContact(id: string): Promise<Contact> {
     .single();
 
   if (error) throw new Error(error.message);
-  return mapContactRow(data as ContactRow);
+  return mapContactRow(data as unknown as ContactRow);
 }
 
 export async function fetchContactNotes(contactId: string): Promise<ContactNote[]> {

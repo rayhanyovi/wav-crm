@@ -139,6 +139,8 @@ export function CalendarPage() {
 
   const filteredActivities = useMemo(() => {
     return activities
+      // Calendar only shows scheduled appointments (activities with a date/time)
+      .filter((activity) => !!activity.scheduled_at)
       // Base ownership gate — non-MASTER users can only see their allowed set
       .filter((activity) => {
         if (allowedUserIds === null) return true; // MASTER sees all
@@ -152,7 +154,7 @@ export function CalendarPage() {
       )
       .filter((activity) => {
         if (filterStatus === "SCHEDULED")
-          return !!activity.scheduled_at && !activity.completed_at;
+          return !activity.completed_at;
         if (filterStatus === "COMPLETED") return !!activity.completed_at;
         return true;
       })
@@ -284,8 +286,7 @@ export function CalendarPage() {
         <div>
           <h1 className="text-2xl font-bold">Calendar</h1>
           <p className="text-sm text-muted-foreground">
-            Track scheduled calls, meetings, follow-ups, tasks, demos, emails,
-            and notes.
+            Scheduled appointments and follow-ups.
           </p>
         </div>
         <Button variant="outline" size="sm" className="shrink-0 gap-2" onClick={() => setGcalOpen(true)}>
@@ -421,7 +422,7 @@ export function CalendarPage() {
           <EmptyState
             icon={CalendarDays}
             title="No activities in view"
-            description="Adjust filters or create a new activity."
+            description="No appointments scheduled this month. Adjust filters or create a new appointment."
           />
         ) : (
           <div className="grid grid-cols-7">

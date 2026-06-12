@@ -22,7 +22,9 @@ const LEAD_COLS = `
   notes, appointment_date, appointment_time, appointment_result,
   is_abandoned, abandoned_at, other_status_note, products_discussed,
   assigned_to_id, telemarketer_owner_id, adviser_owner_id,
-  bounce_count, last_bounced_at, converted_contact_id, converted_at,
+  bounce_count, last_bounced_at, cooldown_until, converted_contact_id, converted_at,
+  financial_goal, risk_tolerance, investment_horizon,
+  monthly_investable, existing_investments, fact_find_notes, fact_find_done,
   created_by, created_at, updated_at, deleted_at
 `.trim();
 
@@ -125,6 +127,22 @@ export async function claimLead(leadId: string, userId: string): Promise<{ new_b
   return data as { new_balance: number };
 }
 
+/**
+ * Claim a batch of pooled leads for a TM's calling session.
+ * Only assigns ownership to leads that aren't already owned by another TM —
+ * good enough at low concurrency without needing a locking RPC.
+ */
+export async function claimLeadsForCall(leadIds: string[], userId: string): Promise<void> {
+  if (leadIds.length === 0) return;
+  const { error } = await supabase
+    .from("leads")
+    .update({ telemarketer_owner_id: userId })
+    .in("id", leadIds)
+    .is("telemarketer_owner_id", null);
+
+  if (error) throw new Error(error.message);
+}
+
 export async function returnLead(leadId: string, userId: string): Promise<{ new_balance: number }> {
   const { data, error } = await supabase.rpc("return_lead", {
     p_lead_id: leadId,
@@ -147,9 +165,9 @@ export interface ConvertLeadPayload {
     title: string;
     value: number;
     stage: string;
-    assigned_to_id: string;
+    assigned_to_id?: string | null;
     created_by: string;
-    contact_id: string;
+    contact_id?: string;
   } | null;
 }
 

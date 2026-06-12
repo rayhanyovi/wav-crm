@@ -58,7 +58,7 @@ export function LoginPage() {
 
     const { data: profile, error: profileError } = await supabase
       .from("crm_users")
-      .select("id,name,email,role,avatar,is_active,credit_balance,telemarketer_access,telemarketer_id,created_at")
+      .select("id,name,email,role,avatar,is_active,credit_balance,telemarketer_access,telemarketer_id,leads_access,created_at")
       .eq("auth_user_id", authData.user.id)
       .single();
 

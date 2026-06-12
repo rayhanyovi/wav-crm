@@ -13,6 +13,7 @@ export interface UserRow {
   credit_balance: number | null;
   telemarketer_access: boolean | null;
   telemarketer_id: string | null;
+  leads_access: boolean | null;
   created_at: string;
 }
 
@@ -25,6 +26,7 @@ export interface UpdateUserPayload {
   credit_balance?: number;
   telemarketer_access?: boolean;
   telemarketer_id?: string | null;
+  leads_access?: boolean;
 }
 
 // ─── Mapper ───────────────────────────────────────────────────────────────────
@@ -40,12 +42,13 @@ export function mapUserRow(row: UserRow): User {
     credit_balance: row.credit_balance ?? 0,
     telemarketer_access: row.telemarketer_access ?? false,
     telemarketer_id: row.telemarketer_id ?? undefined,
+    leads_access: row.leads_access ?? true,
     created_at: row.created_at,
   };
 }
 
 const SELECT_COLS =
-  "id,name,email,role,avatar,is_active,credit_balance,telemarketer_access,telemarketer_id,created_at";
+  "id,name,email,role,avatar,is_active,credit_balance,telemarketer_access,telemarketer_id,leads_access,created_at";
 
 // ─── Service functions ────────────────────────────────────────────────────────
 

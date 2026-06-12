@@ -8,6 +8,7 @@ const leadStatusColors: Record<LeadStatus, string> = {
   AVOID:          "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400",
   KIV:            "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400",
   OTHERS:         "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
+  COOLDOWN:       "bg-cyan-100 text-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-400",
 };
 
 const dealStageColors: Record<DealStage, string> = {

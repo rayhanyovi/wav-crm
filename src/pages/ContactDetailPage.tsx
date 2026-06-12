@@ -11,7 +11,7 @@ import {
   useDeleteContactNote,
   useUpdateContact,
 } from "@/hooks/useContacts";
-import { useCreateDeal, useDeals, useUpdateDeal } from "@/hooks/useDeals";
+import { useDeals } from "@/hooks/useDeals";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -63,8 +63,6 @@ export function ContactDetailPage() {
   );
   const { data: contactNotes = [], isLoading: notesLoading, error: notesError } = useContactNotes(id);
   const updateContactMutation = useUpdateContact();
-  const updateDealMutation = useUpdateDeal();
-  const createDealMutation = useCreateDeal();
   const addContactNoteMutation = useAddContactNote();
   const deleteContactNoteMutation = useDeleteContactNote();
   const [editing, setEditing] = useState(false);
@@ -120,27 +118,16 @@ export function ContactDetailPage() {
   const totalDealValue = contactDeals.filter((d) => d.stage !== "LOST").reduce((s, d) => s + (d.value || 0), 0);
   const wonDealValue = contactDeals.filter((d) => d.stage === "WON").reduce((s, d) => s + (d.value || 0), 0);
 
-  // ── Risk profile: from most recent deal with fact-find data ────────────────
-  const dealWithFF = [...contactDeals]
-    .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
-    .find((d) => d.risk_tolerance || d.financial_goal || d.investment_horizon);
-
-  // Target deal to write fact-find to: prefer the one that already has FF, else newest deal
-  const ffTargetDeal = dealWithFF
-    ?? [...contactDeals].sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())[0]
-    ?? null;
-
   const canFillFF = currentUser && (isAdviser(currentUser) || isMaster(currentUser));
 
   const openFF = () => {
-    const src = ffTargetDeal;
     setFfForm({
-      financial_goal: src?.financial_goal ?? "",
-      risk_tolerance: src?.risk_tolerance ?? "",
-      investment_horizon: src?.investment_horizon ?? "",
-      monthly_investable: src?.monthly_investable != null ? String(src.monthly_investable) : "",
-      existing_investments: src?.existing_investments ?? "",
-      fact_find_notes: src?.fact_find_notes ?? "",
+      financial_goal: contact.financial_goal ?? "",
+      risk_tolerance: contact.risk_tolerance ?? "",
+      investment_horizon: contact.investment_horizon ?? "",
+      monthly_investable: contact.monthly_investable != null ? String(contact.monthly_investable) : "",
+      existing_investments: contact.existing_investments ?? "",
+      fact_find_notes: contact.fact_find_notes ?? "",
     });
     setInvestPeriod("monthly");
     setEditingFF(true);
@@ -163,22 +150,7 @@ export function ContactDetailPage() {
       fact_find_done: !!(ffForm.financial_goal && ffForm.risk_tolerance && ffForm.investment_horizon),
     };
 
-    if (ffTargetDeal) {
-      await updateDealMutation.mutateAsync({
-        id: ffTargetDeal.id,
-        payload: ffData,
-      });
-    } else {
-      await createDealMutation.mutateAsync({
-        title: `${contact.first_name} ${contact.last_name}`,
-        value: 0,
-        stage: "APPOINTMENT",
-        contact_id: contact.id,
-        assigned_to_id: currentUser.id,
-        created_by: currentUser.id,
-        ...ffData,
-      });
-    }
+    await updateContactMutation.mutateAsync({ id: contact.id, payload: ffData });
     setEditingFF(false);
   };
 
@@ -313,13 +285,13 @@ export function ContactDetailPage() {
               <CardTitle className="text-sm flex items-center gap-1.5">
                 <ClipboardList className="h-4 w-4 text-muted-foreground" />
                 Fact Find
-                {dealWithFF?.fact_find_done && (
+                {contact.fact_find_done && (
                   <span className="ml-1 text-[10px] font-normal text-green-600 dark:text-green-400">✓ Complete</span>
                 )}
               </CardTitle>
               {canFillFF && !editingFF && (
-                <Button size="sm" variant={dealWithFF ? "outline" : "default"} className="h-7 text-xs gap-1" onClick={openFF}>
-                  {dealWithFF ? "Edit" : (
+                <Button size="sm" variant={contact.financial_goal ? "outline" : "default"} className="h-7 text-xs gap-1" onClick={openFF}>
+                  {contact.financial_goal ? "Edit" : (
                     <><ClipboardList className="h-3.5 w-3.5" />Fill In</>
                   )}
                 </Button>
@@ -416,18 +388,12 @@ export function ContactDetailPage() {
                   />
                 </div>
 
-                {!ffTargetDeal && (
-                  <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-md px-2.5 py-1.5">
-                    No deal linked yet — a new deal will be created automatically when you save.
-                  </p>
-                )}
-
                 <div className="flex gap-2 justify-end pt-1">
                   <Button variant="outline" size="sm" onClick={() => setEditingFF(false)}>Cancel</Button>
               <Button size="sm" onClick={() => void saveFF()}>Save Fact Find</Button>
                 </div>
               </div>
-            ) : !dealWithFF ? (
+            ) : !contact.financial_goal ? (
               /* ── Empty state ── */
               <p className="text-sm text-muted-foreground">
                 {canFillFF
@@ -437,50 +403,47 @@ export function ContactDetailPage() {
             ) : (
               /* ── Read view ── */
               <div className="space-y-3">
-                {dealWithFF.risk_tolerance && (
+                {contact.risk_tolerance && (
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">Risk Tolerance</span>
-                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${RISK_COLOR[dealWithFF.risk_tolerance]}`}>
-                      {TOLERANCE_LABELS[dealWithFF.risk_tolerance]}
+                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${RISK_COLOR[contact.risk_tolerance]}`}>
+                      {TOLERANCE_LABELS[contact.risk_tolerance]}
                     </span>
                   </div>
                 )}
-                {dealWithFF.financial_goal && (
+                {contact.financial_goal && (
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">Financial Goal</span>
-                    <span className="text-sm font-medium">{GOAL_LABELS[dealWithFF.financial_goal]}</span>
+                    <span className="text-sm font-medium">{GOAL_LABELS[contact.financial_goal]}</span>
                   </div>
                 )}
-                {dealWithFF.investment_horizon && (
+                {contact.investment_horizon && (
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">Horizon</span>
-                    <span className="text-sm font-medium">{HORIZON_LABELS[dealWithFF.investment_horizon]}</span>
+                    <span className="text-sm font-medium">{HORIZON_LABELS[contact.investment_horizon]}</span>
                   </div>
                 )}
-                {dealWithFF.monthly_investable && (
+                {contact.monthly_investable && (
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">Monthly Investable</span>
                     <span className="text-sm font-semibold">
-                      {formatCurrency(dealWithFF.monthly_investable)}
+                      {formatCurrency(contact.monthly_investable)}
                       <span className="text-muted-foreground font-normal"> /mo</span>
                     </span>
                   </div>
                 )}
-                {dealWithFF.existing_investments && (
+                {contact.existing_investments && (
                   <div className="pt-1 border-t">
                     <p className="text-xs text-muted-foreground mb-0.5">Existing Investments</p>
-                    <p className="text-sm">{dealWithFF.existing_investments}</p>
+                    <p className="text-sm">{contact.existing_investments}</p>
                   </div>
                 )}
-                {dealWithFF.fact_find_notes && (
+                {contact.fact_find_notes && (
                   <div className="pt-1 border-t">
                     <p className="text-xs text-muted-foreground mb-0.5">Notes</p>
-                    <p className="text-sm whitespace-pre-wrap">{dealWithFF.fact_find_notes}</p>
+                    <p className="text-sm whitespace-pre-wrap">{contact.fact_find_notes}</p>
                   </div>
                 )}
-                <p className="text-[10px] text-muted-foreground border-t pt-1">
-                  Linked to: <Link to={`/deals/${dealWithFF.id}`} className="text-primary hover:underline">{dealWithFF.title}</Link>
-                </p>
               </div>
             )}
           </CardContent>

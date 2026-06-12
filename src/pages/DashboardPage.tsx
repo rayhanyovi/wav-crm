@@ -25,6 +25,7 @@ const STATUS_COLORS: Record<LeadStatus, string> = {
   AVOID:          "#dc2626",
   KIV:            "#f59e0b",
   OTHERS:         "#9333ea",
+  COOLDOWN:       "#0d9488",
 };
 
 const STATUS_LABELS: Record<LeadStatus, string> = {
@@ -34,6 +35,7 @@ const STATUS_LABELS: Record<LeadStatus, string> = {
   AVOID:          "Avoid",
   KIV:            "KIV",
   OTHERS:         "Others",
+  COOLDOWN:       "Cooldown",
 };
 
 function StatCard({

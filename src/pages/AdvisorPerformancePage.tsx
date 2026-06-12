@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, UserCog } from "lucide-react";
-import { useCrmStore } from "@/store/useCrmStore";
 import { useAuthStore } from "@/store/useAuthStore";
-import { useUsers } from "@/hooks/useUsers";
+import { useUsers, useUpdateUser } from "@/hooks/useUsers";
 import { useActivities } from "@/hooks/useActivities";
+import { useDeals } from "@/hooks/useDeals";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -46,9 +46,10 @@ const RESULT_COLORS: Record<string, string> = {
 export function AdvisorPerformancePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { deals, updateUser, assignCredits } = useCrmStore();
+  const { data: deals = [] } = useDeals();
   const { data: activities = [] } = useActivities();
   const { data: users = [] } = useUsers();
+  const updateUserMutation = useUpdateUser();
   const { currentUser } = useAuthStore();
   const [creditAdjust, setCreditAdjust] = useState(0);
 
@@ -212,6 +213,40 @@ export function AdvisorPerformancePage() {
         )}
       </div>
 
+      {/* Leads module access — MASTER only */}
+      {advisor.role === "ADVISER" && isMaster(currentUser) && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <UserCog className="h-4 w-4 text-muted-foreground" />
+              Leads Access
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="leads-access-toggle" className="text-sm font-medium">
+                  Allow access to Leads
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  When disabled, this adviser can't see or manage the Leads module — they only work from Deals.
+                </p>
+              </div>
+              <Switch
+                id="leads-access-toggle"
+                checked={advisor.leads_access ?? true}
+                onCheckedChange={(checked) => {
+                  updateUserMutation.mutate({
+                    id: advisor.id,
+                    payload: { leads_access: checked },
+                  });
+                }}
+              />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Telemarketer access panel — MASTER can manage anyone; ADVISER can manage their own */}
       {advisor.role === "ADVISER" && (isMaster(currentUser) || currentUser?.id === advisor.id) && (
         <Card>
@@ -235,9 +270,12 @@ export function AdvisorPerformancePage() {
                 id="tele-toggle"
                 checked={!!advisor.telemarketer_access}
                 onCheckedChange={(checked) => {
-                  updateUser(advisor.id, {
-                    telemarketer_access: checked,
-                    telemarketer_id: checked ? advisor.telemarketer_id : undefined,
+                  updateUserMutation.mutate({
+                    id: advisor.id,
+                    payload: {
+                      telemarketer_access: checked,
+                      telemarketer_id: checked ? advisor.telemarketer_id || null : null,
+                    },
                   });
                 }}
               />
@@ -249,7 +287,10 @@ export function AdvisorPerformancePage() {
                 <Select
                   value={advisor.telemarketer_id ?? ""}
                   onValueChange={(v) =>
-                    updateUser(advisor.id, { telemarketer_id: v || undefined })
+                    updateUserMutation.mutate({
+                      id: advisor.id,
+                      payload: { telemarketer_id: v || null },
+                    })
                   }
                 >
                   <SelectTrigger>
@@ -325,7 +366,10 @@ export function AdvisorPerformancePage() {
                     disabled={creditAdjust === 0 || !currentUser}
                     onClick={() => {
                       if (!currentUser) return;
-                      assignCredits(advisor.id, creditAdjust, currentUser.id);
+                      updateUserMutation.mutate({
+                        id: advisor.id,
+                        payload: { credit_balance: Math.max(0, (advisor.credit_balance ?? 0) + creditAdjust) },
+                      });
                       setCreditAdjust(0);
                     }}
                   >

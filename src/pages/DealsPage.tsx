@@ -1,12 +1,14 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Plus, Search, Phone, Calendar, TrendingUp, UserPlus } from "lucide-react";
+import { MoreHorizontal, Plus, Search, Phone, Calendar, TrendingUp, UserPlus } from "lucide-react";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useActivities } from "@/hooks/useActivities";
 import { useUsers } from "@/hooks/useUsers";
 import { useLeads } from "@/hooks/useLeads";
 import { useContacts } from "@/hooks/useContacts";
-import { useCreateDeal, useDeals, useUpdateDeal } from "@/hooks/useDeals";
+import { useCreateDeal, useDeals, useMoveDealStage, useUpdateDeal } from "@/hooks/useDeals";
+import { useUpdateUser } from "@/hooks/useUsers";
+import { useCreateContact } from "@/hooks/useContacts";
 import { isAdviser as isAdviserRole } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +29,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -38,7 +47,17 @@ import { DealStageBadge } from "@/components/common/StatusBadge";
 import { EmptyState } from "@/components/common/EmptyState";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { can } from "@/lib/permissions";
-import type { DealStage } from "@/data/types";
+import type { DealStage, LeadSource } from "@/data/types";
+
+const CONTACT_SOURCES: LeadSource[] = ["AP_MARKETING", "LP_MARKETING", "OWN_SOURCE", "OTHERS"];
+const CONTACT_SOURCE_LABELS: Record<LeadSource, string> = {
+  AP_MARKETING: "AP Marketing",
+  LP_MARKETING: "LP Marketing",
+  OWN_SOURCE: "Own Source",
+  OTHERS: "Others",
+};
+
+const PAGE_SIZE = 20;
 
 // Stages visible to each role
 const ALL_STAGES: DealStage[] = ["CALLING", "APPOINTMENT", "PROPOSAL", "SUBMITTED", "WON", "LOST"];
@@ -70,11 +89,17 @@ export function DealsPage() {
   const { data: deals = [], isLoading: dealsLoading, error: dealsError } = useDeals();
   const createDealMutation = useCreateDeal();
   const updateDealMutation = useUpdateDeal();
+  const moveStageMutation  = useMoveDealStage();
+  const updateUserMutation = useUpdateUser();
+  const createContactMutation = useCreateContact();
   const { currentUser } = useAuthStore();
   const navigate = useNavigate();
 
   const [search, setSearch] = useState("");
   const [filterStage, setFilterStage] = useState<DealStage | "ALL">("ALL");
+  const [page, setPage] = useState(1);
+  const [pendingLost, setPendingLost] = useState<{ dealId: string; title: string } | null>(null);
+  const [lostReason, setLostReason] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [form, setForm] = useState({
     title: "",
@@ -84,6 +109,13 @@ export function DealsPage() {
     assigned_to_id: "",
     stage: "CALLING" as DealStage,
   });
+  const [newContact, setNewContact] = useState({
+    first_name: "",
+    last_name: "",
+    email: "",
+    phone: "",
+    source: "OWN_SOURCE" as LeadSource,
+  });
 
   const isAdviser = currentUser?.role === "ADVISER";
   const isTelemarketer = currentUser?.role === "TELEMARKETER";
@@ -91,22 +123,11 @@ export function DealsPage() {
   const visibleDeals = useMemo(() => {
     return deals.filter((d) => {
       if (d.deleted_at) return false;
-      // MASTER: sees all deals including unassigned (released) ones
-      if (!isAdviser && !isTelemarketer) return true;
-      // ADVISER: sees APPOINTMENT+ deals assigned to them, plus unassigned released deals (to claim)
-      if (isAdviser) {
-        if (!ADVISER_STAGES.includes(d.stage)) return false;
-        // Show own deals + unassigned deals in APPOINTMENT+ that they can pick up
-        if (d.assigned_to_id && d.assigned_to_id !== currentUser?.id) return false;
-      }
-      // TELEMARKETER: only their deals (Deals page is ADVISER+ so TM can't reach this)
-      if (isTelemarketer) {
-        if (d.telemarketer_id && d.telemarketer_id !== currentUser?.id) return false;
-        if (!d.telemarketer_id && d.created_by !== currentUser?.id) return false;
-      }
+      // Advisers only see APPOINTMENT+ (CALLING stage is the TM phase)
+      if (isAdviser && !ADVISER_STAGES.includes(d.stage)) return false;
       return true;
     });
-  }, [deals, currentUser, isAdviser, isTelemarketer]);
+  }, [deals, isAdviser]);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
@@ -155,10 +176,30 @@ export function DealsPage() {
 
   const availableStages = currentUser?.role === "TELEMARKETER" ? ALL_STAGES : ADVISER_STAGES;
 
+  // Reset to page 1 whenever filters change
+  useEffect(() => { setPage(1); }, [search, filterStage]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paginatedDeals = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   const handleCreate = async () => {
     if (!currentUser || !form.title) return;
     const lead = leads.find((l) => l.id === form.lead_id);
-    const contactId = lead?.converted_contact_id || form.contact_id || "";
+    let contactId = lead?.converted_contact_id || form.contact_id || "";
+
+    if (form.contact_id === "__new__") {
+      if (!newContact.first_name.trim() || !newContact.last_name.trim()) return;
+      const contact = await createContactMutation.mutateAsync({
+        first_name: newContact.first_name.trim(),
+        last_name: newContact.last_name.trim(),
+        email: newContact.email.trim() || undefined,
+        phone: newContact.phone.trim() || undefined,
+        source: newContact.source,
+        created_by: currentUser.id,
+      });
+      contactId = contact.id;
+    }
+
     if (!contactId) return;
 
     await createDealMutation.mutateAsync({
@@ -168,12 +209,13 @@ export function DealsPage() {
       lead_id: form.lead_id || undefined,
       contact_id: contactId,
       telemarketer_id: isTelemarketer ? currentUser.id : undefined,
-      assigned_to_id: form.assigned_to_id || undefined,
+      assigned_to_id: form.assigned_to_id || (isAdviser ? currentUser.id : undefined),
       created_by: currentUser.id,
     });
 
     setCreateOpen(false);
     setForm({ title: "", value: "", lead_id: "", contact_id: "", assigned_to_id: "", stage: "CALLING" });
+    setNewContact({ first_name: "", last_name: "", email: "", phone: "", source: "OWN_SOURCE" });
   };
 
   const advisers = users.filter((u) => u.is_active && can(u, "ADVISER"));
@@ -285,7 +327,7 @@ export function DealsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((deal) => {
+              {paginatedDeals.map((deal) => {
                 const lead = leads.find((l) => l.id === deal.lead_id);
                 const contact = contacts.find((c) => c.id === deal.contact_id);
                 const adviser = users.find((u) => u.id === deal.assigned_to_id);
@@ -335,24 +377,70 @@ export function DealsPage() {
                     <TableCell className="hidden md:table-cell text-xs text-muted-foreground">
                       {formatDate(deal.updated_at)}
                     </TableCell>
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      {isReleased && isAdviserRole(currentUser) && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="gap-1 text-xs h-7 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400"
-                          onClick={() => {
-                            if (currentUser) {
+                    <TableCell onClick={(e) => e.stopPropagation()} className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        {isReleased && isAdviserRole(currentUser) && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="gap-1 text-xs h-7 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400"
+                            disabled={(currentUser?.credit_balance ?? 0) < 1}
+                            title="Claiming this client costs 1 credit"
+                            onClick={() => {
+                              if (!currentUser) return;
                               updateDealMutation.mutate({
                                 id: deal.id,
                                 payload: { assigned_to_id: currentUser.id },
                               });
-                            }
-                          }}
-                        >
-                          <UserPlus className="h-3 w-3" /> Claim
-                        </Button>
-                      )}
+                              updateUserMutation.mutate({
+                                id: currentUser.id,
+                                payload: { credit_balance: Math.max(0, (currentUser.credit_balance ?? 0) - 1) },
+                              });
+                            }}
+                          >
+                            <UserPlus className="h-3 w-3" /> Claim (1 credit)
+                          </Button>
+                        )}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-7 w-7">
+                              <MoreHorizontal className="h-3.5 w-3.5" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            {ALL_STAGES.filter((s) => s !== deal.stage && s !== "LOST").map((s) => (
+                              <DropdownMenuItem
+                                key={s}
+                                onClick={() => {
+                                  if (currentUser) {
+                                    moveStageMutation.mutate({
+                                      dealId: deal.id,
+                                      toStage: s,
+                                      userId: currentUser.id,
+                                    });
+                                  }
+                                }}
+                              >
+                                <DealStageBadge stage={s} />
+                              </DropdownMenuItem>
+                            ))}
+                            {deal.stage !== "LOST" && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  className="text-destructive focus:text-destructive"
+                                  onClick={() => {
+                                    setLostReason("");
+                                    setPendingLost({ dealId: deal.id, title: deal.title });
+                                  }}
+                                >
+                                  Mark as Lost
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                     </TableCell>
                   </TableRow>
                 );
@@ -361,6 +449,72 @@ export function DealsPage() {
           </Table>
         </div>
       )}
+
+      {/* Pagination */}
+      {filtered.length > 0 && (
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-xs text-muted-foreground">
+            Page {page} of {totalPages} · {filtered.length} deal{filtered.length !== 1 ? "s" : ""}
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page <= 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+            >
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page >= totalPages}
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Mark as Lost dialog */}
+      <Dialog open={!!pendingLost} onOpenChange={(open) => { if (!open) setPendingLost(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Mark Deal as Lost</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-1">
+            <p className="text-sm text-muted-foreground">
+              <span className="font-medium text-foreground">{pendingLost?.title}</span> will be moved to Lost stage.
+            </p>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Reason for losing <span className="text-destructive">*</span></Label>
+              <Input
+                placeholder="e.g. Client chose a competitor"
+                value={lostReason}
+                onChange={(e) => setLostReason(e.target.value)}
+                autoFocus
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPendingLost(null)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              disabled={!lostReason.trim() || moveStageMutation.isPending}
+              onClick={() => {
+                if (!pendingLost || !currentUser) return;
+                moveStageMutation.mutate(
+                  { dealId: pendingLost.dealId, toStage: "LOST", userId: currentUser.id, lostReason: lostReason.trim() },
+                  { onSuccess: () => setPendingLost(null) },
+                );
+              }}
+            >
+              {moveStageMutation.isPending ? "Saving…" : "Confirm Lost"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Create Deal dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
@@ -412,6 +566,7 @@ export function DealsPage() {
                 <SelectTrigger><SelectValue placeholder="Select contact" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">— Select contact —</SelectItem>
+                  <SelectItem value="__new__">+ New person (not yet a contact)</SelectItem>
                   {contacts.map((contact) => (
                     <SelectItem key={contact.id} value={contact.id}>
                       {contact.first_name} {contact.last_name}
@@ -420,6 +575,57 @@ export function DealsPage() {
                 </SelectContent>
               </Select>
             </div>
+            {form.contact_id === "__new__" && (
+              <div className="space-y-3 rounded-lg border p-3">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  New person's details
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">First name *</Label>
+                    <Input
+                      value={newContact.first_name}
+                      onChange={(e) => setNewContact((c) => ({ ...c, first_name: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Last name *</Label>
+                    <Input
+                      value={newContact.last_name}
+                      onChange={(e) => setNewContact((c) => ({ ...c, last_name: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Email</Label>
+                    <Input
+                      type="email"
+                      value={newContact.email}
+                      onChange={(e) => setNewContact((c) => ({ ...c, email: e.target.value }))}
+                      placeholder="optional"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Phone</Label>
+                    <Input
+                      value={newContact.phone}
+                      onChange={(e) => setNewContact((c) => ({ ...c, phone: e.target.value }))}
+                      placeholder="optional"
+                    />
+                  </div>
+                  <div className="col-span-2 space-y-1.5">
+                    <Label className="text-xs">Source</Label>
+                    <Select value={newContact.source} onValueChange={(v) => setNewContact((c) => ({ ...c, source: v as LeadSource }))}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {CONTACT_SOURCES.map((s) => (
+                          <SelectItem key={s} value={s}>{CONTACT_SOURCE_LABELS[s]}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Stage</Label>
@@ -458,12 +664,18 @@ export function DealsPage() {
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => { setCreateOpen(false); setNewContact({ first_name: "", last_name: "", email: "", phone: "", source: "OWN_SOURCE" }); }}>Cancel</Button>
             <Button
               onClick={() => void handleCreate()}
-              disabled={!form.title || !(form.contact_id || leads.find((lead) => lead.id === form.lead_id)?.converted_contact_id) || createDealMutation.isPending}
+              disabled={
+                !form.title ||
+                !(form.contact_id || leads.find((lead) => lead.id === form.lead_id)?.converted_contact_id) ||
+                (form.contact_id === "__new__" && (!newContact.first_name.trim() || !newContact.last_name.trim())) ||
+                createDealMutation.isPending ||
+                createContactMutation.isPending
+              }
             >
-              {createDealMutation.isPending ? "Creating..." : "Create Deal"}
+              {createDealMutation.isPending || createContactMutation.isPending ? "Creating..." : "Create Deal"}
             </Button>
           </DialogFooter>
         </DialogContent>

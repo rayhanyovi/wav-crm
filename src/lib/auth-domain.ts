@@ -11,6 +11,7 @@ export const SUPER_ADMIN_EMAIL = "tech@wav.sg";
  */
 export const ALLOWED_TEST_EMAILS: readonly string[] = [
   "yovihan@gmail.com",
+  "rayhan.yovi@gmail.com",
 ];
 
 export function normalizeEmail(email: string): string {

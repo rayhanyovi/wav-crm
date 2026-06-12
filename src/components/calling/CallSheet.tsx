@@ -16,7 +16,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useCallSessionStore } from "@/store/useCallSessionStore";
 import { useActivities } from "@/hooks/useActivities";
 import { useContact } from "@/hooks/useContacts";
-import { useDeals, useUpdateDeal } from "@/hooks/useDeals";
+import { useDeals } from "@/hooks/useDeals";
+import { useUpdateLead } from "@/hooks/useLeads";
 import { LeadStatusBadge } from "@/components/common/StatusBadge";
 import { formatCurrency, formatDate } from "@/lib/format";
 import type { Lead, FinancialGoal, RiskTolerance, InvestmentHorizon } from "@/data/types";
@@ -40,12 +41,12 @@ interface CallSheetProps {
 }
 
 export function CallSheet({ lead }: CallSheetProps) {
-  const { startCall, endCall, liveNotes, setLiveNotes, phase } =
+  const { startCall, endCall, liveNotes, setLiveNotes, phase, updateCurrentLead } =
     useCallSessionStore();
   const { data: activities = [] } = useActivities({ lead_id: lead?.id });
   const { data: deals = [] } = useDeals();
   const { data: convertedContact } = useContact(lead?.converted_contact_id);
-  const updateDealMutation = useUpdateDeal();
+  const updateLeadMutation = useUpdateLead();
   const { currentUser } = useAuthStore();
   const [editingFF, setEditingFF] = useState(false);
   const [ffForm, setFfForm] = useState({
@@ -74,26 +75,21 @@ export function CallSheet({ lead }: CallSheetProps) {
         new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
     );
 
-  // Latest active deal for fact-find
-  const activeDeal = relatedDeals[0];
-
   const openFF = () => {
     setFfForm({
-      financial_goal: activeDeal?.financial_goal ?? "",
-      risk_tolerance: activeDeal?.risk_tolerance ?? "",
-      investment_horizon: activeDeal?.investment_horizon ?? "",
-      monthly_investable: activeDeal?.monthly_investable != null ? String(activeDeal.monthly_investable) : "",
-      existing_investments: activeDeal?.existing_investments ?? "",
-      fact_find_notes: activeDeal?.fact_find_notes ?? "",
+      financial_goal: lead.financial_goal ?? "",
+      risk_tolerance: lead.risk_tolerance ?? "",
+      investment_horizon: lead.investment_horizon ?? "",
+      monthly_investable: lead.monthly_investable != null ? String(lead.monthly_investable) : "",
+      existing_investments: lead.existing_investments ?? "",
+      fact_find_notes: lead.fact_find_notes ?? "",
     });
     setEditingFF(true);
   };
 
   const saveFF = () => {
-    if (!activeDeal || !currentUser) return;
-    updateDealMutation.mutate({
-      id: activeDeal.id,
-      payload: {
+    if (!currentUser) return;
+    const payload = {
       financial_goal: ffForm.financial_goal || undefined,
       risk_tolerance: ffForm.risk_tolerance || undefined,
       investment_horizon: ffForm.investment_horizon || undefined,
@@ -101,8 +97,13 @@ export function CallSheet({ lead }: CallSheetProps) {
       existing_investments: ffForm.existing_investments || undefined,
       fact_find_notes: ffForm.fact_find_notes || undefined,
       fact_find_done: !!(ffForm.financial_goal && ffForm.risk_tolerance && ffForm.investment_horizon),
-      },
+    };
+    updateLeadMutation.mutate({
+      id: lead.id,
+      userId: currentUser.id,
+      payload,
     });
+    updateCurrentLead(payload);
     setEditingFF(false);
   };
 
@@ -191,13 +192,9 @@ export function CallSheet({ lead }: CallSheetProps) {
 
         {/* ── Fact Find tab ── */}
         <TabsContent value="factfind" className="mt-0 space-y-3">
-          {!activeDeal ? (
-            <div className="rounded-lg border p-3 text-xs text-muted-foreground text-center py-6">
-              No linked deal yet. Create a deal first to record fact-find details.
-            </div>
-          ) : editingFF ? (
+          {editingFF ? (
             <div className="rounded-lg border p-3 space-y-2.5 text-xs">
-              <p className="font-medium text-xs text-muted-foreground uppercase tracking-wide">Client Fact Find — {activeDeal.title}</p>
+              <p className="font-medium text-xs text-muted-foreground uppercase tracking-wide">Client Fact Find — {lead.first_name} {lead.last_name}</p>
               <div className="space-y-1">
                 <label className="text-[11px] text-muted-foreground">Financial Goal</label>
                 <Select value={ffForm.financial_goal} onValueChange={(v) => setFfForm((f) => ({ ...f, financial_goal: v as FinancialGoal }))}>
@@ -240,20 +237,20 @@ export function CallSheet({ lead }: CallSheetProps) {
             <div className="rounded-lg border p-3 space-y-2 text-xs">
               <div className="flex items-center justify-between">
                 <p className="font-medium text-muted-foreground uppercase tracking-wide text-[10px]">
-                  {activeDeal.fact_find_done ? "✓ Fact Find Complete" : "Fact Find"}
+                  {lead.fact_find_done ? "✓ Fact Find Complete" : "Fact Find"}
                 </p>
                 <button onClick={openFF} className="text-[11px] text-primary hover:underline">
-                  {activeDeal.financial_goal ? "Edit" : "Fill In"}
+                  {lead.financial_goal ? "Edit" : "Fill In"}
                 </button>
               </div>
-              {activeDeal.financial_goal ? (
+              {lead.financial_goal ? (
                 <div className="space-y-1.5">
-                  <div><span className="text-muted-foreground">Goal: </span><span className="font-medium">{GOAL_LABELS[activeDeal.financial_goal]}</span></div>
-                  {activeDeal.risk_tolerance && <div><span className="text-muted-foreground">Risk: </span><span className="font-medium">{TOLERANCE_LABELS[activeDeal.risk_tolerance]}</span></div>}
-                  {activeDeal.investment_horizon && <div><span className="text-muted-foreground">Horizon: </span><span className="font-medium">{HORIZON_LABELS[activeDeal.investment_horizon]}</span></div>}
-                  {activeDeal.monthly_investable && <div><span className="text-muted-foreground">Monthly investable: </span><span className="font-medium">SGD {activeDeal.monthly_investable.toLocaleString()}</span></div>}
-                  {activeDeal.existing_investments && <div><span className="text-muted-foreground">Existing: </span><span>{activeDeal.existing_investments}</span></div>}
-                  {activeDeal.fact_find_notes && <p className="text-muted-foreground italic border-t pt-1.5 mt-1">{activeDeal.fact_find_notes}</p>}
+                  <div><span className="text-muted-foreground">Goal: </span><span className="font-medium">{GOAL_LABELS[lead.financial_goal]}</span></div>
+                  {lead.risk_tolerance && <div><span className="text-muted-foreground">Risk: </span><span className="font-medium">{TOLERANCE_LABELS[lead.risk_tolerance]}</span></div>}
+                  {lead.investment_horizon && <div><span className="text-muted-foreground">Horizon: </span><span className="font-medium">{HORIZON_LABELS[lead.investment_horizon]}</span></div>}
+                  {lead.monthly_investable && <div><span className="text-muted-foreground">Monthly investable: </span><span className="font-medium">SGD {lead.monthly_investable.toLocaleString()}</span></div>}
+                  {lead.existing_investments && <div><span className="text-muted-foreground">Existing: </span><span>{lead.existing_investments}</span></div>}
+                  {lead.fact_find_notes && <p className="text-muted-foreground italic border-t pt-1.5 mt-1">{lead.fact_find_notes}</p>}
                 </div>
               ) : (
                 <p className="text-muted-foreground py-2">Not filled yet. Tap "Fill In" to record client details.</p>

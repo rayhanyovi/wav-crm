@@ -364,26 +364,6 @@ function RiskGauge({ score }: { score: number }) {
 // ── Copy Summary Card ────────────────────────────────────────────────────────
 const PROFILE_OPTIONS: RiskCategory[] = ['Conservative', 'Moderate', 'Balanced', 'Growth', 'Aggressive'];
 
-function RiskBarPreview({ highlight }: { highlight: RiskCategory }) {
-  return (
-    <span className="inline-flex gap-0.5">
-      {PROFILE_OPTIONS.map((c) => (
-        <span
-          key={c}
-          className={`inline-block w-4 h-4 rounded-sm text-[8px] leading-4 text-center ${
-            c === highlight
-              ? 'bg-blue-500 text-white'
-              : 'bg-muted border border-border'
-          }`}
-          title={c}
-        >
-          {c === highlight ? '●' : ''}
-        </span>
-      ))}
-    </span>
-  );
-}
-
 function CopySummaryCard({
   filledLines,
   resultCategory,
@@ -419,20 +399,16 @@ function CopySummaryCard({
           <div className="space-y-0.5">
             {filledLines.map((l, i) => (
               <p key={l.id}>
-                {i + 1}.&nbsp;&nbsp;{l.fund!.name} - <span className={`font-semibold ${RISK_CATEGORY_COLOR[l.fund!.riskCategory].split(' ').find(c => c.startsWith('text-')) ?? ''}`}>{l.fund!.riskCategory}</span> - {l.allocation}%
+                {i + 1}.&nbsp;&nbsp;🟦{l.fund!.name}, {l.allocation}% {l.fund!.riskCategory}🟦
               </p>
             ))}
           </div>
           <p className="pt-1">
-            The overall risk classification of the funds selected by you is{' '}
-            <span className="font-semibold">{resultCategory}</span>.&nbsp;&nbsp;
-            <RiskBarPreview highlight={resultCategory} />
+            The overall risk classification of the funds selected by you is 🟦{resultCategory}🟦.
           </p>
           {clientProfile && (
             <p>
-              Your risk profile is{' '}
-              <span className="font-semibold">{clientProfile}</span>.&nbsp;&nbsp;
-              <RiskBarPreview highlight={clientProfile} />
+              Your risk profile is 🟦{clientProfile}🟦.
             </p>
           )}
         </div>
@@ -723,17 +699,13 @@ export function PortfolioRiskCalculatorPage() {
               onClientProfileChange={setClientProfile}
               copied={copied}
               onCopy={() => {
-                const riskBar = (cat: RiskCategory) => {
-                  const cats: RiskCategory[] = ['Conservative', 'Moderate', 'Balanced', 'Growth', 'Aggressive'];
-                  return cats.map((c) => c === cat ? `🟦` : `⬜`).join('');
-                };
                 const fundLines = filledLines.map((l, i) =>
-                  `${i + 1}.  ${l.fund!.name} - ${l.fund!.riskCategory} - ${l.allocation}%`
+                  `${i + 1}.  🟦${l.fund!.name}, ${l.allocation}% ${l.fund!.riskCategory}🟦`
                 ).join('\n');
                 const profileLine = clientProfile
-                  ? `\n\nYour risk profile is ${clientProfile}.  ${riskBar(clientProfile)}`
+                  ? `\nYour risk profile is 🟦${clientProfile}🟦.`
                   : '';
-                const text = `Funds available were shown and you have selected the following:\n${fundLines}\n\nThe overall risk classification of the funds selected by you is ${resultCategory}.  ${riskBar(resultCategory)}${profileLine}`;
+                const text = `Funds available were shown and you have selected the following:\n${fundLines}\n\nThe overall risk classification of the funds selected by you is 🟦${resultCategory}🟦.${profileLine}`;
                 navigator.clipboard.writeText(text);
                 setCopied(true);
                 setTimeout(() => setCopied(false), 2000);

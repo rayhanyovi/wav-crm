@@ -35,10 +35,26 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { StatusUpdateModal } from "@/components/leads/StatusUpdateModal";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { canEdit, canLogActivity, canManage, isAdviser } from "@/lib/permissions";
 import { buildGoogleCalendarUrl, downloadIcs } from "@/lib/calendar";
 import type { LeadStatus, LeadSource, DealStage, Lead, AppointmentResult } from "@/data/types";
+
+// APPOINTMENT is excluded — once a lead reaches that status it lives in Deals
+const STATUSES: LeadStatus[] = [
+  "NA",
+  "NOT_INTERESTED",
+  "AVOID",
+  "KIV",
+  "OTHERS",
+];
 
 const SOURCES: LeadSource[] = [
   "AP_MARKETING",
@@ -94,6 +110,7 @@ export function LeadDetailPage() {
   const [outcomeOpen, setOutcomeOpen] = useState(false);
   const [outcomeResult, setOutcomeResult] = useState<AppointmentResult>("MET");
   const [activityOpen, setActivityOpen] = useState(false);
+  const [pendingStatus, setPendingStatus] = useState<LeadStatus | null>(null);
   const [actForm, setActForm] = useState({
     type: "CALL" as const,
     subject: "",
@@ -232,15 +249,32 @@ export function LeadDetailPage() {
                 <Button onClick={handleSave}>Save</Button>
               </>
             ) : (
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setEditing(true);
-                  setForm(lead);
-                }}
-              >
-                Edit
-              </Button>
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setEditing(true);
+                    setForm(lead);
+                  }}
+                >
+                  Edit
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline">Change Status</Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {STATUSES.filter((s) => s !== lead.status).map((s) => (
+                      <DropdownMenuItem
+                        key={s}
+                        onClick={() => setPendingStatus(s)}
+                      >
+                        <LeadStatusBadge status={s} />
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </>
             )}
           </div>
         )}
@@ -770,7 +804,7 @@ export function LeadDetailPage() {
       <Card>
         <CardHeader className="pb-2 flex flex-row items-center justify-between">
           <CardTitle className="text-sm">Activity Timeline</CardTitle>
-          {canLogActivity(currentUser) && !isConverted && (
+          {false && canLogActivity(currentUser) && !isConverted && (
             <Button
               size="sm"
               variant="outline"
@@ -1055,6 +1089,16 @@ export function LeadDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Status update modal — opens when user picks a new status from "Change Status" */}
+      {pendingStatus && lead && (
+        <StatusUpdateModal
+          lead={lead}
+          newStatus={pendingStatus}
+          open={!!pendingStatus}
+          onClose={() => setPendingStatus(null)}
+        />
+      )}
     </div>
   );
 }

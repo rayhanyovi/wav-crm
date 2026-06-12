@@ -6,6 +6,7 @@ import { CommandPalette } from "@/components/search/CommandPalette";
 import { CallingPanel } from "@/components/calling/CallingPanel";
 import { StartCallingModal } from "@/components/calling/StartCallingModal";
 import { FloatingCallBar } from "@/components/calling/FloatingCallBar";
+import { Toaster } from "@/components/common/Toaster";
 import { useCallSessionStore } from "@/store/useCallSessionStore";
 import { useLayoutStore } from "@/store/useLayoutStore";
 import { cn } from "@/lib/utils";
@@ -69,6 +70,7 @@ export function AppShell() {
       />
       {sessionActive && <FloatingCallBar />}
       <CallingPanel />
+      <Toaster />
     </div>
   );
 }

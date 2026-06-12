@@ -61,6 +61,7 @@ export function useUpdateUser() {
                 credit_balance: payload.credit_balance ?? u.credit_balance,
                 telemarketer_access: payload.telemarketer_access ?? u.telemarketer_access,
                 telemarketer_id: payload.telemarketer_id ?? u.telemarketer_id,
+                leads_access: payload.leads_access ?? u.leads_access,
               }
             : u,
         ) ?? []

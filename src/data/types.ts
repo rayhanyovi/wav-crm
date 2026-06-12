@@ -2,7 +2,7 @@
 
 export type UserRole = 'MASTER' | 'ADVISER' | 'TELEMARKETER';
 
-export type LeadStatus = 'NA' | 'APPOINTMENT' | 'NOT_INTERESTED' | 'AVOID' | 'KIV' | 'OTHERS';
+export type LeadStatus = 'NA' | 'APPOINTMENT' | 'NOT_INTERESTED' | 'AVOID' | 'KIV' | 'OTHERS' | 'COOLDOWN';
 export type LeadSource = 'AP_MARKETING' | 'LP_MARKETING' | 'OWN_SOURCE' | 'OTHERS';
 
 // WAV deal pipeline:
@@ -42,10 +42,26 @@ export interface User {
   // Telemarketer access toggle
   telemarketer_access?: boolean;
   telemarketer_id?: string;
+  // Master-controlled toggle: whether an Adviser can access the Leads module
+  leads_access?: boolean;
   created_at: string;
 }
 
-export interface Contact {
+// Fact-find fields, shared between Lead, Contact, and Deal — captured by a TM
+// during a cold call (on the Lead) or an Adviser (on the Contact/Deal). When a
+// Lead converts, these are copied onto the resulting Contact and, if a Deal is
+// created, onto the Deal too.
+export interface FactFindFields {
+  financial_goal?: FinancialGoal;
+  risk_tolerance?: RiskTolerance;
+  investment_horizon?: InvestmentHorizon;
+  monthly_investable?: number;   // SGD per month client can invest
+  existing_investments?: string; // free text: what they already hold
+  fact_find_notes?: string;
+  fact_find_done?: boolean;
+}
+
+export interface Contact extends FactFindFields {
   id: string;
   first_name: string;
   last_name: string;
@@ -66,7 +82,7 @@ export interface StatusHistoryEntry {
   note?: string;
 }
 
-export interface Lead {
+export interface Lead extends FactFindFields {
   id: string;
   // Name
   salutation?: string;
@@ -109,6 +125,7 @@ export interface Lead {
   adviser_owner_id?: string;
   bounce_count?: number;
   last_bounced_at?: string;    // set whenever NO_SHOW resets the lead; used to sort TM queue
+  cooldown_until?: string;     // set when TM marks "Rejected"; lead re-enters NA pool after this date
   converted_contact_id?: string;
   converted_at?: string;
   created_by: string;
@@ -133,7 +150,7 @@ export interface ContactNote {
   created_at: string;
 }
 
-export interface Deal {
+export interface Deal extends FactFindFields {
   id: string;
   title: string;
   value: number;           // total investment value (SGD)
@@ -150,14 +167,6 @@ export interface Deal {
   insurer_ref?: string;
   submitted_at?: string;
   policy_number?: string;   // filled when WON
-  // Fact-find — filled by adviser after first meeting
-  financial_goal?: FinancialGoal;
-  risk_tolerance?: RiskTolerance;
-  investment_horizon?: InvestmentHorizon;
-  monthly_investable?: number;      // SGD per month client can invest
-  existing_investments?: string;    // free text: what they already hold
-  fact_find_notes?: string;         // adviser's notes from fact-find session
-  fact_find_done?: boolean;         // whether fact-find is complete
   created_by: string;
   created_at: string;
   updated_at: string;

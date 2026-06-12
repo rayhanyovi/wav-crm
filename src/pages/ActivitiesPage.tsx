@@ -201,8 +201,8 @@ export function ActivitiesPage() {
                 return (
                   <TableRow
                     key={a.id}
-                    className="cursor-pointer"
-                    onClick={() => navigate(`/activities/${a.id}`)}
+                    className={related ? "cursor-pointer" : ""}
+                    onClick={() => related && navigate(related.href)}
                   >
                     <TableCell>
                       <ActivityTypeBadge type={a.type} />

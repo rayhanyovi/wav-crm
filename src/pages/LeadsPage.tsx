@@ -1,8 +1,8 @@
-import { useState } from "react";
-import { CalendarCheck, ExternalLink, MoreHorizontal, Plus, Upload, Users } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { ArrowDown, ArrowUp, ArrowUpDown, CalendarCheck, ExternalLink, MoreHorizontal, Plus, Upload, Users } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useActivities } from "@/hooks/useActivities";
-import { useUsers } from "@/hooks/useUsers";
 import { useLeads, useCreateLead } from "@/hooks/useLeads";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,8 +39,9 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { formatDate } from "@/lib/format";
+import { flyDotToNav } from "@/lib/flyToNav";
 import { getLastContactedDate } from "@/lib/selectors";
-import { canEdit, isMaster, isAdviser, isTelemarketer } from "@/lib/permissions";
+import { canEdit, canLogActivity, isMaster, isAdviser, isTelemarketer } from "@/lib/permissions";
 import { Link, useNavigate } from "react-router-dom";
 import type { LeadStatus, LeadSource } from "@/data/types";
 import {
@@ -83,16 +84,51 @@ const STATUS_LABELS: Record<LeadStatus, string> = {
   AVOID: "Avoid",
   KIV: "KIV",
   OTHERS: "Others",
+  COOLDOWN: "Cooldown",
 };
+
+const PAGE_SIZE = 25;
+
+type SortKey = "name" | "status" | "source" | "lastContacted" | "created";
+
+function SortHead({
+  label,
+  sortKey,
+  active,
+  dir,
+  onSort,
+}: {
+  label: string;
+  sortKey: SortKey;
+  active: boolean;
+  dir: "asc" | "desc";
+  onSort: (k: SortKey) => void;
+}) {
+  return (
+    <TableHead>
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        className="-ml-1 flex items-center gap-1 rounded px-1 py-0.5 hover:text-foreground"
+      >
+        {label}
+        {active ? (
+          dir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+        ) : (
+          <ArrowUpDown className="h-3 w-3 opacity-30" />
+        )}
+      </button>
+    </TableHead>
+  );
+}
 
 export function LeadsPage() {
   const { data: activities = [] } = useActivities();
-  const { data: users = [] } = useUsers();
   const { currentUser } = useAuthStore();
   const navigate = useNavigate();
 
   // Real Supabase data — RLS scopes by role automatically
-  const { data: leads = [] } = useLeads({ includeAbandoned: true });
+  const { data: leads = [], isLoading: leadsLoading, isError: leadsError, error: leadsErrorObj } = useLeads({ includeAbandoned: true });
   const createLeadMutation = useCreateLead();
 
   // Pending status change — set when user picks a new status; clears after modal closes
@@ -103,7 +139,13 @@ export function LeadsPage() {
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("ALL");
   const [filterSource, setFilterSource] = useState("ALL");
-  const [filterAssignee, setFilterAssignee] = useState("ALL");
+  const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "created", dir: "desc" });
+  const [page, setPage] = useState(1);
+
+  // Row element refs (for the fly-to-Deals animation origin) + the row currently
+  // animating out after a lead → deal conversion.
+  const rowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
+  const [exiting, setExiting] = useState<{ id: string; rows: typeof leads } | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [showAbandoned, setShowAbandoned] = useState(false);
@@ -119,29 +161,8 @@ export function LeadsPage() {
     notes: "",
   });
 
-  // Role-based lead scoping (Task #7)
-  const scopedLeads = leads.filter((l) => {
-    if (l.deleted_at) return false;
-    if (isMaster(currentUser)) return true;
-    if (isAdviser(currentUser)) {
-      return (
-        l.assigned_to_id === currentUser?.id ||
-        l.adviser_owner_id === currentUser?.id
-      );
-    }
-    if (isTelemarketer(currentUser)) {
-      // Telemarketer sees leads where they are the telemarketer owner
-      // OR where their linked adviser has telemarketer_access enabled and lists this user as telemarketerId
-      const linkedAdviser = users.find(
-        (u) => u.telemarketer_access && u.telemarketer_id === currentUser?.id
-      );
-      return (
-        l.telemarketer_owner_id === currentUser?.id ||
-        (linkedAdviser != null && l.assigned_to_id === linkedAdviser.id)
-      );
-    }
-    return false;
-  });
+  // RLS already scopes by role at DB level — just strip soft-deleted rows
+  const scopedLeads = leads.filter((l) => !l.deleted_at);
 
   // APPOINTMENT leads have been handed off to Deals — hide them here
   const preAppointmentLeads = scopedLeads.filter((l) => l.status !== "APPOINTMENT");
@@ -150,6 +171,11 @@ export function LeadsPage() {
   const liveLeads = preAppointmentLeads.filter((l) =>
     showAbandoned ? true : !l.is_abandoned
   );
+
+  const lastContactedAt = (id: string) => {
+    const d = getLastContactedDate(id, activities);
+    return d ? new Date(d).getTime() : 0;
+  };
 
   const filtered = liveLeads
     .filter((l) => {
@@ -163,21 +189,65 @@ export function LeadsPage() {
         return false;
       if (filterStatus !== "ALL" && l.status !== filterStatus) return false;
       if (filterSource !== "ALL" && l.source !== filterSource) return false;
-      if (filterAssignee !== "ALL" && l.assigned_to_id !== filterAssignee)
-        return false;
       return true;
     })
     .sort((a, b) => {
-      // For TM: recently bounced (no-show) leads float to the top so they can recall first
-      if (isTelemarketer(currentUser)) {
-        const aBounced = a.last_bounced_at && a.status === "NA" ? new Date(a.last_bounced_at).getTime() : 0;
-        const bBounced = b.last_bounced_at && b.status === "NA" ? new Date(b.last_bounced_at).getTime() : 0;
-        if (aBounced !== bBounced) return bBounced - aBounced;
+      const mult = sort.dir === "asc" ? 1 : -1;
+      switch (sort.key) {
+        case "name":
+          return mult * `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`);
+        case "status":
+          return mult * a.status.localeCompare(b.status);
+        case "source":
+          return mult * a.source.localeCompare(b.source);
+        case "lastContacted":
+          return mult * (lastContactedAt(a.id) - lastContactedAt(b.id));
+        case "created":
+        default: {
+          // For TM on the default sort: recently bounced (no-show) NA leads float up so they recall first
+          if (isTelemarketer(currentUser)) {
+            const aBounced = a.last_bounced_at && a.status === "NA" ? new Date(a.last_bounced_at).getTime() : 0;
+            const bBounced = b.last_bounced_at && b.status === "NA" ? new Date(b.last_bounced_at).getTime() : 0;
+            if (aBounced !== bBounced) return bBounced - aBounced;
+          }
+          return mult * (new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+        }
       }
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
 
   const abandonedCount = scopedLeads.filter((l) => l.is_abandoned).length;
+
+  // Reset to page 1 whenever any filter or sort changes
+  useEffect(() => { setPage(1); }, [search, filterStatus, filterSource, showAbandoned, sort]);
+
+  // While a row animates out (conversion), freeze the displayed rows so the
+  // exiting row keeps its place until the animation finishes.
+  const displayLeads = exiting ? exiting.rows : filtered;
+  const totalPages = Math.max(1, Math.ceil(displayLeads.length / PAGE_SIZE));
+  const paginatedLeads = displayLeads.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  const toggleSort = (key: SortKey) =>
+    setSort((s) => (s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }));
+
+  // Lead → Deal conversion: fly a dot to the Deals tab and fade the row out.
+  const handleConverted = (leadId: string) => {
+    const el = rowRefs.current[leadId];
+    flyDotToNav(el, "/deals");
+    setExiting({ id: leadId, rows: filtered });
+    const done = () => setExiting(null);
+    if (el) {
+      const anim = el.animate(
+        [
+          { opacity: 1, transform: "translateX(0)" },
+          { opacity: 0, transform: "translateX(24px)" },
+        ],
+        { duration: 450, easing: "ease-in", fill: "forwards" },
+      );
+      anim.onfinish = done;
+    } else {
+      setTimeout(done, 450);
+    }
+  };
 
   const handleCreate = () => {
     if (!form.first_name || !form.last_name || !currentUser) return;
@@ -197,9 +267,6 @@ export function LeadsPage() {
   };
 
   const selectedLead = leads.find((l) => l.id === selectedLeadId);
-  const selectedAssignee = selectedLead
-    ? users.find((u) => u.id === selectedLead.assigned_to_id)
-    : undefined;
   const selectedLastContacted = selectedLead
     ? getLastContactedDate(selectedLead.id, activities)
     : null;
@@ -252,21 +319,6 @@ export function LeadsPage() {
               ))}
             </SelectContent>
           </Select>
-          <Select value={filterAssignee} onValueChange={setFilterAssignee}>
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="Assignee" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">All Assignees</SelectItem>
-              {users
-                .filter((u) => u.role === "ADVISER")
-                .map((u) => (
-                  <SelectItem key={u.id} value={u.id}>
-                    {u.name}
-                  </SelectItem>
-                ))}
-            </SelectContent>
-          </Select>
           {abandonedCount > 0 && (
             <Button
               variant={showAbandoned ? "destructive" : "outline"}
@@ -278,12 +330,14 @@ export function LeadsPage() {
             </Button>
           )}
         </div>
-        {canEdit(currentUser) && (
+        {(canEdit(currentUser) || isTelemarketer(currentUser)) && (
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setImportOpen(true)} className="gap-1.5">
-              <Upload className="h-4 w-4" />
-              Import CSV
-            </Button>
+            {canEdit(currentUser) && (
+              <Button variant="outline" onClick={() => setImportOpen(true)} className="gap-1.5">
+                <Upload className="h-4 w-4" />
+                Import CSV
+              </Button>
+            )}
             <Button onClick={() => setCreateOpen(true)} className="gap-1.5">
               <Plus className="h-4 w-4" />
               New Lead
@@ -292,14 +346,46 @@ export function LeadsPage() {
         )}
       </div>
 
+      {/* Error banner — helps diagnose RLS / auth issues */}
+      {leadsError && (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+          Failed to load leads: {leadsErrorObj?.message ?? "Unknown error"}
+        </div>
+      )}
+
       {/* Table */}
-      {filtered.length === 0 ? (
+      {leadsLoading ? (
+        <div className="border rounded-lg overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Phone</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Source</TableHead>
+                <TableHead>Last Contacted</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {Array.from({ length: 8 }).map((_, i) => (
+                <TableRow key={i}>
+                  <TableCell><Skeleton className="h-4 w-28" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                  <TableCell><Skeleton className="h-5 w-16 rounded-full" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      ) : filtered.length === 0 ? (
         <EmptyState
           icon={Users}
           title="No leads found"
           description="Create your first lead or adjust filters."
           action={
-            canEdit(currentUser)
+            canEdit(currentUser) || isTelemarketer(currentUser)
               ? { label: "New Lead", onClick: () => setCreateOpen(true) }
               : undefined
           }
@@ -309,33 +395,26 @@ export function LeadsPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Email</TableHead>
+                <SortHead label="Name" sortKey="name" active={sort.key === "name"} dir={sort.dir} onSort={toggleSort} />
                 <TableHead>Phone</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Source</TableHead>
-                <TableHead>Assigned To</TableHead>
-                <TableHead>Last Contacted</TableHead>
-                {canEdit(currentUser) && <TableHead className="w-16">Action</TableHead>}
+                <SortHead label="Status" sortKey="status" active={sort.key === "status"} dir={sort.dir} onSort={toggleSort} />
+                <SortHead label="Source" sortKey="source" active={sort.key === "source"} dir={sort.dir} onSort={toggleSort} />
+                <SortHead label="Last Contacted" sortKey="lastContacted" active={sort.key === "lastContacted"} dir={sort.dir} onSort={toggleSort} />
+                {canLogActivity(currentUser) && <TableHead className="w-16">Action</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((lead) => {
-                const assignee = users.find(
-                  (u) => u.id === lead.assigned_to_id,
-                );
+              {paginatedLeads.map((lead) => {
                 const lastContacted = getLastContactedDate(lead.id, activities);
                 return (
                   <TableRow
                     key={lead.id}
+                    ref={(el) => { rowRefs.current[lead.id] = el; }}
                     className="cursor-pointer"
                     onClick={() => navigate(`/leads/${lead.id}`)}
                   >
                     <TableCell className="font-medium">
                       {lead.first_name} {lead.last_name}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-xs">
-                      {lead.email || "..."}
                     </TableCell>
                     <TableCell className="text-muted-foreground text-xs font-mono">
                       {lead.phone || "..."}
@@ -346,19 +425,6 @@ export function LeadsPage() {
                     <TableCell className="text-xs text-muted-foreground">
                       {SOURCE_LABELS[lead.source] ?? lead.source}
                     </TableCell>
-                    <TableCell className="text-xs">
-                      {assignee ? (
-                        <Link
-                          to={`/team/${assignee.id}`}
-                          onClick={(event) => event.stopPropagation()}
-                          className="font-medium text-primary hover:underline"
-                        >
-                          {assignee.name}
-                        </Link>
-                      ) : (
-                        "..."
-                      )}
-                    </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {lastContacted ? (
                         formatDate(lastContacted)
@@ -366,7 +432,7 @@ export function LeadsPage() {
                         <span className="text-orange-500">Never</span>
                       )}
                     </TableCell>
-                    {canEdit(currentUser) && (
+                    {canLogActivity(currentUser) && (
                       <TableCell>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
@@ -404,6 +470,33 @@ export function LeadsPage() {
               })}
             </TableBody>
           </Table>
+        </div>
+      )}
+
+      {/* Pagination */}
+      {filtered.length > 0 && (
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-xs text-muted-foreground">
+            Page {page} of {totalPages} · {filtered.length} lead{filtered.length !== 1 ? "s" : ""}
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page <= 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+            >
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page >= totalPages}
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            >
+              Next
+            </Button>
+          </div>
         </div>
       )}
 
@@ -451,19 +544,6 @@ export function LeadsPage() {
                   <div>
                     <span className="text-muted-foreground">Phone:</span>{" "}
                     {selectedLead.phone || "N/A"}
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Assignee:</span>{" "}
-                    {selectedAssignee ? (
-                      <Link
-                        to={`/team/${selectedAssignee.id}`}
-                        className="font-medium text-primary hover:underline"
-                      >
-                        {selectedAssignee.name}
-                      </Link>
-                    ) : (
-                      "N/A"
-                    )}
                   </div>
                   <div>
                     <span className="text-muted-foreground">Created:</span>{" "}
@@ -644,6 +724,7 @@ export function LeadsPage() {
           lead={appointmentLead}
           open={!!appointmentLead}
           onClose={() => setAppointmentLead(null)}
+          onConverted={handleConverted}
         />
       )}
     </div>

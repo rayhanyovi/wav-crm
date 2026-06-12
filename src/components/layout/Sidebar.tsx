@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/useAuthStore";
-import { can, isTelemarketer } from "@/lib/permissions";
+import { can, isTelemarketer, hasLeadsAccess } from "@/lib/permissions";
 import { useState } from "react";
 import {
   adminItems,
@@ -101,6 +101,7 @@ export function Sidebar() {
         )}
         {navItems.map((item) => {
           if (!can(currentUser, item.minRole)) return null;
+          if (item.href === "/leads" && !hasLeadsAccess(currentUser)) return null;
           const children = getChildren(item)?.filter((child) =>
             can(currentUser, child.minRole),
           );
@@ -186,6 +187,7 @@ export function Sidebar() {
             <Link
               key={item.href}
               to={item.href}
+              data-nav-href={item.href}
               className={cn(
                 "flex items-center gap-3 rounded-md border-l-2 px-3 py-2 text-sm transition-all duration-150",
                 active

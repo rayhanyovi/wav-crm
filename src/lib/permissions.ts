@@ -56,3 +56,14 @@ export function isTelemarketer(user: User | null): boolean {
 export function canLogActivity(user: User | null): boolean {
   return can(user, "TELEMARKETER");
 }
+
+/**
+ * Whether this user can access the Leads module.
+ * Master-controlled per-Adviser toggle (`leads_access`, default true);
+ * TMs and Masters always have access.
+ */
+export function hasLeadsAccess(user: User | null): boolean {
+  if (!user) return false;
+  if (user.role !== "ADVISER") return true;
+  return user.leads_access ?? true;
+}
