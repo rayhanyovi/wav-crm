@@ -18,6 +18,8 @@ async function getToken(): Promise<string | null> {
   return data.session?.access_token ?? null;
 }
 
+const BASE = import.meta.env.VITE_API_URL ?? "";
+
 async function request<T>(
   method: "GET" | "POST" | "PATCH" | "DELETE",
   path: string,
@@ -27,7 +29,7 @@ async function request<T>(
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
-  const res = await fetch(path, {
+  const res = await fetch(`${BASE}${path}`, {
     method,
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
