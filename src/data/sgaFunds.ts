@@ -6,10 +6,13 @@ export type AssetClass = 'Equity' | 'Mixed Assets' | 'Bond' | 'Money Market' | '
 export type DividendFrequency = 'Mthly' | 'Qtrly' | 'Semi-Annual' | 'Annual';
 
 export interface SgaFund {
+  id?: string;
+  sourceSheet?: string;
+  sourceRowNumber?: number;
   isin: string;
   name: string;
   manager: string;
-  assetClass: AssetClass;
+  assetClass: AssetClass | string;
   geoFocus: string;
   sgaClass: string;
   riskCategory: RiskCategory;

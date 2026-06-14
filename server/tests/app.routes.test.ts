@@ -7,6 +7,7 @@ vi.mock("../middleware/auth.js", () => ({
     req.actor = { id: "u1", role: "MASTER", telemarketerAccess: true };
     next();
   },
+  requireSession: () => (_req: unknown, _res: unknown, next: () => void) => next(),
   getActor: (req: { actor?: unknown }) => req.actor,
   supabaseJwtVerifier: {},
 }));

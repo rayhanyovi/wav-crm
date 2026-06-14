@@ -44,7 +44,8 @@ import { DealStageBadge, ActivityTypeBadge, ActivityResultBadge } from "@/compon
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/format";
 import { can } from "@/lib/permissions";
 import type { DealStage, DealProposal, DealProposalStatus, DealProposalLine, FinancialGoal, RiskTolerance, InvestmentHorizon, ActivityType } from "@/data/types";
-import { SGA_FUNDS, getRiskCategory, RISK_CATEGORY_COLOR } from "@/data/sgaFunds";
+import { getRiskCategory, RISK_CATEGORY_COLOR, type SgaFund } from "@/data/sgaFunds";
+import { useSgaFunds } from "@/hooks/useFunds";
 import { nanoid } from "nanoid";
 
 const DEAL_STAGES: DealStage[] = ["CALLING", "APPOINTMENT", "PROPOSAL", "SUBMITTED", "WON", "LOST"];
@@ -80,10 +81,12 @@ const PROPOSAL_STATUS_COLORS: Record<DealProposalStatus, string> = {
 
 // ── Inline fund-allocation editor (mini portfolio builder) ───────────────────
 function ProposalEditor({
+  funds,
   proposal,
   onSave,
   onCancel,
 }: {
+  funds: SgaFund[];
   proposal: Partial<DealProposal> & { deal_id: string };
   onSave: (p: Omit<DealProposal, "id" | "created_at" | "updated_at">) => void;
   onCancel: () => void;
@@ -100,13 +103,13 @@ function ProposalEditor({
 
   const fundResults = useMemo(() => {
     const q = fundQuery.trim().toLowerCase();
-    if (!q) return SGA_FUNDS.slice(0, 8);
-    return SGA_FUNDS.filter(
+    if (!q) return funds.slice(0, 8);
+    return funds.filter(
       (f) => f.name.toLowerCase().includes(q) || f.isin.toLowerCase().includes(q) || f.manager.toLowerCase().includes(q)
     ).slice(0, 12);
-  }, [fundQuery]);
+  }, [fundQuery, funds]);
 
-  const addFund = (fund: (typeof SGA_FUNDS)[0]) => {
+  const addFund = (fund: SgaFund) => {
     if (lines.some((l) => l.fund_isin === fund.isin)) return;
     setLines((prev) => [
       ...prev,
@@ -215,7 +218,7 @@ function ProposalEditor({
               </thead>
               <tbody className="divide-y">
                 {lines.map((l) => {
-                  const fund = SGA_FUNDS.find((f) => f.isin === l.fund_isin);
+                  const fund = funds.find((f) => f.isin === l.fund_isin);
                   const cat = fund ? fund.riskCategory : getRiskCategory(l.risk_rating);
                   return (
                     <tr key={l.id} className="hover:bg-muted/20">
@@ -279,6 +282,7 @@ export function DealDetailPage() {
   const { currentUser } = useAuthStore();
   const { data: activities = [] } = useActivities();
   const { data: users = [] } = useUsers();
+  const { data: funds = [] } = useSgaFunds();
   const { data: deal, isLoading: dealLoading, error: dealError } = useDeal(id);
   const { data: contact } = useContact(deal?.contact_id);
   const { data: proposals = [], isLoading: proposalsLoading, error: proposalsError } = useDealProposals(id);
@@ -845,6 +849,7 @@ export function DealDetailPage() {
           {/* New proposal form */}
           {editingProposalId === "new" && currentUser && (
             <ProposalEditor
+              funds={funds}
               proposal={{ deal_id: id!, created_by: currentUser.id }}
               onSave={(data) => {
                 createDealProposalMutation.mutate({ ...data, created_by: currentUser.id });
@@ -877,6 +882,7 @@ export function DealDetailPage() {
               return (
                 <ProposalEditor
                   key={p.id}
+                  funds={funds}
                   proposal={p}
                   onSave={(data) => {
                     updateDealProposalMutation.mutate({ id: p.id, payload: data, dealId: p.deal_id });
@@ -946,7 +952,7 @@ export function DealDetailPage() {
                     </thead>
                     <tbody className="divide-y">
                       {p.lines.map((l) => {
-                        const fund = SGA_FUNDS.find((f) => f.isin === l.fund_isin);
+                        const fund = funds.find((f) => f.isin === l.fund_isin);
                         const cat = fund ? fund.riskCategory : getRiskCategory(l.risk_rating);
                         return (
                           <tr key={l.id} className="hover:bg-muted/20">

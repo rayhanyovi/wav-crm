@@ -6,13 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
-  SGA_FUNDS,
   getRiskCategory,
   RISK_CATEGORY_COLOR,
   RISK_CATEGORY_BAR,
   type SgaFund,
   type RiskCategory,
 } from "@/data/sgaFunds";
+import { useSgaFunds } from "@/hooks/useFunds";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface PortfolioLine {
@@ -39,9 +39,11 @@ const MATRIX_BG: Record<number, string> = {
 
 // ── Fund Search Combobox (portal dropdown to escape overflow:hidden) ──────────
 function FundCombobox({
+  funds,
   value,
   onChange,
 }: {
+  funds: SgaFund[];
   value: SgaFund | null;
   onChange: (f: SgaFund | null) => void;
 }) {
@@ -88,14 +90,14 @@ function FundCombobox({
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return SGA_FUNDS.slice(0, 12);
-    return SGA_FUNDS.filter((f) =>
+    if (!q) return funds.slice(0, 12);
+    return funds.filter((f) =>
       f.name.toLowerCase().includes(q) ||
       f.manager.toLowerCase().includes(q) ||
       f.sgaClass.toLowerCase().includes(q) ||
       f.isin.toLowerCase().includes(q)
     ).slice(0, 20);
-  }, [query]);
+  }, [funds, query]);
 
   const dropdown = open && createPortal(
     <div
@@ -164,11 +166,13 @@ const RISK_OPTIONS: RiskCategory[] = ['Conservative', 'Moderate', 'Balanced', 'G
 const RATING_OPTIONS = [1,2,3,4,5,6,7,8,9,10,11,12];
 
 function FundBrowserModal({
+  funds,
   open,
   onClose,
   addedKeys,
   onAdd,
 }: {
+  funds: SgaFund[];
   open: boolean;
   onClose: () => void;
   addedKeys: Set<string>;
@@ -185,7 +189,7 @@ function FundBrowserModal({
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return SGA_FUNDS.filter((f) => {
+    return funds.filter((f) => {
       if (filterAsset && f.assetClass !== filterAsset) return false;
       if (filterRisk && f.riskCategory !== filterRisk) return false;
       if (filterRatings.length > 0 && !filterRatings.includes(f.riskRating)) return false;
@@ -198,7 +202,7 @@ function FundBrowserModal({
         f.isin.toLowerCase().includes(q)
       );
     });
-  }, [search, filterAsset, filterRisk, filterRatings, filterDividend]);
+  }, [funds, search, filterAsset, filterRisk, filterRatings, filterDividend]);
 
   const hasFilters = !!(search || filterAsset || filterRisk || filterRatings.length || filterDividend);
 
@@ -445,6 +449,7 @@ const EMPTY_LINE = (): PortfolioLine => ({ id: makeId(), fund: null, allocation:
 
 export function PortfolioRiskCalculatorPage() {
   const navigate = useNavigate();
+  const { data: funds = [], isLoading: fundsLoading } = useSgaFunds();
   const [lines, setLines] = useState<PortfolioLine[]>([EMPTY_LINE(), EMPTY_LINE()]);
   const [showMatrix, setShowMatrix] = useState(false);
   const [showBrowser, setShowBrowser] = useState(false);
@@ -556,6 +561,7 @@ export function PortfolioRiskCalculatorPage() {
                 <div key={line.id} className="grid grid-cols-[1fr_90px_80px_32px] gap-2 items-center px-3 py-2">
                   {/* Fund picker */}
                   <FundCombobox
+                    funds={funds}
                     value={line.fund}
                     onChange={(f) => updateLine(line.id, { fund: f })}
                   />
@@ -684,8 +690,8 @@ export function PortfolioRiskCalculatorPage() {
               </>
             ) : (
               <div className="text-center py-8 text-muted-foreground">
-                <p className="text-sm">Add funds and set allocations</p>
-                <p className="text-xs mt-1">to calculate portfolio risk</p>
+            <p className="text-sm">Add funds and set allocations</p>
+                <p className="text-xs mt-1">{fundsLoading ? "Loading SGA funds..." : "to calculate portfolio risk"}</p>
               </div>
             )}
           </div>
@@ -763,6 +769,7 @@ export function PortfolioRiskCalculatorPage() {
       </div>
 
       <FundBrowserModal
+        funds={funds}
         open={showBrowser}
         onClose={() => setShowBrowser(false)}
         addedKeys={addedKeys}
