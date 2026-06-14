@@ -2,7 +2,7 @@ import express, { type Express } from "express";
 import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
-import pinoHttp from "pino-http";
+import { pinoHttp } from "pino-http";
 import { randomUUID } from "node:crypto";
 import { env } from "./config/env.js";
 import "./middleware/context.js"; // augments Express.Request

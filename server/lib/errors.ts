@@ -31,7 +31,8 @@ export class AppError extends Error {
     message: string,
     options?: { details?: unknown; expose?: boolean; cause?: unknown },
   ) {
-    super(message, options?.cause !== undefined ? { cause: options.cause } : undefined);
+    super(message);
+    if (options?.cause !== undefined) (this as { cause?: unknown }).cause = options.cause;
     this.name = new.target.name;
     this.status = status;
     this.code = code;
