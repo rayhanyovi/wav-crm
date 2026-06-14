@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { api, type Page } from "@/lib/api";
 import type { AuditLog } from "@/data/types";
 
 export interface AuditLogFilters {
@@ -15,53 +15,45 @@ export interface AuditLogPage {
   total: number;
 }
 
-interface AuditLogRow {
+// ─── API response shape (Prisma camelCase) ────────────────────────────────────
+
+interface ApiAuditLog {
   id: string;
-  user_id: string;
+  userId: string;
   action: string;
-  entity_type: string;
-  entity_id: string;
-  metadata: Record<string, unknown> | null;
-  created_at: string;
+  entityType: string;
+  entityId: string;
+  metadata: Record<string, unknown>;
+  createdAt: string;
 }
 
-function mapAuditLogRow(row: AuditLogRow): AuditLog {
+function mapAuditLog(r: ApiAuditLog): AuditLog {
   return {
-    id: row.id,
-    user_id: row.user_id,
-    action: row.action as AuditLog["action"],
-    entity_type: row.entity_type,
-    entity_id: row.entity_id,
-    metadata: row.metadata ?? undefined,
-    created_at: row.created_at,
+    id: r.id,
+    user_id: r.userId,
+    action: r.action as AuditLog["action"],
+    entity_type: r.entityType,
+    entity_id: r.entityId,
+    metadata: r.metadata ?? undefined,
+    created_at: r.createdAt,
   };
 }
 
+// ─── Service function ─────────────────────────────────────────────────────────
+
 export async function fetchAuditLogs(filters: AuditLogFilters): Promise<AuditLogPage> {
-  const from = (filters.page - 1) * filters.pageSize;
-  const to = from + filters.pageSize - 1;
+  const params: Record<string, string | number | undefined> = {
+    page: filters.page,
+    pageSize: filters.pageSize,
+  };
 
-  let query = supabase
-    .from("audit_logs")
-    .select("id,user_id,action,entity_type,entity_id,metadata,created_at", { count: "exact" })
-    .order("created_at", { ascending: false })
-    .range(from, to);
+  if (filters.userId) params.user_id = filters.userId;
+  if (filters.entityType && filters.entityType !== "ALL") params.entity_type = filters.entityType;
+  // Note: backend doesn't support action/search filters yet — kept for interface compat
 
-  if (filters.userId) query = query.eq("user_id", filters.userId);
-  if (filters.action && filters.action !== "ALL") query = query.eq("action", filters.action);
-  if (filters.entityType && filters.entityType !== "ALL") query = query.eq("entity_type", filters.entityType);
-  if (filters.search?.trim()) {
-    const term = filters.search.trim();
-    query = query.or(
-      `entity_type.ilike.%${term}%,action.ilike.%${term}%,entity_id.ilike.%${term}%`,
-    );
-  }
-
-  const { data, error, count } = await query;
-  if (error) throw new Error(error.message);
-
+  const res = await api.get<Page<ApiAuditLog>>("/api/audit-logs", params);
   return {
-    items: ((data ?? []) as AuditLogRow[]).map(mapAuditLogRow),
-    total: count ?? 0,
+    items: res.data.map(mapAuditLog),
+    total: res.total,
   };
 }

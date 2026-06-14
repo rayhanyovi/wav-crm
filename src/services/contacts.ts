@@ -1,34 +1,8 @@
-import { nanoid } from "nanoid";
 import { supabase } from "@/lib/supabase";
+import { api, asNumber, type Envelope, type Page } from "@/lib/api";
 import type { Contact, ContactNote, LeadSource, FactFindFields } from "@/data/types";
 
-const CONTACT_SELECT =
-  "id,first_name,last_name,email,phone,title,source,created_by,created_at,updated_at,deleted_at," +
-  "financial_goal,risk_tolerance,investment_horizon,monthly_investable,existing_investments,fact_find_notes,fact_find_done";
-const CONTACT_NOTE_SELECT =
-  "id,contact_id,content,created_by,created_at";
-
-interface ContactRow extends FactFindFields {
-  id: string;
-  first_name: string;
-  last_name: string;
-  email: string | null;
-  phone: string | null;
-  title: string | null;
-  source: LeadSource;
-  created_by: string;
-  created_at: string;
-  updated_at: string;
-  deleted_at: string | null;
-}
-
-interface ContactNoteRow {
-  id: string;
-  contact_id: string;
-  content: string;
-  created_by: string;
-  created_at: string;
-}
+// ─── Kept for callers ─────────────────────────────────────────────────────────
 
 export interface ContactFilters {
   createdBy?: string;
@@ -54,166 +28,145 @@ export interface UpdateContactPayload extends FactFindFields {
   source?: LeadSource;
 }
 
-function mapContactRow(row: ContactRow): Contact {
+// ─── API response shapes ──────────────────────────────────────────────────────
+
+interface ApiContact {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string | null;
+  phone: string | null;
+  title: string | null;
+  source: LeadSource;
+  financialGoal: string | null;
+  riskTolerance: string | null;
+  investmentHorizon: string | null;
+  monthlyInvestable: string | null;
+  existingInvestments: string | null;
+  factFindNotes: string | null;
+  factFindDone: boolean | null;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+}
+
+interface ApiContactNote {
+  id: string;
+  contactId: string;
+  content: string;
+  createdBy: string;
+  createdAt: string;
+}
+
+function mapContact(r: ApiContact): Contact {
   return {
-    id: row.id,
-    first_name: row.first_name,
-    last_name: row.last_name,
-    email: row.email ?? undefined,
-    phone: row.phone ?? undefined,
-    title: row.title ?? undefined,
-    source: row.source,
-    created_by: row.created_by,
-    created_at: row.created_at,
-    updated_at: row.updated_at,
-    deleted_at: row.deleted_at ?? undefined,
-    financial_goal: row.financial_goal ?? undefined,
-    risk_tolerance: row.risk_tolerance ?? undefined,
-    investment_horizon: row.investment_horizon ?? undefined,
-    monthly_investable: row.monthly_investable ?? undefined,
-    existing_investments: row.existing_investments ?? undefined,
-    fact_find_notes: row.fact_find_notes ?? undefined,
-    fact_find_done: row.fact_find_done ?? undefined,
+    id: r.id,
+    first_name: r.firstName,
+    last_name: r.lastName,
+    email: r.email ?? undefined,
+    phone: r.phone ?? undefined,
+    title: r.title ?? undefined,
+    source: r.source,
+    financial_goal: (r.financialGoal as Contact["financial_goal"]) ?? undefined,
+    risk_tolerance: (r.riskTolerance as Contact["risk_tolerance"]) ?? undefined,
+    investment_horizon: (r.investmentHorizon as Contact["investment_horizon"]) ?? undefined,
+    monthly_investable: asNumber(r.monthlyInvestable),
+    existing_investments: r.existingInvestments ?? undefined,
+    fact_find_notes: r.factFindNotes ?? undefined,
+    fact_find_done: r.factFindDone ?? undefined,
+    created_by: r.createdBy,
+    created_at: r.createdAt,
+    updated_at: r.updatedAt,
+    deleted_at: r.deletedAt ?? undefined,
   };
 }
 
-function mapContactNoteRow(row: ContactNoteRow): ContactNote {
+function mapContactNote(r: ApiContactNote): ContactNote {
   return {
-    id: row.id,
-    contact_id: row.contact_id,
-    content: row.content,
-    created_by: row.created_by,
-    created_at: row.created_at,
+    id: r.id,
+    contact_id: r.contactId,
+    content: r.content,
+    created_by: r.createdBy,
+    created_at: r.createdAt,
   };
 }
+
+// ─── Service functions ────────────────────────────────────────────────────────
 
 export async function fetchContacts(filters?: ContactFilters): Promise<Contact[]> {
-  let query = supabase
-    .from("contacts")
-    .select(CONTACT_SELECT)
-    .is("deleted_at", null)
-    .order("updated_at", { ascending: false });
-
-  if (filters?.createdBy) query = query.eq("created_by", filters.createdBy);
-  if (filters?.ids?.length) query = query.in("id", filters.ids);
-
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
-  return (data as unknown as ContactRow[]).map(mapContactRow);
+  const res = await api.get<Page<ApiContact>>("/api/contacts", { page: 1, pageSize: 500 });
+  let contacts = res.data.map(mapContact);
+  if (filters?.ids?.length) contacts = contacts.filter((c) => filters.ids!.includes(c.id));
+  if (filters?.createdBy) contacts = contacts.filter((c) => c.created_by === filters.createdBy);
+  return contacts;
 }
 
 export async function fetchContactById(id: string): Promise<Contact> {
-  const { data, error } = await supabase
-    .from("contacts")
-    .select(CONTACT_SELECT)
-    .eq("id", id)
-    .is("deleted_at", null)
-    .single();
-
-  if (error) throw new Error(error.message);
-  return mapContactRow(data as unknown as ContactRow);
+  const res = await api.get<Envelope<ApiContact>>(`/api/contacts/${id}`);
+  return mapContact(res.data);
 }
 
 export async function createContact(payload: CreateContactPayload): Promise<Contact> {
-  const insertPayload = {
-    id: `cnt-${nanoid(8)}`,
+  const res = await api.post<Envelope<ApiContact>>("/api/contacts", {
     first_name: payload.first_name,
     last_name: payload.last_name,
-    email: payload.email || null,
-    phone: payload.phone || null,
-    title: payload.title || null,
+    email: payload.email,
+    phone: payload.phone,
+    title: payload.title,
     source: payload.source,
-    created_by: payload.created_by,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    financial_goal: payload.financial_goal ?? null,
-    risk_tolerance: payload.risk_tolerance ?? null,
-    investment_horizon: payload.investment_horizon ?? null,
-    monthly_investable: payload.monthly_investable ?? null,
-    existing_investments: payload.existing_investments ?? null,
-    fact_find_notes: payload.fact_find_notes ?? null,
-    fact_find_done: payload.fact_find_done ?? null,
-  };
-
-  const { data, error } = await supabase
-    .from("contacts")
-    .insert(insertPayload)
-    .select(CONTACT_SELECT)
-    .single();
-
-  if (error) throw new Error(error.message);
-  return mapContactRow(data as unknown as ContactRow);
+    financial_goal: payload.financial_goal,
+    risk_tolerance: payload.risk_tolerance,
+    investment_horizon: payload.investment_horizon,
+    monthly_investable: payload.monthly_investable,
+    existing_investments: payload.existing_investments,
+    fact_find_notes: payload.fact_find_notes,
+    fact_find_done: payload.fact_find_done,
+  });
+  return mapContact(res.data);
 }
 
 export async function updateContact(id: string, payload: UpdateContactPayload): Promise<Contact> {
-  const { data, error } = await supabase
-    .from("contacts")
-    .update({
-      ...payload,
-      email: payload.email === "" ? null : payload.email,
-      phone: payload.phone === "" ? null : payload.phone,
-      title: payload.title === "" ? null : payload.title,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", id)
-    .select(CONTACT_SELECT)
-    .single();
-
-  if (error) throw new Error(error.message);
-  return mapContactRow(data as unknown as ContactRow);
+  const res = await api.patch<Envelope<ApiContact>>(`/api/contacts/${id}`, {
+    first_name: payload.first_name,
+    last_name: payload.last_name,
+    email: payload.email,
+    phone: payload.phone,
+    title: payload.title,
+    source: payload.source,
+    financial_goal: payload.financial_goal,
+    risk_tolerance: payload.risk_tolerance,
+    investment_horizon: payload.investment_horizon,
+    monthly_investable: payload.monthly_investable,
+    existing_investments: payload.existing_investments,
+    fact_find_notes: payload.fact_find_notes,
+    fact_find_done: payload.fact_find_done,
+  });
+  return mapContact(res.data);
 }
 
 export async function deleteContact(id: string): Promise<Contact> {
-  const { data, error } = await supabase
-    .from("contacts")
-    .update({ deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-    .eq("id", id)
-    .select(CONTACT_SELECT)
-    .single();
-
-  if (error) throw new Error(error.message);
-  return mapContactRow(data as unknown as ContactRow);
+  const contact = await fetchContactById(id);
+  await api.delete(`/api/contacts/${id}`);
+  return contact;
 }
 
 export async function fetchContactNotes(contactId: string): Promise<ContactNote[]> {
-  const { data, error } = await supabase
-    .from("contact_notes")
-    .select(CONTACT_NOTE_SELECT)
-    .eq("contact_id", contactId)
-    .order("created_at", { ascending: false });
-
-  if (error) throw new Error(error.message);
-  return (data as ContactNoteRow[]).map(mapContactNoteRow);
+  const res = await api.get<Envelope<ApiContactNote[]>>(`/api/contacts/${contactId}/notes`);
+  return res.data.map(mapContactNote);
 }
 
 export async function addContactNote(
   contactId: string,
   content: string,
-  userId: string,
+  _userId?: string,
 ): Promise<ContactNote> {
-  const { data, error } = await supabase
-    .from("contact_notes")
-    .insert({
-      id: `cn-${nanoid(8)}`,
-      contact_id: contactId,
-      content,
-      created_by: userId,
-      created_at: new Date().toISOString(),
-    })
-    .select(CONTACT_NOTE_SELECT)
-    .single();
-
-  if (error) throw new Error(error.message);
-  return mapContactNoteRow(data as ContactNoteRow);
+  const res = await api.post<Envelope<ApiContactNote>>(`/api/contacts/${contactId}/notes`, { content });
+  return mapContactNote(res.data);
 }
 
 export async function deleteContactNote(id: string): Promise<void> {
-  const { error } = await supabase
-    .from("contact_notes")
-    .delete()
-    .eq("id", id)
-    .select("id")
-    .single();
-
+  // No API endpoint yet — call Supabase directly.
+  const { error } = await supabase.from("contact_notes").delete().eq("id", id);
   if (error) throw new Error(error.message);
 }

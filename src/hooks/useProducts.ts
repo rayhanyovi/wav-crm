@@ -9,13 +9,13 @@ export const productKeys = {
 export function useProducts() {
   return useQuery({
     queryKey: productKeys.all,
-    queryFn: fetchProducts,
+    queryFn: () => fetchProducts(),
   });
 }
 
 export function useBundles() {
   return useQuery({
     queryKey: productKeys.bundles,
-    queryFn: fetchBundles,
+    queryFn: () => fetchBundles(),
   });
 }

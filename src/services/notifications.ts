@@ -1,64 +1,47 @@
-import { supabase } from "@/lib/supabase";
+import { api, type Envelope, type Page } from "@/lib/api";
 import type { Notification } from "@/data/types";
 
-const NOTIFICATION_SELECT =
-  "id,recipient_id,type,title,message,entity_type,entity_id,is_read,read_at,created_at";
+// ─── API response shape ───────────────────────────────────────────────────────
 
-interface NotificationRow {
+interface ApiNotification {
   id: string;
-  recipient_id: string;
+  recipientId: string;
   type: string;
   title: string;
   message: string;
-  entity_type: string;
-  entity_id: string;
-  is_read: boolean;
-  read_at: string | null;
-  created_at: string;
+  entityType: string;
+  entityId: string;
+  isRead: boolean;
+  readAt: string | null;
+  createdAt: string;
 }
 
-function mapNotificationRow(row: NotificationRow): Notification {
+function mapNotification(r: ApiNotification): Notification {
   return {
-    id: row.id,
-    recipient_id: row.recipient_id,
-    type: row.type,
-    title: row.title,
-    message: row.message,
-    entity_type: row.entity_type,
-    entity_id: row.entity_id,
-    is_read: row.is_read,
-    read_at: row.read_at ?? undefined,
-    created_at: row.created_at,
+    id: r.id,
+    recipient_id: r.recipientId,
+    type: r.type,
+    title: r.title,
+    message: r.message,
+    entity_type: r.entityType,
+    entity_id: r.entityId,
+    is_read: r.isRead,
+    read_at: r.readAt ?? undefined,
+    created_at: r.createdAt,
   };
 }
 
-export async function fetchNotifications(userId: string, limit = 20): Promise<Notification[]> {
-  const { data, error } = await supabase
-    .from("notifications")
-    .select(NOTIFICATION_SELECT)
-    .eq("recipient_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(limit);
+// ─── Service functions ────────────────────────────────────────────────────────
 
-  if (error) throw new Error(error.message);
-  return ((data ?? []) as NotificationRow[]).map(mapNotificationRow);
+export async function fetchNotifications(_userId?: string, limit = 20): Promise<Notification[]> {
+  const res = await api.get<Page<ApiNotification>>("/api/notifications", { pageSize: limit, page: 1 });
+  return res.data.map(mapNotification);
 }
 
 export async function markNotificationRead(id: string): Promise<void> {
-  const { error } = await supabase
-    .from("notifications")
-    .update({ is_read: true, read_at: new Date().toISOString() })
-    .eq("id", id);
-
-  if (error) throw new Error(error.message);
+  await api.patch<Envelope<ApiNotification>>(`/api/notifications/${id}/read`, {});
 }
 
-export async function markAllNotificationsRead(userId: string): Promise<void> {
-  const { error } = await supabase
-    .from("notifications")
-    .update({ is_read: true, read_at: new Date().toISOString() })
-    .eq("recipient_id", userId)
-    .eq("is_read", false);
-
-  if (error) throw new Error(error.message);
+export async function markAllNotificationsRead(_userId?: string): Promise<void> {
+  await api.patch("/api/notifications/read-all", {});
 }

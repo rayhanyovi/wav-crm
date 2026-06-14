@@ -14,8 +14,7 @@ import { createApp } from "../server/app.js";
 
 export default createApp();
 
-// Vercel sizes the function from this config.
+// Node.js runtime (not Edge) — required for Prisma and full Node APIs.
 export const config = {
-  // `maxDuration` also lives in vercel.json; kept here for clarity.
-  runtime: "nodejs20.x",
+  runtime: "nodejs",
 };

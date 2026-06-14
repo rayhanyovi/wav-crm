@@ -1,7 +1,8 @@
 import { supabase } from "@/lib/supabase";
+import { api, type Envelope, type Page } from "@/lib/api";
 import type { User } from "@/data/types";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ─── Types (kept for backward compat) ────────────────────────────────────────
 
 export interface UserRow {
   id: string;
@@ -29,7 +30,37 @@ export interface UpdateUserPayload {
   leads_access?: boolean;
 }
 
-// ─── Mapper ───────────────────────────────────────────────────────────────────
+// ─── API response shape ───────────────────────────────────────────────────────
+
+interface ApiUser {
+  id: string;
+  name: string;
+  email: string;
+  role: string | null;
+  avatar: string | null;
+  isActive: boolean;
+  creditBalance: number;
+  telemarketerAccess: boolean;
+  telemarketerId: string | null;
+  leadsAccess: boolean;
+  createdAt: string;
+}
+
+function mapApiUser(r: ApiUser): User {
+  return {
+    id: r.id,
+    name: r.name,
+    email: r.email,
+    role: (r.role as User["role"]) ?? "TELEMARKETER",
+    avatar: r.avatar ?? undefined,
+    is_active: r.isActive,
+    credit_balance: r.creditBalance,
+    telemarketer_access: r.telemarketerAccess,
+    telemarketer_id: r.telemarketerId ?? undefined,
+    leads_access: r.leadsAccess,
+    created_at: r.createdAt,
+  };
+}
 
 export function mapUserRow(row: UserRow): User {
   return {
@@ -47,45 +78,32 @@ export function mapUserRow(row: UserRow): User {
   };
 }
 
-const SELECT_COLS =
-  "id,name,email,role,avatar,is_active,credit_balance,telemarketer_access,telemarketer_id,leads_access,created_at";
-
 // ─── Service functions ────────────────────────────────────────────────────────
 
 export async function fetchUsers(): Promise<User[]> {
-  const { data, error } = await supabase
-    .from("crm_users")
-    .select(SELECT_COLS)
-    .order("name");
-
-  if (error) throw new Error(error.message);
-  return (data as UserRow[]).map(mapUserRow);
+  const res = await api.get<Page<ApiUser>>("/api/users", { page: 1, pageSize: 200 });
+  return res.data.map(mapApiUser);
 }
 
 export async function fetchUserById(id: string): Promise<User> {
-  const { data, error } = await supabase
-    .from("crm_users")
-    .select(SELECT_COLS)
-    .eq("id", id)
-    .single();
-
-  if (error) throw new Error(error.message);
-  return mapUserRow(data as UserRow);
+  const res = await api.get<Envelope<ApiUser>>(`/api/users/${id}`);
+  return mapApiUser(res.data);
 }
 
 export async function updateUser(id: string, payload: UpdateUserPayload): Promise<User> {
-  const { data, error } = await supabase
-    .from("crm_users")
-    .update({ ...payload, updated_at: new Date().toISOString() })
-    .eq("id", id)
-    .select(SELECT_COLS)
-    .single();
-
-  if (error) throw new Error(error.message);
-  return mapUserRow(data as UserRow);
+  const res = await api.patch<Envelope<ApiUser>>(`/api/users/${id}`, {
+    name: payload.name,
+    role: payload.role,
+    is_active: payload.is_active,
+    credit_balance: payload.credit_balance,
+    telemarketer_access: payload.telemarketer_access,
+    telemarketer_id: payload.telemarketer_id,
+    leads_access: payload.leads_access,
+  });
+  return mapApiUser(res.data);
 }
 
-// ─── Registration / onboarding / approval ──────────────────────────────────────
+// ─── Onboarding / approval (still use Supabase RPCs — no API endpoints yet) ──
 
 export interface PendingUser {
   id: string;
@@ -96,7 +114,6 @@ export interface PendingUser {
   created_at: string;
 }
 
-/** MASTER-only: users awaiting approval (RLS lets MASTER read all rows). */
 export async function fetchPendingUsers(): Promise<PendingUser[]> {
   const { data, error } = await supabase
     .from("crm_users")
@@ -108,7 +125,6 @@ export async function fetchPendingUsers(): Promise<PendingUser[]> {
   return (data as PendingUser[]) ?? [];
 }
 
-/** Called by a PENDING_PROFILE user to submit name + requested role. */
 export async function completeOnboarding(
   name: string,
   requestedRole: "ADVISER" | "TELEMARKETER",
@@ -120,20 +136,12 @@ export async function completeOnboarding(
   if (error) throw new Error(error.message);
 }
 
-/**
- * Called by the super admin (tech@wav.sg) after setting their password.
- * Skips the approval queue — activates the account immediately.
- */
 export async function activateSuperAdmin(): Promise<void> {
   const { error } = await supabase.rpc("activate_super_admin");
   if (error) throw new Error(error.message);
 }
 
-/** MASTER-only: assign a role + activate a pending account. */
-export async function approveUser(
-  id: string,
-  role: User["role"],
-): Promise<void> {
+export async function approveUser(id: string, role: User["role"]): Promise<void> {
   const { error } = await supabase.rpc("approve_user", {
     p_user_id: id,
     p_role: role,
@@ -141,7 +149,6 @@ export async function approveUser(
   if (error) throw new Error(error.message);
 }
 
-/** MASTER-only: reject a pending account. */
 export async function rejectUser(id: string): Promise<void> {
   const { error } = await supabase.rpc("reject_user", { p_user_id: id });
   if (error) throw new Error(error.message);

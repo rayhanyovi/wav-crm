@@ -1,96 +1,85 @@
-import { supabase } from "@/lib/supabase";
+import { api, asNumber, type Page } from "@/lib/api";
 import type { Bundle, Product } from "@/data/types";
 
-interface ProductRow {
+// ─── API response shapes (Prisma camelCase) ───────────────────────────────────
+
+interface ApiProduct {
   id: string;
   name: string;
   ticker: string;
   description: string | null;
   category: string;
-  risk_score: number;
-  annual_return: number | string | null;
-  market_cap: string | null;
-  is_active: boolean;
-  created_at: string;
+  riskScore: number;
+  annualReturn: string | null;
+  marketCap: string | null;
+  isActive: boolean;
+  createdAt: string;
 }
 
-interface BundleRow {
+interface ApiBundleProduct {
+  bundleId: string;
+  productId: string;
+  allocationPct: string;
+  product: ApiProduct;
+}
+
+interface ApiBundle {
   id: string;
   name: string;
   description: string | null;
-  risk_score: number;
-  is_active: boolean;
-  created_at: string;
+  riskScore: number;
+  isActive: boolean;
+  createdAt: string;
+  products: ApiBundleProduct[];
 }
 
-interface BundleProductRow {
-  bundle_id: string;
-  product_id: string;
-  allocation_pct: number | string;
-}
-
-const PRODUCT_SELECT =
-  "id,name,ticker,description,category,risk_score,annual_return,market_cap,is_active,created_at";
-const BUNDLE_SELECT = "id,name,description,risk_score,is_active,created_at";
-const BUNDLE_PRODUCT_SELECT = "bundle_id,product_id,allocation_pct";
-
-function asNumber(value: number | string | null): number | undefined {
-  if (value == null) return undefined;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : undefined;
-}
-
-function mapProductRow(row: ProductRow): Product {
+function mapProduct(r: ApiProduct): Product {
   return {
-    id: row.id,
-    name: row.name,
-    ticker: row.ticker,
-    description: row.description ?? undefined,
-    category: row.category,
-    risk_score: row.risk_score,
-    annual_return: asNumber(row.annual_return),
-    market_cap: row.market_cap ?? undefined,
-    is_active: row.is_active,
-    created_at: row.created_at,
+    id: r.id,
+    name: r.name,
+    ticker: r.ticker,
+    description: r.description ?? undefined,
+    category: r.category,
+    risk_score: r.riskScore,
+    annual_return: asNumber(r.annualReturn),
+    market_cap: r.marketCap ?? undefined,
+    is_active: r.isActive,
+    created_at: r.createdAt,
   };
 }
 
-export async function fetchProducts(): Promise<Product[]> {
-  const { data, error } = await supabase
-    .from("products")
-    .select(PRODUCT_SELECT)
-    .order("is_active", { ascending: false })
-    .order("name", { ascending: true });
-
-  if (error) throw new Error(error.message);
-  return ((data ?? []) as ProductRow[]).map(mapProductRow);
+function mapBundle(r: ApiBundle): Bundle {
+  const bundleProducts = r.products ?? [];
+  return {
+    id: r.id,
+    name: r.name,
+    description: r.description ?? undefined,
+    product_ids: bundleProducts.map((bp) => bp.productId),
+    allocations: Object.fromEntries(
+      bundleProducts.map((bp) => [bp.productId, asNumber(bp.allocationPct) ?? 0]),
+    ),
+    risk_score: r.riskScore,
+    is_active: r.isActive,
+    created_at: r.createdAt,
+  };
 }
 
-export async function fetchBundles(): Promise<Bundle[]> {
-  const [{ data: bundles, error: bundleError }, { data: bundleProducts, error: bundleProductError }] =
-    await Promise.all([
-      supabase.from("bundles").select(BUNDLE_SELECT).order("name", { ascending: true }),
-      supabase.from("bundle_products").select(BUNDLE_PRODUCT_SELECT),
-    ]);
+// ─── Service functions ────────────────────────────────────────────────────────
 
-  if (bundleError) throw new Error(bundleError.message);
-  if (bundleProductError) throw new Error(bundleProductError.message);
+export async function fetchProducts(activeOnly = false): Promise<Product[]> {
+  const res = await api.get<ApiProduct[]>("/api/products", activeOnly ? { active_only: true } : undefined);
+  return res.map(mapProduct);
+}
 
-  const rows = (bundleProducts ?? []) as BundleProductRow[];
+export async function fetchBundles(activeOnly = false): Promise<Bundle[]> {
+  const res = await api.get<ApiBundle[]>("/api/bundles", activeOnly ? { active_only: true } : undefined);
+  return res.map(mapBundle);
+}
 
-  return ((bundles ?? []) as BundleRow[]).map((bundle) => {
-    const bundleRows = rows.filter((row) => row.bundle_id === bundle.id);
-    return {
-      id: bundle.id,
-      name: bundle.name,
-      description: bundle.description ?? undefined,
-      product_ids: bundleRows.map((row) => row.product_id),
-      allocations: Object.fromEntries(
-        bundleRows.map((row) => [row.product_id, asNumber(row.allocation_pct) ?? 0]),
-      ),
-      risk_score: bundle.risk_score,
-      is_active: bundle.is_active,
-      created_at: bundle.created_at,
-    };
+export async function fetchFunds(search?: string, page = 1, pageSize = 50) {
+  return api.get<Page<Record<string, unknown>>>("/api/funds", {
+    page,
+    pageSize,
+    ...(search ? { search } : {}),
   });
 }
