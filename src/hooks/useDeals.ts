@@ -38,7 +38,7 @@ function updateDealInListCache(
   updated: Deal,
 ) {
   queryClient.setQueriesData<Deal[]>({ queryKey: dealKeys.all }, (old) =>
-    old?.map((deal) => (deal.id === updated.id ? updated : deal)) ?? old,
+    Array.isArray(old) ? old.map((deal) => (deal.id === updated.id ? updated : deal)) : old,
   );
 }
 
