@@ -233,10 +233,10 @@ export function TopBar({
       )}
     >
       <Search className="h-4 w-4" />
-      <span className="hidden sm:inline text-xs">Search</span>
+      {/* <span className="hidden sm:inline text-xs">Search</span>
       <kbd className="hidden xl:inline text-xs bg-muted/10 px-1 rounded">
         Ctrl+K
-      </kbd>
+      </kbd> */}
     </Button>
   );
 
