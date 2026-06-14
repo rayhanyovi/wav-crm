@@ -20,17 +20,46 @@ export interface Paginated<T> {
   total: number;
 }
 
+async function getSharedAdviserIdsForTelemarketer(
+  db: Pick<typeof prisma, "crmUser">,
+  actor: Actor,
+): Promise<string[]> {
+  if (actor.role !== "TELEMARKETER") return [];
+  const advisers = await db.crmUser.findMany({
+    where: {
+      role: "ADVISER",
+      isActive: true,
+      telemarketerAccess: true,
+      telemarketerId: actor.id,
+    },
+    select: { id: true },
+  });
+  return advisers.map((adviser) => adviser.id);
+}
+
 export async function listContacts(actor: Actor, query: ListQuery): Promise<Paginated<Contact>> {
   if (!canListContacts(actor)) throw new ForbiddenError("Not allowed to view contacts");
 
   const where: Prisma.ContactWhereInput = { deletedAt: null };
+  const sharedAdviserIds = await getSharedAdviserIdsForTelemarketer(prisma, actor);
+  if (actor.role === "TELEMARKETER") {
+    where.createdBy = { in: [actor.id, ...sharedAdviserIds] };
+  }
   if (query.search) {
-    where.OR = [
+    const searchFilter: Prisma.ContactWhereInput = {
+      OR: [
       { firstName: { contains: query.search, mode: "insensitive" } },
       { lastName: { contains: query.search, mode: "insensitive" } },
       { email: { contains: query.search, mode: "insensitive" } },
       { phone: { contains: query.search } },
-    ];
+      ],
+    };
+    if (where.createdBy) {
+      where.AND = [{ createdBy: where.createdBy }, searchFilter];
+      delete where.createdBy;
+    } else {
+      Object.assign(where, searchFilter);
+    }
   }
 
   const [data, total] = await Promise.all([
@@ -47,9 +76,10 @@ export async function listContacts(actor: Actor, query: ListQuery): Promise<Pagi
 }
 
 export async function getContact(actor: Actor, id: string): Promise<Contact> {
-  if (!canViewContact(actor)) throw new ForbiddenError("Not allowed to view contacts");
   const contact = await prisma.contact.findFirst({ where: { id, deletedAt: null } });
   if (!contact) throw new NotFoundError("Contact not found");
+  const sharedAdviserIds = await getSharedAdviserIdsForTelemarketer(prisma, actor);
+  if (!canViewContact(actor, contact, sharedAdviserIds)) throw new ForbiddenError("Not allowed to view contacts");
   return contact;
 }
 
@@ -87,11 +117,11 @@ export async function updateContact(
   id: string,
   input: UpdateContactInput,
 ): Promise<Contact> {
-  if (!canUpdateContact(actor)) throw new ForbiddenError("Not allowed to update contacts");
-
   return prisma.$transaction(async (tx) => {
     const prev = await tx.contact.findFirst({ where: { id, deletedAt: null } });
     if (!prev) throw new NotFoundError("Contact not found");
+    const sharedAdviserIds = await getSharedAdviserIdsForTelemarketer(tx, actor);
+    if (!canUpdateContact(actor, prev, sharedAdviserIds)) throw new ForbiddenError("Not allowed to update contacts");
 
     const data: Prisma.ContactUpdateInput = {};
     if (input.first_name !== undefined) data.firstName = input.first_name;
@@ -127,9 +157,10 @@ export async function softDeleteContact(actor: Actor, id: string): Promise<void>
 }
 
 export async function getContactNotes(actor: Actor, contactId: string): Promise<ContactNote[]> {
-  if (!canViewContact(actor)) throw new ForbiddenError("Not allowed to view contacts");
   const contact = await prisma.contact.findFirst({ where: { id: contactId, deletedAt: null } });
   if (!contact) throw new NotFoundError("Contact not found");
+  const sharedAdviserIds = await getSharedAdviserIdsForTelemarketer(prisma, actor);
+  if (!canViewContact(actor, contact, sharedAdviserIds)) throw new ForbiddenError("Not allowed to view contacts");
   return prisma.contactNote.findMany({ where: { contactId }, orderBy: { createdAt: "desc" } });
 }
 
@@ -138,9 +169,10 @@ export async function addContactNote(
   contactId: string,
   input: AddNoteInput,
 ): Promise<ContactNote> {
-  if (!canViewContact(actor)) throw new ForbiddenError("Not allowed to add notes to contacts");
   const contact = await prisma.contact.findFirst({ where: { id: contactId, deletedAt: null } });
   if (!contact) throw new NotFoundError("Contact not found");
+  const sharedAdviserIds = await getSharedAdviserIdsForTelemarketer(prisma, actor);
+  if (!canViewContact(actor, contact, sharedAdviserIds)) throw new ForbiddenError("Not allowed to add notes to contacts");
   return prisma.contactNote.create({
     data: { contactId, content: input.content, createdBy: actor.id },
   });

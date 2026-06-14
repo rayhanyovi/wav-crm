@@ -20,6 +20,7 @@ function actor(overrides: Partial<Actor> = {}): Actor {
     telemarketerAccess: false,
     telemarketerId: null,
     leadsAccess: true,
+    delegatedAdviserIds: [],
     ...overrides,
   };
 }
@@ -70,6 +71,12 @@ describe("canViewDeal", () => {
   it("TELEMARKETER cannot view unrelated deals", () => {
     expect(canViewDeal(actor({ role: "TELEMARKETER", id: "tm-2" }), tmDeal)).toBe(false);
   });
+
+  it("delegated TELEMARKETER can view a deal assigned to a granting adviser", () => {
+    const tm = actor({ role: "TELEMARKETER", id: "tm-1", delegatedAdviserIds: ["adv-1"] });
+    expect(canViewDeal(tm, { assignedToId: "adv-1", telemarketerId: null })).toBe(true);
+    expect(canViewDeal(tm, { assignedToId: "adv-x", telemarketerId: null })).toBe(false);
+  });
 });
 
 describe("canMutateDeal", () => {
@@ -87,8 +94,15 @@ describe("canMutateDeal", () => {
     expect(canMutateDeal(actor({ id: "u1" }), otherDeal)).toBe(false);
   });
 
-  it("TELEMARKETER cannot mutate deals", () => {
+  it("TELEMARKETER cannot mutate deals by default", () => {
     expect(canMutateDeal(actor({ role: "TELEMARKETER" }), tmDeal)).toBe(false);
+  });
+
+  it("delegated TELEMARKETER can mutate a deal assigned to a granting adviser", () => {
+    const tm = actor({ role: "TELEMARKETER", id: "tm-1", delegatedAdviserIds: ["adv-1"] });
+    expect(canMutateDeal(tm, { assignedToId: "adv-1" })).toBe(true);
+    expect(canMutateDeal(tm, { assignedToId: "adv-x" })).toBe(false);
+    expect(canMutateDeal(tm, { assignedToId: null })).toBe(false);
   });
 });
 

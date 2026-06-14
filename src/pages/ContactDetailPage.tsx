@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { ArrowLeft, Phone, Calendar, TrendingUp, MessageSquare, Plus, Trash2, ClipboardList } from "lucide-react";
+import { ArrowLeft, Phone, Calendar, TrendingUp, MessageSquare, Plus, Trash2, ClipboardList, Loader2 } from "lucide-react";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useActivities } from "@/hooks/useActivities";
 import { useUsers } from "@/hooks/useUsers";
@@ -82,9 +82,42 @@ export function ContactDetailPage() {
   });
 
   const contactActivities = getContactActivities(id!, activities);
-  const thisNotes = contactNotes
+
+  // Contact-level notes (from contact_notes table)
+  const contactLevelNotes = contactNotes
     .filter((n) => n.contact_id === id)
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+  // NOTE-type activities from all of this contact's deals
+  const dealIds = new Set(contactDeals.map((d) => d.id));
+  const dealNoteActivities = activities.filter(
+    (a) => a.type === "NOTE" && a.deal_id && dealIds.has(a.deal_id),
+  );
+
+  // Unified merged list (contact notes + deal notes), sorted newest-first
+  type MergedNote =
+    | { kind: "contact"; id: string; content: string; created_by: string; created_at: string; contactId: string }
+    | { kind: "deal"; id: string; content: string; created_by: string; created_at: string; dealId: string; dealTitle: string };
+
+  const mergedNotes: MergedNote[] = [
+    ...contactLevelNotes.map((n): MergedNote => ({
+      kind: "contact",
+      id: n.id,
+      content: n.content,
+      created_by: n.created_by,
+      created_at: n.created_at,
+      contactId: n.contact_id,
+    })),
+    ...dealNoteActivities.map((a): MergedNote => ({
+      kind: "deal",
+      id: a.id,
+      content: (a.description && a.description.trim()) ? a.description : a.subject,
+      created_by: a.created_by,
+      created_at: a.created_at,
+      dealId: a.deal_id!,
+      dealTitle: contactDeals.find((d) => d.id === a.deal_id)?.title ?? "Deal",
+    })),
+  ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
   if (contactLoading || dealsLoading || notesLoading) {
     return (
@@ -161,7 +194,7 @@ export function ContactDetailPage() {
   };
 
   const handleAddNote = async () => {
-    if (!noteText.trim() || !currentUser) return;
+    if (!noteText.trim() || !currentUser || addContactNoteMutation.isPending) return;
     await addContactNoteMutation.mutateAsync({
       contactId: contact.id,
       content: noteText.trim(),
@@ -502,6 +535,9 @@ export function ContactDetailPage() {
           <CardTitle className="text-sm flex items-center gap-2">
             <MessageSquare className="h-4 w-4 text-muted-foreground" />
             Client Notes
+            {mergedNotes.length > 0 && (
+              <span className="text-xs font-normal text-muted-foreground">({mergedNotes.length})</span>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -511,30 +547,44 @@ export function ContactDetailPage() {
                 placeholder="Add a note about this client..."
                 value={noteText}
                 onChange={(e) => setNoteText(e.target.value)}
+                disabled={addContactNoteMutation.isPending}
                 rows={2}
                 className="flex-1 resize-none text-sm"
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && noteText.trim()) {
-                    handleAddNote();
+                  if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && noteText.trim() && !addContactNoteMutation.isPending) {
+                    void handleAddNote();
                   }
                 }}
               />
-              <Button size="sm" className="self-end" disabled={!noteText.trim()} onClick={() => void handleAddNote()}>
-                <Plus className="h-3.5 w-3.5 mr-1" />
-                Add
+              <Button size="sm" className="self-end" disabled={!noteText.trim() || addContactNoteMutation.isPending} onClick={() => void handleAddNote()}>
+                {addContactNoteMutation.isPending ? (
+                  <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                ) : (
+                  <Plus className="h-3.5 w-3.5 mr-1" />
+                )}
+                {addContactNoteMutation.isPending ? "Adding..." : "Add"}
               </Button>
             </div>
           )}
-          {thisNotes.length === 0 ? (
+          {mergedNotes.length === 0 ? (
             <p className="text-sm text-muted-foreground">No notes yet.</p>
           ) : (
             <div className="space-y-2">
-              {thisNotes.map((note) => {
+              {mergedNotes.map((note) => {
                 const author = users.find((u) => u.id === note.created_by);
-                const canDelete = currentUser?.id === note.created_by || currentUser?.role === "MASTER";
+                const canDelete = note.kind === "contact" &&
+                  (currentUser?.id === note.created_by || currentUser?.role === "MASTER");
                 return (
                   <div key={note.id} className="group flex items-start gap-3 rounded-lg bg-muted/40 px-3 py-2">
                     <div className="flex-1 min-w-0">
+                      {note.kind === "deal" && (
+                        <Link
+                          to={`/deals/${note.dealId}`}
+                          className="inline-flex items-center gap-1 mb-1 text-[10px] font-medium rounded px-1.5 py-0.5 bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                        >
+                          From: {note.dealTitle}
+                        </Link>
+                      )}
                       <p className="text-sm leading-snug whitespace-pre-wrap">{note.content}</p>
                       <p className="text-xs text-muted-foreground mt-1">
                         {author?.name ?? "Unknown"} · {new Date(note.created_at).toLocaleString("en-SG", {

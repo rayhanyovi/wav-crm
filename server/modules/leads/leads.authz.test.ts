@@ -13,6 +13,7 @@ function actor(overrides: Partial<Actor> = {}): Actor {
     telemarketerAccess: false,
     telemarketerId: null,
     leadsAccess: true,
+    delegatedAdviserIds: [],
     ...overrides,
   };
 }
@@ -44,6 +45,14 @@ describe("leads.authz", () => {
         telemarketerOwnerId: null,
         adviserOwnerId: null,
       })).toBe(false);
+    });
+
+    it("allows TELEMARKETER to update rows owned by an adviser who shared access", () => {
+      expect(canUpdateLead(actor({ role: "TELEMARKETER", id: "tm" }), {
+        assignedToId: "adv-1",
+        telemarketerOwnerId: null,
+        adviserOwnerId: null,
+      }, ["adv-1"])).toBe(true);
     });
   });
 

@@ -183,24 +183,28 @@ export function Sidebar() {
             );
           }
 
-          return (
-            <Link
-              key={item.href}
-              to={item.href}
-              data-nav-href={item.href}
-              className={cn(
-                "flex items-center gap-3 rounded-md border-l-2 px-3 py-2 text-sm transition-all duration-150",
-                active
-                  ? "border-sidebar-primary bg-sidebar-accent text-sidebar-accent-foreground shadow-sm"
-                  : "border-transparent text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                collapsed && "justify-center border-l-0 px-0",
-              )}
-              title={collapsed ? item.label : undefined}
-            >
-              <item.icon className="h-4 w-4 shrink-0" />
-              {!collapsed && <span>{item.label}</span>}
-            </Link>
-          );
+          {
+            const tourKey = item.href === "/" ? "dashboard" : item.href.slice(1).replace("/", "-");
+            return (
+              <Link
+                key={item.href}
+                to={item.href}
+                data-nav-href={item.href}
+                data-tour={`nav-${tourKey}`}
+                className={cn(
+                  "flex items-center gap-3 rounded-md border-l-2 px-3 py-2 text-sm transition-all duration-150",
+                  active
+                    ? "border-sidebar-primary bg-sidebar-accent text-sidebar-accent-foreground shadow-sm"
+                    : "border-transparent text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                  collapsed && "justify-center border-l-0 px-0",
+                )}
+                title={collapsed ? item.label : undefined}
+              >
+                <item.icon className="h-4 w-4 shrink-0" />
+                {!collapsed && <span>{item.label}</span>}
+              </Link>
+            );
+          }
         })}
 
         {adminItems.some((i) => can(currentUser, i.minRole)) && (
@@ -219,10 +223,12 @@ export function Sidebar() {
             {adminItems.map((item) => {
               if (!can(currentUser, item.minRole)) return null;
               const active = location.pathname.startsWith(item.href);
+              const tourKey = item.href.slice(1).replace("/", "-");
               return (
                 <Link
                   key={item.href}
                   to={item.href}
+                  data-tour={`nav-${tourKey}`}
                   className={cn(
                     "flex items-center gap-3 rounded-md border-l-2 px-3 py-2 text-sm transition-all duration-150",
                     active

@@ -31,6 +31,7 @@ function actor(overrides: Partial<Actor> = {}): Actor {
     telemarketerAccess: false,
     telemarketerId: null,
     leadsAccess: true,
+    delegatedAdviserIds: [],
     ...overrides,
   };
 }

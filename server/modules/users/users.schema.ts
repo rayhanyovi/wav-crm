@@ -6,7 +6,7 @@ export const listQuerySchema = z.object({
   search: z.string().trim().min(1).max(120).optional(),
   role: z.enum(["MASTER", "ADVISER", "TELEMARKETER"]).optional(),
   page: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(1).max(100).default(25),
+  pageSize: z.coerce.number().int().min(1).max(500).default(25),
 });
 
 export const updateUserSchema = z
@@ -22,5 +22,18 @@ export const updateUserSchema = z
   .partial()
   .refine((obj) => Object.keys(obj).length > 0, { message: "Empty update payload" });
 
+/** Body for POST /users/:id/approve — MASTER assigns a role and activates. */
+export const approveUserSchema = z.object({
+  role: z.enum(["MASTER", "ADVISER", "TELEMARKETER"]),
+});
+
+/** Body for POST /users/onboarding — a signed-in user finishes their own profile. */
+export const onboardingSchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  requested_role: z.enum(["ADVISER", "TELEMARKETER"]),
+});
+
 export type ListQuery = z.infer<typeof listQuerySchema>;
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;
+export type ApproveUserInput = z.infer<typeof approveUserSchema>;
+export type OnboardingInput = z.infer<typeof onboardingSchema>;

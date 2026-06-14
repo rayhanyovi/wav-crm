@@ -1,51 +1,38 @@
-import type { Lead, User } from "@/data/types";
+import type { User } from "@/data/types";
 
-type LeadAdviserFields = Pick<Lead, "assigned_to_id" | "adviser_owner_id">;
+/**
+ * Advisers that `actor` may assign an appointment deal to (spending one of that
+ * adviser's credits). Only advisers with at least one credit are eligible.
+ *
+ *  - MASTER: any active adviser.
+ *  - TELEMARKETER: advisers who delegated dealing access to them
+ *    (`telemarketer_access` + `telemarketer_id === actor.id`).
+ *  - everyone else (incl. plain advisers booking their own): none — the deal is
+ *    left unassigned for the claim pool.
+ *
+ * When this returns more than one adviser the booking UI must make the TM choose
+ * (requirement 2d); a single result can be defaulted; an empty result means the
+ * deal stays unassigned.
+ */
+export function assignableAdvisersFor(actor: User | null | undefined, users: User[]): User[] {
+  if (!actor?.is_active) return [];
 
-function hasAppointmentClaimCredit(user: User | undefined): user is User {
-  return !!user && user.role === "ADVISER" && user.is_active && (user.credit_balance ?? 0) > 0;
-}
+  const hasCredit = (u: User) => (u.credit_balance ?? 0) > 0;
 
-export function resolveAppointmentDealAdviser({
-  actor,
-  lead,
-  users,
-}: {
-  actor: User | null | undefined;
-  lead?: Partial<LeadAdviserFields>;
-  users: User[];
-}): User | undefined {
-  if (!actor?.is_active) return undefined;
-
-  const freshActor = users.find((user) => user.id === actor.id) ?? actor;
-
-  if (freshActor.role === "ADVISER") {
-    return hasAppointmentClaimCredit(freshActor) ? freshActor : undefined;
+  if (actor.role === "MASTER") {
+    return users.filter((u) => u.role === "ADVISER" && u.is_active && hasCredit(u));
   }
 
-  if (freshActor.role !== "TELEMARKETER") return undefined;
-
-  const grantingAdvisers = users.filter(
-    (user) =>
-      user.role === "ADVISER" &&
-      user.is_active &&
-      user.telemarketer_access &&
-      user.telemarketer_id === freshActor.id &&
-      (user.credit_balance ?? 0) > 0,
-  );
-
-  const preferredAdviserIds = [lead?.adviser_owner_id, lead?.assigned_to_id].filter(
-    (id): id is string => !!id,
-  );
-
-  for (const adviserId of preferredAdviserIds) {
-    const adviser = grantingAdvisers.find((user) => user.id === adviserId);
-    if (adviser) return adviser;
+  if (actor.role === "TELEMARKETER") {
+    return users.filter(
+      (u) =>
+        u.role === "ADVISER" &&
+        u.is_active &&
+        u.telemarketer_access &&
+        u.telemarketer_id === actor.id &&
+        hasCredit(u),
+    );
   }
 
-  return grantingAdvisers.length === 1 ? grantingAdvisers[0] : undefined;
-}
-
-export function nextCreditBalanceAfterAppointmentClaim(user: User): number {
-  return Math.max(0, (user.credit_balance ?? 0) - 1);
+  return [];
 }

@@ -24,7 +24,7 @@ export interface NavigationItem {
 export const navItems: NavigationItem[] = [
   { href: "/",           label: "Dashboard",  icon: LayoutDashboard, minRole: "TELEMARKETER" },
   { href: "/leads",      label: "Leads",      icon: Users,           minRole: "TELEMARKETER" },
-  { href: "/deals",      label: "Deals",      icon: Handshake,       minRole: "ADVISER"      },
+  { href: "/deals",      label: "Deals",      icon: Handshake,       minRole: "TELEMARKETER" },
   { href: "/activities", label: "Activities", icon: Activity,        minRole: "TELEMARKETER" },
   { href: "/calendar",   label: "Calendar",   icon: CalendarDays,    minRole: "TELEMARKETER" },
   { href: "/contacts",   label: "Contacts",   icon: UserCheck,       minRole: "ADVISER"      },

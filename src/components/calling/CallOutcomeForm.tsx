@@ -7,16 +7,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useCallSessionStore } from "@/store/useCallSessionStore";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useCreateActivity } from "@/hooks/useActivities";
-import { useCreateContact } from "@/hooks/useContacts";
-import { useCreateDeal, useDeals } from "@/hooks/useDeals";
-import { useUpdateLead } from "@/hooks/useLeads";
-import { useUpdateUser, useUsers } from "@/hooks/useUsers";
+import { useDeals } from "@/hooks/useDeals";
+import { useConvertLead, useUpdateLead } from "@/hooks/useLeads";
+import { useUsers } from "@/hooks/useUsers";
+import { assignableAdvisersFor } from "@/lib/dealAssignment";
 import { isColdCaller } from "@/lib/permissions";
-import {
-  nextCreditBalanceAfterAppointmentClaim,
-  resolveAppointmentDealAdviser,
-} from "@/lib/dealAssignment";
-import { pickFactFind } from "@/lib/factFind";
 import { STATUS_REASONS, AUTO_RESULT, STATUS_LABELS, TM_STATUS_OPTIONS, type TmCallStatus } from "@/lib/leadStatusReasons";
 import type { ActivityResult, Lead } from "@/data/types";
 import { ChevronRight, PhoneOff } from "lucide-react";
@@ -63,11 +58,14 @@ export function CallOutcomeForm({ lead }: CallOutcomeFormProps) {
   const { submitOutcome, nextLead, liveNotes, callDurationSeconds } = useCallSessionStore();
   const createActivityMutation = useCreateActivity();
   const updateLeadMutation = useUpdateLead();
-  const createContactMutation = useCreateContact();
-  const createDealMutation = useCreateDeal();
-  const updateUserMutation = useUpdateUser();
+  const convertLeadMutation = useConvertLead();
   const { data: deals = [] } = useDeals();
-  const { data: users = [], isLoading: usersLoading } = useUsers();
+  const { data: users = [] } = useUsers();
+
+  // Advisers this caller can assign the appointment to (delegated TM / master).
+  const assignableAdvisers = assignableAdvisersFor(currentUser, users);
+  // "" = leave unassigned (claim pool).
+  const [assignAdviserId, setAssignAdviserId] = useState("");
 
   // ── Derived flags ──────────────────────────────────────────────────────────
   const effectiveResult: ActivityResult = isTM ? AUTO_RESULT[tmStatus] : result;
@@ -95,8 +93,7 @@ export function CallOutcomeForm({ lead }: CallOutcomeFormProps) {
     (reasonRequired && !reason) ||
     (showProspectValue && !hasValidProspectValue) ||
     (followUpDateRequired && !followUpDateTime) ||
-    (showMeetingDate && !meetingDateTime) ||
-    usersLoading;
+    (showMeetingDate && !meetingDateTime);
 
   // ── Submit ─────────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
@@ -172,63 +169,48 @@ export function CallOutcomeForm({ lead }: CallOutcomeFormProps) {
         });
       }
 
-      // Auto-advance lead to APPOINTMENT + create contact & deal when a meeting is scheduled
+      // Advance lead to APPOINTMENT when a meeting is scheduled. convertLead is the
+      // transactional path the backend intends for this (TMs can't create deals
+      // directly): it creates the contact + an UNASSIGNED appointment deal, carries
+      // over fact-find, and flips the lead status — all server-side, no extra writes.
+      // An adviser later claims the deal from the Deals page (spending a credit).
       if (showMeetingDate && meetingDateTime) {
-        const assignedAdviser = resolveAppointmentDealAdviser({
-          actor: currentUser,
-          lead,
-          users,
-        });
-
-        await updateLeadMutation.mutateAsync({
-          id: lead.id,
-          payload: {
-            status: "APPOINTMENT",
-            appointment_date: meetingDate,
-            appointment_time: meetingTime,
-          },
-          userId: currentUser.id,
-        });
-
         const existingDeal = deals.find((d) => d.lead_id === lead.id && !d.deleted_at);
-        if (!existingDeal) {
-          let contactId = lead.converted_contact_id;
-          if (!contactId) {
-            const newContact = await createContactMutation.mutateAsync({
-            first_name: lead.first_name,
-            last_name: lead.last_name,
-            email: lead.email,
-            phone: lead.phone,
-            source: lead.source,
-            created_by: currentUser.id,
-            ...pickFactFind(lead),
-            });
-            contactId = newContact.id;
-            await updateLeadMutation.mutateAsync({
-              id: lead.id,
-              payload: { converted_contact_id: contactId },
-              userId: currentUser.id,
-            });
-          }
-          await createDealMutation.mutateAsync({
-            title: `${lead.first_name} ${lead.last_name}`,
-            value: 0,
-            stage: "APPOINTMENT",
-            lead_id: lead.id,
-            contact_id: contactId,
-            assigned_to_id: assignedAdviser?.id,
-            telemarketer_id: currentUser.id,
-            created_by: currentUser.id,
-            ...pickFactFind(lead),
-          });
-          if (assignedAdviser) {
-            await updateUserMutation.mutateAsync({
-              id: assignedAdviser.id,
-              payload: {
-                credit_balance: nextCreditBalanceAfterAppointmentClaim(assignedAdviser),
+        if (!existingDeal && lead.status !== "APPOINTMENT") {
+          await convertLeadMutation.mutateAsync({
+            leadId: lead.id,
+            userId: currentUser.id,
+            payload: {
+              contact: {
+                first_name: lead.first_name,
+                last_name:  lead.last_name,
+                email:      lead.email ?? undefined,
+                phone:      lead.phone ?? undefined,
+                source:     lead.source,
+                created_by: currentUser.id,
               },
-            });
-          }
+              deal: {
+                title:          `${lead.first_name} ${lead.last_name}`,
+                value:          0,
+                stage:          "APPOINTMENT",
+                assigned_to_id: assignAdviserId || null,
+                created_by:     currentUser.id,
+              },
+              appointment_date: meetingDate,
+              appointment_time: meetingTime,
+            },
+          });
+        } else {
+          // Already converted / a deal exists — just record the new meeting date.
+          await updateLeadMutation.mutateAsync({
+            id: lead.id,
+            payload: {
+              status: "APPOINTMENT",
+              appointment_date: meetingDate,
+              appointment_time: meetingTime,
+            },
+            userId: currentUser.id,
+          });
         }
       }
 
@@ -243,6 +225,7 @@ export function CallOutcomeForm({ lead }: CallOutcomeFormProps) {
       setMeetingDate("");
       setMeetingTime("");
       setProspectValue("");
+      setAssignAdviserId("");
     } catch (error) {
       console.error("Failed to save call outcome", error);
     }
@@ -369,6 +352,27 @@ export function CallOutcomeForm({ lead }: CallOutcomeFormProps) {
           {meetingDateTime && (
             <div className="rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 p-2.5 text-xs text-green-800 dark:text-green-300 font-medium">
               ✓ Lead will be marked as Appointment Confirmed
+            </div>
+          )}
+          {assignableAdvisers.length > 0 && (
+            <div className="space-y-1">
+              <Label className="text-xs">Assign to adviser</Label>
+              <Select value={assignAdviserId || "none"} onValueChange={(v) => setAssignAdviserId(v === "none" ? "" : v)}>
+                <SelectTrigger className="text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Leave unassigned (claim pool)</SelectItem>
+                  {assignableAdvisers.map((adviser) => (
+                    <SelectItem key={adviser.id} value={adviser.id}>
+                      {adviser.name} · {adviser.credit_balance ?? 0} credit{(adviser.credit_balance ?? 0) === 1 ? "" : "s"}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground">
+                Choosing an adviser assigns the deal to them now and spends 1 of their credits.
+              </p>
             </div>
           )}
         </div>

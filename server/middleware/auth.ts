@@ -130,6 +130,22 @@ export function requireAuth(verifier: TokenVerifier = supabaseJwtVerifier): Requ
         throw new ForbiddenError("Account has no assigned role");
       }
 
+      // A TM may be delegated dealing access by one or more advisers. Resolve
+      // those advisers so authz can let the TM act on their deals/proposals.
+      let delegatedAdviserIds: string[] = [];
+      if (user.role === "TELEMARKETER") {
+        const grantors = await prisma.crmUser.findMany({
+          where: {
+            role: "ADVISER",
+            isActive: true,
+            telemarketerAccess: true,
+            telemarketerId: user.id,
+          },
+          select: { id: true },
+        });
+        delegatedAdviserIds = grantors.map((g) => g.id);
+      }
+
       const actor: Actor = {
         id: user.id,
         authUserId,
@@ -140,8 +156,48 @@ export function requireAuth(verifier: TokenVerifier = supabaseJwtVerifier): Requ
         telemarketerAccess: user.telemarketerAccess,
         telemarketerId: user.telemarketerId,
         leadsAccess: user.leadsAccess,
+        delegatedAdviserIds,
       };
       req.actor = actor;
+      next();
+    } catch (err) {
+      next(err);
+    }
+  };
+}
+
+/**
+ * Lighter-weight auth for onboarding/bootstrap routes. Verifies the token and
+ * resolves the matching crm_users row, but — unlike {@link requireAuth} — does
+ * NOT require the account to be ACTIVE or to have a role yet. This lets a freshly
+ * signed-up PENDING_PROFILE user call POST /api/users/onboarding (and a
+ * pre-configured admin call /activate-super-admin) to progress through the
+ * approval flow. The row itself must exist (created by the auth.users trigger).
+ */
+export function requireSession(verifier: TokenVerifier = supabaseJwtVerifier): RequestHandler {
+  return async (req, _res, next) => {
+    try {
+      const token = bearerToken(req.headers.authorization);
+      if (!token) throw new UnauthenticatedError("Missing bearer token");
+
+      const { authUserId } = await verifier.verify(token);
+
+      const user = await prisma.crmUser.findFirst({ where: { authUserId } });
+      if (!user) throw new UnauthenticatedError("No CRM profile for this account");
+
+      req.actor = {
+        id: user.id,
+        authUserId,
+        email: user.email,
+        // Role may be null/unassigned at this stage; onboarding routes don't read it.
+        role: user.role as CrmRole,
+        isActive: user.isActive,
+        creditBalance: user.creditBalance,
+        telemarketerAccess: user.telemarketerAccess,
+        telemarketerId: user.telemarketerId,
+        leadsAccess: user.leadsAccess,
+        delegatedAdviserIds: [],
+      };
       next();
     } catch (err) {
       next(err);

@@ -64,6 +64,23 @@ function toPrismaUpdate(input: UpdateLeadInput): Prisma.LeadUpdateInput {
   return out;
 }
 
+async function getSharedAdviserIdsForTelemarketer(
+  db: Pick<typeof prisma, "crmUser">,
+  actor: Actor,
+): Promise<string[]> {
+  if (actor.role !== "TELEMARKETER") return [];
+  const advisers = await db.crmUser.findMany({
+    where: {
+      role: "ADVISER",
+      isActive: true,
+      telemarketerAccess: true,
+      telemarketerId: actor.id,
+    },
+    select: { id: true },
+  });
+  return advisers.map((adviser) => adviser.id);
+}
+
 export async function listLeads(actor: Actor, query: ListQuery): Promise<Paginated<Lead>> {
   if (!canListLeads(actor)) throw new ForbiddenError("Not allowed to view leads");
 
@@ -72,11 +89,25 @@ export async function listLeads(actor: Actor, query: ListQuery): Promise<Paginat
   if (query.status) where.status = query.status;
   if (query.source) where.source = query.source;
 
+  const sharedAdviserIds = await getSharedAdviserIdsForTelemarketer(prisma, actor);
+  const telemarketerScope: Prisma.LeadWhereInput = {
+    OR: [
+      { telemarketerOwnerId: actor.id },
+      { telemarketerOwnerId: null },
+      ...(sharedAdviserIds.length > 0
+        ? [
+            { assignedToId: { in: sharedAdviserIds } },
+            { adviserOwnerId: { in: sharedAdviserIds } },
+          ]
+        : []),
+    ],
+  };
+
   const scopeFilter: Prisma.LeadWhereInput | null =
-    actor.role === "MASTER"
+    actor.role === "MASTER" || (actor.role === "ADVISER" && actor.leadsAccess)
       ? null
       : actor.role === "TELEMARKETER"
-        ? { OR: [{ telemarketerOwnerId: actor.id }, { telemarketerOwnerId: null }] }
+        ? telemarketerScope
         : { OR: [{ assignedToId: actor.id }, { adviserOwnerId: actor.id }] };
 
   const searchFilter: Prisma.LeadWhereInput | null = query.search
@@ -110,7 +141,8 @@ export async function listLeads(actor: Actor, query: ListQuery): Promise<Paginat
 export async function getLead(actor: Actor, id: string): Promise<Lead> {
   const lead = await prisma.lead.findFirst({ where: { id, deletedAt: null } });
   if (!lead) throw new NotFoundError("Lead not found");
-  if (!canViewLead(actor, lead)) throw new ForbiddenError("Not allowed to view leads");
+  const sharedAdviserIds = await getSharedAdviserIdsForTelemarketer(prisma, actor);
+  if (!canViewLead(actor, lead, sharedAdviserIds)) throw new ForbiddenError("Not allowed to view leads");
   return lead;
 }
 
@@ -155,7 +187,8 @@ export async function updateLead(actor: Actor, id: string, input: UpdateLeadInpu
   return prisma.$transaction(async (tx) => {
     const prev = await tx.lead.findFirst({ where: { id, deletedAt: null } });
     if (!prev) throw new NotFoundError("Lead not found");
-    if (!canUpdateLead(actor, prev)) throw new ForbiddenError("Not allowed to update leads");
+    const sharedAdviserIds = await getSharedAdviserIdsForTelemarketer(tx, actor);
+    if (!canUpdateLead(actor, prev, sharedAdviserIds)) throw new ForbiddenError("Not allowed to update leads");
 
     const data = toPrismaUpdate(input);
     const nextStatus = (input.status ?? prev.status) as Lead["status"];
@@ -361,7 +394,30 @@ export async function convertLead(
       contactId = contact.id;
     }
 
-    // Create the deal (initially APPOINTMENT stage, unassigned).
+    // Resolve a direct assignment target, if any. A deal is assigned at creation
+    // (spending that adviser's credit) only when the actor is allowed to book on
+    // that adviser's behalf — a MASTER, or a delegated TM picking one of their
+    // granting advisers. Otherwise the deal stays unassigned for the claim pool.
+    let assignedToId: string | undefined = undefined;
+    const requestedAdviserId = input.assigned_adviser_id ?? undefined;
+    if (requestedAdviserId) {
+      const allowed =
+        actor.role === "MASTER" || actor.delegatedAdviserIds.includes(requestedAdviserId);
+      if (!allowed) {
+        throw new ForbiddenError("You can't assign this appointment to that adviser");
+      }
+      const adviser = await tx.crmUser.findUnique({ where: { id: requestedAdviserId } });
+      if (!adviser || adviser.role !== "ADVISER" || !adviser.isActive) {
+        throw new ConflictError("Chosen adviser is not available");
+      }
+      // Only assign + charge when the adviser has a credit to spend; otherwise
+      // fall back to the claim pool so the appointment is never lost.
+      if (adviser.creditBalance > 0) {
+        assignedToId = requestedAdviserId;
+      }
+    }
+
+    // Create the deal (APPOINTMENT stage; assigned only in the delegated case above).
     const fullName = `${lead.firstName} ${lead.lastName}`.trim();
     const deal = await tx.deal.create({
       data: {
@@ -371,7 +427,7 @@ export async function convertLead(
         leadId: id,
         contactId,
         telemarketerId: actor.role === "TELEMARKETER" ? actor.id : undefined,
-        assignedToId: actor.role === "ADVISER" ? actor.id : undefined,
+        assignedToId,
         financialGoal: lead.financialGoal ?? undefined,
         riskTolerance: lead.riskTolerance ?? undefined,
         investmentHorizon: lead.investmentHorizon ?? undefined,
@@ -382,6 +438,24 @@ export async function convertLead(
         createdBy: actor.id,
       },
     });
+
+    // Charge the assigned adviser one credit (mirrors claimDeal), recorded as a
+    // CLAIM transaction so the ledger is consistent however the deal got assigned.
+    if (assignedToId) {
+      const adviser = await tx.crmUser.findUniqueOrThrow({ where: { id: assignedToId } });
+      await tx.crmUser.update({
+        where: { id: assignedToId },
+        data: { creditBalance: { decrement: 1 } },
+      });
+      await tx.creditTransaction.create({
+        data: {
+          userId: assignedToId,
+          action: "CLAIM",
+          balanceBefore: adviser.creditBalance,
+          balanceAfter: adviser.creditBalance - 1,
+        },
+      });
+    }
 
     // Update the lead itself.
     const next = await tx.lead.update({
@@ -454,7 +528,8 @@ export async function claimForCall(
 export async function getLeadNotes(actor: Actor, leadId: string): Promise<LeadNote[]> {
   const lead = await prisma.lead.findFirst({ where: { id: leadId, deletedAt: null } });
   if (!lead) throw new NotFoundError("Lead not found");
-  if (!canViewLead(actor, lead)) throw new ForbiddenError("Not allowed to view leads");
+  const sharedAdviserIds = await getSharedAdviserIdsForTelemarketer(prisma, actor);
+  if (!canViewLead(actor, lead, sharedAdviserIds)) throw new ForbiddenError("Not allowed to view leads");
   return prisma.leadNote.findMany({ where: { leadId }, orderBy: { createdAt: "desc" } });
 }
 
@@ -465,7 +540,8 @@ export async function addLeadNote(
 ): Promise<LeadNote> {
   const lead = await prisma.lead.findFirst({ where: { id: leadId, deletedAt: null } });
   if (!lead) throw new NotFoundError("Lead not found");
-  if (!canViewLead(actor, lead)) throw new ForbiddenError("Not allowed to add notes to leads");
+  const sharedAdviserIds = await getSharedAdviserIdsForTelemarketer(prisma, actor);
+  if (!canViewLead(actor, lead, sharedAdviserIds)) throw new ForbiddenError("Not allowed to add notes to leads");
   return prisma.leadNote.create({
     data: { leadId, content: input.content, createdBy: actor.id },
   });
@@ -479,7 +555,8 @@ export async function getLeadStatusHistory(
 ): Promise<LeadStatusHistory[]> {
   const lead = await prisma.lead.findFirst({ where: { id: leadId, deletedAt: null } });
   if (!lead) throw new NotFoundError("Lead not found");
-  if (!canViewLead(actor, lead)) throw new ForbiddenError("Not allowed to view leads");
+  const sharedAdviserIds = await getSharedAdviserIdsForTelemarketer(prisma, actor);
+  if (!canViewLead(actor, lead, sharedAdviserIds)) throw new ForbiddenError("Not allowed to view leads");
   return prisma.leadStatusHistory.findMany({
     where: { leadId },
     orderBy: { changedAt: "desc" },

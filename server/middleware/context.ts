@@ -17,6 +17,13 @@ export interface Actor {
   telemarketerAccess: boolean;
   telemarketerId: string | null;
   leadsAccess: boolean;
+  /**
+   * Advisers that have delegated dealing access to this actor (a TELEMARKETER),
+   * i.e. ADVISER rows with `telemarketerAccess` + `telemarketerId = actor.id`.
+   * The TM may act on their behalf — book appointments assigned to them and
+   * work their deals/proposals. Empty for non-TM actors.
+   */
+  delegatedAdviserIds: string[];
 }
 
 declare global {

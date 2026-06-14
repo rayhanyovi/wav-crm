@@ -43,7 +43,7 @@ import {
 import { DealStageBadge, ActivityTypeBadge, ActivityResultBadge } from "@/components/common/StatusBadge";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/format";
 import { can } from "@/lib/permissions";
-import type { DealStage, DealProposal, DealProposalStatus, DealProposalLine, FinancialGoal, RiskTolerance, InvestmentHorizon } from "@/data/types";
+import type { DealStage, DealProposal, DealProposalStatus, DealProposalLine, FinancialGoal, RiskTolerance, InvestmentHorizon, ActivityType } from "@/data/types";
 import { SGA_FUNDS, getRiskCategory, RISK_CATEGORY_COLOR } from "@/data/sgaFunds";
 import { nanoid } from "nanoid";
 
@@ -66,6 +66,10 @@ const HORIZON_LABELS: Record<InvestmentHorizon, string> = {
 };
 const PROPOSAL_STATUS_LABELS: Record<DealProposalStatus, string> = {
   DRAFT: "Draft", PRESENTED: "Presented", ACCEPTED: "Accepted", REJECTED: "Rejected",
+};
+// Activity categories selectable when logging an entry in the Comments & Activity timeline.
+const ACTIVITY_TYPE_LABELS: Record<ActivityType, string> = {
+  NOTE: "Note", CALL: "Call", MEETING: "Meeting", EMAIL: "Email", TASK: "Task", FOLLOW_UP: "Follow-up",
 };
 const PROPOSAL_STATUS_COLORS: Record<DealProposalStatus, string> = {
   DRAFT:     "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300",
@@ -287,6 +291,7 @@ export function DealDetailPage() {
   const createActivityMutation = useCreateActivity();
 
   const [comment, setComment] = useState("");
+  const [commentType, setCommentType] = useState<ActivityType>("NOTE");
 
   const [stageModalOpen, setStageModalOpen] = useState(false);
   const [newStage, setNewStage] = useState<DealStage | "">("");
@@ -449,14 +454,16 @@ export function DealDetailPage() {
     setComment("");
     createActivityMutation.mutate(
       {
-        type:         "NOTE",
+        type:         commentType,
         subject:      text,
         result:       "COMPLETED",
         deal_id:      id!,
         lead_id:      deal.lead_id ?? undefined,
         created_by:   currentUser.id,
         completed_at: new Date().toISOString(),
-        metadata:     { comment: true },
+        // Plain notes are flagged as comments (hides the result badge); other
+        // categories are logged as proper activities in the timeline.
+        metadata:     commentType === "NOTE" ? { comment: true } : undefined,
       },
       {
         onError: (err) =>
@@ -755,7 +762,7 @@ export function DealDetailPage() {
 
             {/* Comment composer — notes from calls, meetings & status changes all land here */}
             {canEdit && (
-              <div className="flex items-start gap-2 border-b p-3">
+              <div className="space-y-2 border-b p-3">
                 <Textarea
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}
@@ -769,14 +776,26 @@ export function DealDetailPage() {
                     }
                   }}
                 />
-                <Button
-                  size="sm"
-                  className="shrink-0"
-                  onClick={handlePostComment}
-                  disabled={!comment.trim() || createActivityMutation.isPending}
-                >
-                  Post
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Select value={commentType} onValueChange={(v) => setCommentType(v as ActivityType)}>
+                    <SelectTrigger className="h-8 w-36 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(Object.keys(ACTIVITY_TYPE_LABELS) as ActivityType[]).map((t) => (
+                        <SelectItem key={t} value={t}>{ACTIVITY_TYPE_LABELS[t]}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    size="sm"
+                    className="ml-auto shrink-0"
+                    onClick={handlePostComment}
+                    disabled={!comment.trim() || createActivityMutation.isPending}
+                  >
+                    Post
+                  </Button>
+                </div>
               </div>
             )}
 

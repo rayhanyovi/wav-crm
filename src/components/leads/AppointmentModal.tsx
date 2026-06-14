@@ -11,17 +11,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useConvertLead } from "@/hooks/useLeads";
 import { useCreateActivity } from "@/hooks/useActivities";
-import { useUpdateContact } from "@/hooks/useContacts";
-import { useUpdateDeal } from "@/hooks/useDeals";
-import { useUpdateUser, useUsers } from "@/hooks/useUsers";
+import { useUsers } from "@/hooks/useUsers";
 import { useAuthStore } from "@/store/useAuthStore";
-import {
-  nextCreditBalanceAfterAppointmentClaim,
-  resolveAppointmentDealAdviser,
-} from "@/lib/dealAssignment";
-import { hasFactFind, pickFactFind } from "@/lib/factFind";
+import { assignableAdvisersFor } from "@/lib/dealAssignment";
 import type { Lead } from "@/data/types";
 
 interface AppointmentModalProps {
@@ -36,16 +37,19 @@ export function AppointmentModal({ lead, open, onClose, onConverted }: Appointme
   const { currentUser } = useAuthStore();
   const convertLead    = useConvertLead();
   const createActivity = useCreateActivity();
-  const updateContact  = useUpdateContact();
-  const updateDeal     = useUpdateDeal();
-  const updateUser     = useUpdateUser();
-  const { data: users = [], isLoading: usersLoading } = useUsers();
+  const { data: users = [] } = useUsers();
+
+  // Advisers this actor can assign the appointment to (spending the adviser's
+  // credit). A delegated TM with several granting advisers must pick one (2d).
+  const assignableAdvisers = assignableAdvisersFor(currentUser, users);
 
   // Appointment details
   const [appointmentDate, setAppointmentDate] = useState("");
   const [appointmentTime, setAppointmentTime] = useState("");
   const appointmentDateTime = appointmentDate && appointmentTime ? `${appointmentDate}T${appointmentTime}` : "";
   const [notes, setNotes] = useState("");
+  // "" = leave unassigned (claim pool). Default to the only granting adviser.
+  const [assignAdviserId, setAssignAdviserId] = useState("");
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError]           = useState<string | null>(null);
@@ -54,6 +58,7 @@ export function AppointmentModal({ lead, open, onClose, onConverted }: Appointme
     setAppointmentDate("");
     setAppointmentTime("");
     setNotes("");
+    setAssignAdviserId("");
     setError(null);
   };
 
@@ -68,12 +73,8 @@ export function AppointmentModal({ lead, open, onClose, onConverted }: Appointme
     setError(null);
 
     try {
-      const assignedAdviser = resolveAppointmentDealAdviser({
-        actor: currentUser,
-        lead,
-        users,
-      });
-
+      // If an adviser is chosen the backend assigns the deal to them and spends
+      // one of their credits; otherwise the deal stays unassigned (claim pool).
       const { contact_id, deal_id } = await convertLead.mutateAsync({
         leadId: lead.id,
         userId: currentUser.id,
@@ -90,31 +91,15 @@ export function AppointmentModal({ lead, open, onClose, onConverted }: Appointme
             title:          `${lead.first_name} ${lead.last_name} – Appointment`,
             value:          0,
             stage:          "APPOINTMENT",
-            assigned_to_id: assignedAdviser?.id ?? null,
+            assigned_to_id: assignAdviserId || null,
             created_by:     currentUser.id,
           },
         },
       });
 
-      if (assignedAdviser && deal_id) {
-        await updateUser.mutateAsync({
-          id: assignedAdviser.id,
-          payload: {
-            credit_balance: nextCreditBalanceAfterAppointmentClaim(assignedAdviser),
-          },
-        });
-      }
-
-      // Carry over any fact-find data already collected on the lead
-      if (hasFactFind(lead)) {
-        const factFind = pickFactFind(lead);
-        if (contact_id) {
-          await updateContact.mutateAsync({ id: contact_id, payload: factFind });
-        }
-        if (deal_id) {
-          await updateDeal.mutateAsync({ id: deal_id, payload: factFind });
-        }
-      }
+      // Fact-find carry-over is handled server-side by convertLead (it copies the
+      // lead's fact-find onto both the new contact and deal at creation), so no
+      // extra writes are needed here — and a TM can't PATCH the unassigned deal.
 
       // Schedule an appointment activity if a date was given
       if (appointmentDateTime) {
@@ -210,6 +195,29 @@ export function AppointmentModal({ lead, open, onClose, onConverted }: Appointme
                 placeholder="What was discussed? Any prep notes for the meeting…"
               />
             </div>
+
+            {assignableAdvisers.length > 0 && (
+              <div className="space-y-1.5">
+                <Label className="text-xs">Assign to adviser</Label>
+                <Select value={assignAdviserId || "none"} onValueChange={(v) => setAssignAdviserId(v === "none" ? "" : v)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Leave unassigned (claim pool)</SelectItem>
+                    {assignableAdvisers.map((adviser) => (
+                      <SelectItem key={adviser.id} value={adviser.id}>
+                        {adviser.name} · {adviser.credit_balance ?? 0} credit{(adviser.credit_balance ?? 0) === 1 ? "" : "s"}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-muted-foreground">
+                  Choosing an adviser assigns the deal to them now and spends 1 of their credits.
+                  Otherwise it goes to the pool for any adviser to claim.
+                </p>
+              </div>
+            )}
           </div>
 
           {error && (
@@ -225,7 +233,7 @@ export function AppointmentModal({ lead, open, onClose, onConverted }: Appointme
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={submitting || usersLoading}
+            disabled={submitting}
             className="gap-2"
           >
             <CalendarCheck className="h-4 w-4" />

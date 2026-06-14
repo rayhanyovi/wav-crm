@@ -6,8 +6,7 @@ import { useActivities } from "@/hooks/useActivities";
 import { useUsers } from "@/hooks/useUsers";
 import { useLeads } from "@/hooks/useLeads";
 import { useContacts } from "@/hooks/useContacts";
-import { useCreateDeal, useDeals, useMoveDealStage, useUpdateDeal } from "@/hooks/useDeals";
-import { useUpdateUser } from "@/hooks/useUsers";
+import { useClaimDeal, useCreateDeal, useDeals, useMoveDealStage } from "@/hooks/useDeals";
 import { useCreateContact } from "@/hooks/useContacts";
 import { isAdviser as isAdviserRole } from "@/lib/permissions";
 import { toast } from "@/store/useToastStore";
@@ -46,7 +45,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { DealStageBadge } from "@/components/common/StatusBadge";
 import { EmptyState } from "@/components/common/EmptyState";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 import { can } from "@/lib/permissions";
 import type { DealStage, LeadSource } from "@/data/types";
 
@@ -89,9 +88,8 @@ export function DealsPage() {
   const { data: contacts = [], isLoading: contactsLoading, error: contactsError } = useContacts();
   const { data: deals = [], isLoading: dealsLoading, error: dealsError } = useDeals();
   const createDealMutation = useCreateDeal();
-  const updateDealMutation = useUpdateDeal();
   const moveStageMutation  = useMoveDealStage();
-  const updateUserMutation = useUpdateUser();
+  const claimDealMutation  = useClaimDeal();
   const createContactMutation = useCreateContact();
   const { currentUser } = useAuthStore();
   const navigate = useNavigate();
@@ -104,7 +102,6 @@ export function DealsPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [form, setForm] = useState({
     title: "",
-    value: "",
     lead_id: "",
     contact_id: "",
     assigned_to_id: "",
@@ -205,7 +202,7 @@ export function DealsPage() {
 
     await createDealMutation.mutateAsync({
       title: form.title,
-      value: parseFloat(form.value) || 0,
+      value: 0,
       stage: form.stage,
       lead_id: form.lead_id || undefined,
       contact_id: contactId,
@@ -215,7 +212,7 @@ export function DealsPage() {
     });
 
     setCreateOpen(false);
-    setForm({ title: "", value: "", lead_id: "", contact_id: "", assigned_to_id: "", stage: "CALLING" });
+    setForm({ title: "", lead_id: "", contact_id: "", assigned_to_id: "", stage: "CALLING" });
     setNewContact({ first_name: "", last_name: "", email: "", phone: "", source: "OWN_SOURCE" });
   };
 
@@ -238,7 +235,7 @@ export function DealsPage() {
               : "All deals in the pipeline from first cold call to close."}
           </p>
         </div>
-        {can(currentUser, "TELEMARKETER") && (
+        {can(currentUser, "ADVISER") && (
           <Button size="sm" className="gap-2 shrink-0" onClick={() => setCreateOpen(true)}>
             <Plus className="h-4 w-4" /> New Deal
           </Button>
@@ -321,7 +318,6 @@ export function DealsPage() {
                 <TableHead>Client</TableHead>
                 <TableHead>Stage</TableHead>
                 <TableHead className="hidden md:table-cell">Adviser</TableHead>
-                <TableHead className="hidden sm:table-cell text-right">Value</TableHead>
                 <TableHead className="hidden lg:table-cell text-center">Activity</TableHead>
                 <TableHead className="hidden md:table-cell">Updated</TableHead>
                 <TableHead />
@@ -370,9 +366,6 @@ export function DealsPage() {
                         ? <span className="text-xs">TM: {telemarketer.name.split(" ")[0]}</span>
                         : <span className="text-amber-600 dark:text-amber-400 font-medium text-xs">Unassigned</span>}
                     </TableCell>
-                    <TableCell className="hidden sm:table-cell text-right font-semibold text-sm tabular-nums">
-                      {deal.value > 0 ? formatCurrency(deal.value) : <span className="text-muted-foreground font-normal">—</span>}
-                    </TableCell>
                     <TableCell className="hidden lg:table-cell text-center">
                       <span className="text-xs text-muted-foreground flex items-center justify-center gap-2">
                         {stats.calls > 0 && <span className="flex items-center gap-0.5"><Phone className="h-3 w-3" />{stats.calls}</span>}
@@ -385,26 +378,21 @@ export function DealsPage() {
                     </TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()} className="text-right">
                       <div className="flex items-center justify-end gap-1">
-                        {isReleased && isAdviserRole(currentUser) && (
+                        {isReleased && deal.stage === "APPOINTMENT" && isAdviserRole(currentUser) && (
                           <Button
                             size="sm"
                             variant="outline"
                             className="gap-1 text-xs h-7 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400"
                             title="Claiming this client costs 1 credit"
+                            disabled={claimDealMutation.isPending}
                             onClick={() => {
                               if (!currentUser) return;
                               if ((currentUser.credit_balance ?? 0) < 1) {
                                 toast.error("You have no credits left — ask an admin to top up before claiming.");
                                 return;
                               }
-                              updateDealMutation.mutate({
-                                id: deal.id,
-                                payload: { assigned_to_id: currentUser.id },
-                              });
-                              updateUserMutation.mutate({
-                                id: currentUser.id,
-                                payload: { credit_balance: Math.max(0, (currentUser.credit_balance ?? 0) - 1) },
-                              });
+                              // Assignment + credit spend happen atomically server-side.
+                              claimDealMutation.mutate(deal.id);
                             }}
                           >
                             <UserPlus className="h-3 w-3" /> Claim (1 credit)
@@ -637,27 +625,16 @@ export function DealsPage() {
                 </div>
               </div>
             )}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Stage</Label>
-                <Select value={form.stage} onValueChange={(v) => setForm((f) => ({ ...f, stage: v as DealStage }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {ALL_STAGES.map((s) => (
-                      <SelectItem key={s} value={s}>{STAGE_LABELS[s]}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label>Est. Value (SGD)</Label>
-                <Input
-                  type="number"
-                  value={form.value}
-                  onChange={(e) => setForm((f) => ({ ...f, value: e.target.value }))}
-                  placeholder="0"
-                />
-              </div>
+            <div className="space-y-1.5">
+              <Label>Stage</Label>
+              <Select value={form.stage} onValueChange={(v) => setForm((f) => ({ ...f, stage: v as DealStage }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {ALL_STAGES.map((s) => (
+                    <SelectItem key={s} value={s}>{STAGE_LABELS[s]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             {can(currentUser, "MASTER") && (
               <div className="space-y-1.5">

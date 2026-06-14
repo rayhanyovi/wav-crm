@@ -10,6 +10,7 @@ const db = vi.hoisted(() => ({
     update: vi.fn(),
   },
   contactNote: { findMany: vi.fn(), create: vi.fn() },
+  crmUser: { findMany: vi.fn() },
   auditLog: { create: vi.fn() },
   $transaction: vi.fn(),
 }));
@@ -31,20 +32,29 @@ function actor(overrides: Partial<Actor> = {}): Actor {
     telemarketerAccess: false,
     telemarketerId: null,
     leadsAccess: true,
+    delegatedAdviserIds: [],
     ...overrides,
   };
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
+  db.crmUser.findMany.mockResolvedValue([]);
   db.$transaction.mockImplementation(async (cb: (tx: typeof db) => unknown) => cb(db));
 });
 
 describe("listContacts", () => {
-  it("forbids TELEMARKETER", async () => {
-    await expect(
-      listContacts(actor({ role: "TELEMARKETER" }), { page: 1, pageSize: 25 } as never),
-    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  it("scopes TELEMARKETER contacts to themselves and shared advisers", async () => {
+    db.crmUser.findMany.mockResolvedValue([{ id: "adv-1" }]);
+    db.contact.findMany.mockResolvedValue([{ id: "c1" }]);
+    db.contact.count.mockResolvedValue(1);
+
+    await listContacts(actor({ role: "TELEMARKETER", id: "tm-1" }), { page: 1, pageSize: 25 } as never);
+
+    expect(db.contact.findMany.mock.calls[0]![0].where).toMatchObject({
+      deletedAt: null,
+      createdBy: { in: ["tm-1", "adv-1"] },
+    });
   });
 
   it("paginates and returns data+total", async () => {
@@ -62,18 +72,35 @@ describe("getContact", () => {
     await expect(getContact(actor(), "x")).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
-  it("throws FORBIDDEN for TELEMARKETER", async () => {
-    await expect(getContact(actor({ role: "TELEMARKETER" }), "c1")).rejects.toMatchObject({
+  it("throws FORBIDDEN for TELEMARKETER on an unrelated contact", async () => {
+    db.contact.findFirst.mockResolvedValue({ id: "c1", createdBy: "other" });
+    await expect(getContact(actor({ role: "TELEMARKETER", id: "tm-1" }), "c1")).rejects.toMatchObject({
       code: "FORBIDDEN",
     });
+  });
+
+  it("allows TELEMARKETER to view contacts from a shared adviser", async () => {
+    db.crmUser.findMany.mockResolvedValue([{ id: "adv-1" }]);
+    db.contact.findFirst.mockResolvedValue({ id: "c1", createdBy: "adv-1" });
+
+    const contact = await getContact(actor({ role: "TELEMARKETER", id: "tm-1" }), "c1");
+
+    expect(contact.id).toBe("c1");
   });
 });
 
 describe("createContact", () => {
-  it("forbids TELEMARKETER", async () => {
-    await expect(
-      createContact(actor({ role: "TELEMARKETER" }), { first_name: "X" } as never),
-    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  it("allows TELEMARKETER to create contacts from calling workflow", async () => {
+    db.contact.create.mockResolvedValue({ id: "c1", firstName: "X", createdBy: "tm-1" });
+    db.auditLog.create.mockResolvedValue({});
+
+    const contact = await createContact(
+      actor({ role: "TELEMARKETER", id: "tm-1" }),
+      { first_name: "X", last_name: "Y", source: "OTHERS" } as never,
+    );
+
+    expect(contact.id).toBe("c1");
+    expect(db.contact.create.mock.calls[0]![0].data.createdBy).toBe("tm-1");
   });
 
   it("sets createdBy from actor", async () => {

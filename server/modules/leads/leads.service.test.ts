@@ -11,6 +11,9 @@ const db = vi.hoisted(() => {
       create: vi.fn(),
       update: vi.fn(),
     },
+    crmUser: {
+      findMany: vi.fn(),
+    },
     leadStatusHistory: { create: vi.fn() },
     notification: { createMany: vi.fn() },
     auditLog: { create: vi.fn() },
@@ -37,11 +40,14 @@ function actor(overrides: Partial<Actor> = {}): Actor {
     telemarketerAccess: false,
     telemarketerId: null,
     leadsAccess: true,
+    delegatedAdviserIds: [],
     ...overrides,
   };
 }
 
 beforeEach(() => {
+  vi.clearAllMocks();
+  db.crmUser.findMany.mockResolvedValue([]);
   db.$transaction.mockImplementation(async (cb: (tx: typeof db) => unknown) => cb(db));
 });
 
@@ -62,18 +68,61 @@ describe("listLeads", () => {
     expect(db.lead.findMany.mock.calls[0]![0]).toMatchObject({ skip: 10, take: 10 });
   });
 
-  it("filters adviser leads to assigned/adviser-owned rows", async () => {
+  it("does not scope adviser leads when Lead Access is enabled", async () => {
     db.lead.findMany.mockResolvedValue([{ id: "l1" }]);
     db.lead.count.mockResolvedValue(1);
 
-    await listLeads(actor({ role: "ADVISER", id: "adv-1", telemarketerAccess: false }), {
+    await listLeads(actor({ role: "ADVISER", id: "adv-1", leadsAccess: true }), {
       page: 1,
       pageSize: 25,
     } as never);
 
     expect(db.lead.findMany.mock.calls[0]![0].where).toMatchObject({
+      deletedAt: null,
+      isAbandoned: false,
+    });
+    expect(db.lead.findMany.mock.calls[0]![0].where.OR).toBeUndefined();
+  });
+
+  it("filters adviser leads to assigned/adviser-owned rows without Lead Access", async () => {
+    db.lead.findMany.mockResolvedValue([{ id: "l1" }]);
+    db.lead.count.mockResolvedValue(1);
+
+    await listLeads(actor({ role: "ADVISER", id: "adv-1", leadsAccess: false }), {
+      page: 1,
+      pageSize: 25,
+    } as never);
+
+    expect(db.lead.findMany.mock.calls.at(-1)![0].where).toMatchObject({
       OR: [{ assignedToId: "adv-1" }, { adviserOwnerId: "adv-1" }],
     });
+  });
+
+  it("includes leads owned by advisers who assigned this telemarketer", async () => {
+    db.crmUser.findMany.mockResolvedValue([{ id: "adv-1" }]);
+    db.lead.findMany.mockResolvedValue([{ id: "l1" }]);
+    db.lead.count.mockResolvedValue(1);
+
+    await listLeads(actor({ role: "TELEMARKETER", id: "tm-1" }), {
+      page: 1,
+      pageSize: 25,
+    } as never);
+
+    expect(db.crmUser.findMany).toHaveBeenCalledWith({
+      where: {
+        role: "ADVISER",
+        isActive: true,
+        telemarketerAccess: true,
+        telemarketerId: "tm-1",
+      },
+      select: { id: true },
+    });
+    expect(db.lead.findMany.mock.calls[0]![0].where.OR).toEqual([
+      { telemarketerOwnerId: "tm-1" },
+      { telemarketerOwnerId: null },
+      { assignedToId: { in: ["adv-1"] } },
+      { adviserOwnerId: { in: ["adv-1"] } },
+    ]);
   });
 });
 
@@ -103,6 +152,17 @@ describe("updateLead side-effects", () => {
     );
   });
 
+  it("clears abandonment when moving AVOID back to NA", async () => {
+    const prev = { id: "l1", status: "AVOID", firstName: "A", lastName: "B", assignedToId: "u1", telemarketerOwnerId: "u1", adviserOwnerId: null, bounceCount: 0 };
+    db.lead.findFirst.mockResolvedValue(prev);
+    db.lead.update.mockResolvedValue({ ...prev, status: "NA", isAbandoned: false, abandonedAt: null });
+
+    await updateLead(actor(), "l1", { status: "NA" } as never);
+
+    const updateArg = db.lead.update.mock.calls.at(-1)![0];
+    expect(updateArg.data).toMatchObject({ status: "NA", isAbandoned: false, abandonedAt: null });
+  });
+
   it("does not write status history when status is unchanged", async () => {
     const prev = { id: "l1", status: "NA", firstName: "A", lastName: "B", assignedToId: "u1", telemarketerOwnerId: "u1", adviserOwnerId: null, bounceCount: 0 };
     db.lead.findFirst.mockResolvedValue(prev);
@@ -111,6 +171,17 @@ describe("updateLead side-effects", () => {
     await updateLead(actor(), "l1", { notes: "hi" } as never);
 
     expect(db.leadStatusHistory.create).not.toHaveBeenCalled();
+  });
+
+  it("allows an assigned telemarketer to update an adviser's lead", async () => {
+    const prev = { id: "l1", status: "NA", firstName: "A", lastName: "B", assignedToId: "adv-1", telemarketerOwnerId: null, adviserOwnerId: null, bounceCount: 0 };
+    db.crmUser.findMany.mockResolvedValue([{ id: "adv-1" }]);
+    db.lead.findFirst.mockResolvedValue(prev);
+    db.lead.update.mockResolvedValue({ ...prev, status: "KIV" });
+
+    await updateLead(actor({ role: "TELEMARKETER", id: "tm-1" }), "l1", { status: "KIV" } as never);
+
+    expect(db.lead.update.mock.calls[0]![0].data.status).toBe("KIV");
   });
 
   it("throws NOT_FOUND when the lead doesn't exist", async () => {

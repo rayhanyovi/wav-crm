@@ -7,6 +7,9 @@ import { CallingPanel } from "@/components/calling/CallingPanel";
 import { StartCallingModal } from "@/components/calling/StartCallingModal";
 import { FloatingCallBar } from "@/components/calling/FloatingCallBar";
 import { Toaster } from "@/components/common/Toaster";
+import { Tour } from "@/components/tour/Tour";
+import { getTourSteps } from "@/components/tour/tourSteps";
+import { useAuthStore } from "@/store/useAuthStore";
 import { useCallSessionStore } from "@/store/useCallSessionStore";
 import { useLayoutStore } from "@/store/useLayoutStore";
 import { cn } from "@/lib/utils";
@@ -17,9 +20,22 @@ export function AppShell() {
   const [darkMode, setDarkMode] = useState(() => {
     return document.documentElement.classList.contains("dark");
   });
+  const [tourActive, setTourActive] = useState(false);
+  const [tourStep, setTourStep] = useState(0);
+  const [tourSteps, setTourSteps] = useState(() => [] as ReturnType<typeof getTourSteps>);
+  const { currentUser } = useAuthStore();
   const { active: sessionActive } = useCallSessionStore();
   const { layoutMode } = useLayoutStore();
   const location = useLocation();
+
+  const handleStartTour = () => {
+    const raw = getTourSteps(currentUser);
+    const valid = raw.filter((s) => !!document.querySelector(s.selector));
+    if (valid.length === 0) return;
+    setTourSteps(valid);
+    setTourStep(0);
+    setTourActive(true);
+  };
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -45,6 +61,7 @@ export function AppShell() {
         <TopBar
           onSearchOpen={() => setSearchOpen(true)}
           onStartCalling={() => setStartCallingOpen(true)}
+          onStartTour={handleStartTour}
           darkMode={darkMode}
           toggleDark={toggleDark}
         />
@@ -71,6 +88,15 @@ export function AppShell() {
       {sessionActive && <FloatingCallBar />}
       <CallingPanel />
       <Toaster />
+      {tourActive && (
+        <Tour
+          steps={tourSteps}
+          currentStep={tourStep}
+          onNext={() => setTourStep((s) => Math.min(s + 1, tourSteps.length - 1))}
+          onPrev={() => setTourStep((s) => Math.max(s - 1, 0))}
+          onClose={() => setTourActive(false)}
+        />
+      )}
     </div>
   );
 }

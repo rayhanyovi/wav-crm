@@ -313,6 +313,11 @@ export async function moveDealStage(
   return mapDeal(res.data);
 }
 
+export async function claimDeal(dealId: string): Promise<Deal> {
+  const res = await api.post<Envelope<ApiDeal>>(`/api/deals/${dealId}/claim`);
+  return mapDeal(res.data);
+}
+
 export async function releaseDeal(dealId: string, _releaserId?: string, _transferToId?: string): Promise<void> {
   await api.post(`/api/deals/${dealId}/release`);
 }

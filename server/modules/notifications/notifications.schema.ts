@@ -8,7 +8,7 @@ export const listQuerySchema = z.object({
     .optional()
     .transform((v) => v === true || v === "true"),
   page: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(1).max(100).default(25),
+  pageSize: z.coerce.number().int().min(1).max(500).default(25),
 });
 
 export type ListQuery = z.infer<typeof listQuerySchema>;

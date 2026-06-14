@@ -7,11 +7,14 @@ import {
   usePendingUsers,
   useApproveUser,
   useRejectUser,
+  useUpdateUser,
 } from "@/hooks/useUsers";
 import { useActivities } from "@/hooks/useActivities";
+import { useAuthStore } from "@/store/useAuthStore";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -20,8 +23,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { RoleBadge } from "@/components/common/StatusBadge";
+import { isMaster } from "@/lib/permissions";
 import { formatDuration, formatDate } from "@/lib/format";
-import type { UserRole } from "@/data/types";
+import type { User, UserRole } from "@/data/types";
 import type { PendingUser } from "@/services/users";
 
 function PendingApprovals() {
@@ -111,11 +115,74 @@ function PendingRow({ user }: { user: PendingUser }) {
   );
 }
 
+/**
+ * MASTER-only controls on an ADVISER card: grant Leads-module (cold-call) access,
+ * and delegate dealing to a specific telemarketer (lets that TM act on the
+ * adviser's behalf — book appointments for them and work their deals).
+ */
+function AccessControls({ member, telemarketers }: { member: User; telemarketers: User[] }) {
+  const updateUser = useUpdateUser();
+  const stop = (e: React.MouseEvent) => e.stopPropagation();
+
+  return (
+    <div className="mt-3 space-y-2 rounded-md border bg-muted/30 p-3" onClick={stop}>
+      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Access</p>
+
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs">Leads access (can cold-call)</span>
+        <Switch
+          checked={member.leads_access ?? true}
+          onCheckedChange={(v) => updateUser.mutate({ id: member.id, payload: { leads_access: v } })}
+        />
+      </div>
+
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs">Delegate dealing to a TM</span>
+        <Switch
+          checked={member.telemarketer_access ?? false}
+          onCheckedChange={(v) =>
+            updateUser.mutate({ id: member.id, payload: { telemarketer_access: v } })
+          }
+        />
+      </div>
+
+      {member.telemarketer_access && (
+        <div className="space-y-1">
+          <span className="text-xs text-muted-foreground">Acting telemarketer</span>
+          <Select
+            value={member.telemarketer_id ?? "none"}
+            onValueChange={(v) =>
+              updateUser.mutate({
+                id: member.id,
+                payload: { telemarketer_id: v === "none" ? null : v },
+              })
+            }
+          >
+            <SelectTrigger className="h-8 text-xs">
+              <SelectValue placeholder="Choose a telemarketer" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">— None —</SelectItem>
+              {telemarketers.map((tm) => (
+                <SelectItem key={tm.id} value={tm.id}>{tm.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function TeamPage() {
   const { deals } = useCrmStore();
   const { data: activities = [] } = useActivities();
   const { data: users = [] } = useUsers();
+  const { currentUser } = useAuthStore();
   const navigate = useNavigate();
+
+  const canManageAccess = isMaster(currentUser);
+  const telemarketers = users.filter((u) => u.is_active && u.role === "TELEMARKETER");
 
   const teamMembers = users.filter((u) => u.is_active);
 
@@ -169,6 +236,9 @@ export function TeamPage() {
                     </tbody>
                   </table>
                 </div>
+                {canManageAccess && member.role === "ADVISER" && (
+                  <AccessControls member={member} telemarketers={telemarketers} />
+                )}
               </CardContent>
             </Card>
           );

@@ -32,6 +32,13 @@ describe("deriveStatusColumns", () => {
     expect(deriveStatusColumns("AVOID", "AVOID")).toEqual({});
   });
 
+  it("clears abandoned when transitioning out of AVOID", () => {
+    expect(deriveStatusColumns("AVOID", "NA")).toEqual({
+      isAbandoned: false,
+      abandonedAt: null,
+    });
+  });
+
   it("does nothing for non-AVOID transitions", () => {
     expect(deriveStatusColumns("NA", "KIV")).toEqual({});
   });

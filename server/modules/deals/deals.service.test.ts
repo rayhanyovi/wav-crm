@@ -56,6 +56,7 @@ function actor(overrides: Partial<Actor> = {}): Actor {
     telemarketerAccess: false,
     telemarketerId: null,
     leadsAccess: true,
+    delegatedAdviserIds: [],
     ...overrides,
   };
 }
@@ -103,14 +104,30 @@ describe("listDeals", () => {
     expect(where.OR).toEqual([{ assignedToId: "u1" }, { assignedToId: null }]);
   });
 
-  it("TELEMARKETER gets only linked deals", async () => {
+  it("TELEMARKETER gets only their own linked deals when not delegated", async () => {
     db.deal.findMany.mockResolvedValue([]);
     db.deal.count.mockResolvedValue(0);
 
     await listDeals(actor({ role: "TELEMARKETER", id: "tm-1" }), { page: 1, pageSize: 25 } as never);
 
     const where = db.deal.findMany.mock.calls[0]![0].where;
-    expect(where.telemarketerId).toBe("tm-1");
+    expect(where.OR).toEqual([{ telemarketerId: "tm-1" }]);
+  });
+
+  it("TELEMARKETER also gets deals of advisers who delegated to them", async () => {
+    db.deal.findMany.mockResolvedValue([]);
+    db.deal.count.mockResolvedValue(0);
+
+    await listDeals(
+      actor({ role: "TELEMARKETER", id: "tm-1", delegatedAdviserIds: ["adv-1", "adv-2"] }),
+      { page: 1, pageSize: 25 } as never,
+    );
+
+    const where = db.deal.findMany.mock.calls[0]![0].where;
+    expect(where.OR).toEqual([
+      { telemarketerId: "tm-1" },
+      { assignedToId: { in: ["adv-1", "adv-2"] } },
+    ]);
   });
 
   it("paginates correctly", async () => {

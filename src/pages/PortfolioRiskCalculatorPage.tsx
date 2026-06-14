@@ -399,16 +399,16 @@ function CopySummaryCard({
           <div className="space-y-0.5">
             {filledLines.map((l, i) => (
               <p key={l.id}>
-                {i + 1}.&nbsp;&nbsp;🟦{l.fund!.name}, {l.allocation}% {l.fund!.riskCategory}🟦
+                {i + 1}.&nbsp;&nbsp;{l.fund!.name}, {l.allocation}% {l.fund!.riskCategory}
               </p>
             ))}
           </div>
           <p className="pt-1">
-            The overall risk classification of the funds selected by you is 🟦{resultCategory}🟦.
+            The overall risk classification of the funds selected by you is {resultCategory}.
           </p>
           {clientProfile && (
             <p>
-              Your risk profile is 🟦{clientProfile}🟦.
+              Your risk profile is {clientProfile}.
             </p>
           )}
         </div>
@@ -700,12 +700,12 @@ export function PortfolioRiskCalculatorPage() {
               copied={copied}
               onCopy={() => {
                 const fundLines = filledLines.map((l, i) =>
-                  `${i + 1}.  🟦${l.fund!.name}, ${l.allocation}% ${l.fund!.riskCategory}🟦`
+                  `${i + 1}.  ${l.fund!.name}, ${l.allocation}% ${l.fund!.riskCategory}`
                 ).join('\n');
                 const profileLine = clientProfile
-                  ? `\nYour risk profile is 🟦${clientProfile}🟦.`
+                  ? `\nYour risk profile is ${clientProfile}.`
                   : '';
-                const text = `Funds available were shown and you have selected the following:\n${fundLines}\n\nThe overall risk classification of the funds selected by you is 🟦${resultCategory}🟦.${profileLine}`;
+                const text = `Funds available were shown and you have selected the following:\n${fundLines}\n\nThe overall risk classification of the funds selected by you is ${resultCategory}.${profileLine}`;
                 navigator.clipboard.writeText(text);
                 setCopied(true);
                 setTimeout(() => setCopied(false), 2000);

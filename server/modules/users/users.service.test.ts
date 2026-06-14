@@ -27,6 +27,7 @@ function actor(overrides: Partial<Actor> = {}): Actor {
     telemarketerAccess: false,
     telemarketerId: null,
     leadsAccess: true,
+    delegatedAdviserIds: [],
     ...overrides,
   };
 }
@@ -37,10 +38,14 @@ beforeEach(() => {
 });
 
 describe("listUsers", () => {
-  it("forbids non-MASTER", async () => {
-    await expect(listUsers(actor({ role: "ADVISER" }), { page: 1, pageSize: 25 } as never)).rejects.toMatchObject({
-      code: "FORBIDDEN",
-    });
+  it("allows non-MASTER to list active users for CRM attribution", async () => {
+    db.crmUser.findMany.mockResolvedValue([{ id: "u1", isActive: true }]);
+    db.crmUser.count.mockResolvedValue(1);
+
+    const res = await listUsers(actor({ role: "TELEMARKETER" }), { page: 1, pageSize: 25 } as never);
+
+    expect(res.total).toBe(1);
+    expect(db.crmUser.findMany.mock.calls[0]![0].where).toMatchObject({ isActive: true });
   });
 
   it("MASTER can list with pagination", async () => {

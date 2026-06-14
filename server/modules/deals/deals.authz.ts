@@ -12,8 +12,9 @@ export function canCreateDeal(actor: Actor): boolean {
 
 /**
  * MASTER sees all deals.
- * ADVISER sees deals assigned to them OR open APPOINTMENT pool (assignedToId=null).
- * TELEMARKETER sees deals linked to their leads (telemarketerId = actor.id).
+ * ADVISER sees deals assigned to them OR the open APPOINTMENT pool (assignedToId=null).
+ * TELEMARKETER sees deals linked to their leads (telemarketerId = actor.id) OR
+ * deals assigned to an adviser who delegated dealing access to them.
  */
 export function canViewDeal(
   actor: Actor,
@@ -21,20 +22,29 @@ export function canViewDeal(
 ): boolean {
   if (actor.role === "MASTER") return true;
   if (actor.role === "ADVISER") return deal.assignedToId === actor.id || deal.assignedToId === null;
-  if (actor.role === "TELEMARKETER") return deal.telemarketerId === actor.id;
+  if (actor.role === "TELEMARKETER") {
+    if (deal.telemarketerId === actor.id) return true;
+    return deal.assignedToId !== null && actor.delegatedAdviserIds.includes(deal.assignedToId);
+  }
   return false;
 }
 
 /**
  * MASTER can mutate any deal.
  * ADVISER can only mutate deals they are assigned to.
+ * TELEMARKETER can mutate deals assigned to an adviser who delegated to them
+ * (acting on that adviser's behalf — proposals, stage, etc.).
  */
 export function canMutateDeal(
   actor: Actor,
   deal: { assignedToId: string | null },
 ): boolean {
   if (actor.role === "MASTER") return true;
-  return actor.role === "ADVISER" && deal.assignedToId === actor.id;
+  if (actor.role === "ADVISER") return deal.assignedToId === actor.id;
+  if (actor.role === "TELEMARKETER") {
+    return deal.assignedToId !== null && actor.delegatedAdviserIds.includes(deal.assignedToId);
+  }
+  return false;
 }
 
 /** MASTER or ADVISER can claim (credit is checked separately in service). */

@@ -9,6 +9,7 @@ import {
   PanelTop,
   Phone,
   RefreshCcw,
+  Route,
   Search,
   Sun,
   TrendingUp,
@@ -57,6 +58,7 @@ import {
 interface TopBarProps {
   onSearchOpen: () => void;
   onStartCalling: () => void;
+  onStartTour: () => void;
   darkMode: boolean;
   toggleDark: () => void;
 }
@@ -186,6 +188,7 @@ function NavDropdown({
 export function TopBar({
   onSearchOpen,
   onStartCalling,
+  onStartTour,
   darkMode,
   toggleDark,
 }: TopBarProps) {
@@ -244,6 +247,7 @@ export function TopBar({
         onClick={onStartCalling}
         className="gap-1.5"
         variant={sessionActive ? "secondary" : "default"}
+        data-tour="start-calling"
       >
         <Phone className="h-4 w-4" />
         <span className="hidden xl:inline">
@@ -273,10 +277,12 @@ export function TopBar({
         }
 
         const active = isPathActive(location.pathname, item.href);
+        const tourKey = item.href === "/" ? "dashboard" : item.href.slice(1).replace("/", "-");
         return (
           <Link
             key={item.href}
             to={item.href}
+            data-tour={`nav-${tourKey}`}
             className={cn(
               "inline-flex h-14 items-center gap-1.5 whitespace-nowrap border-b-2 px-3 text-sm transition-colors",
               active
@@ -323,6 +329,10 @@ export function TopBar({
         <DropdownMenuItem onClick={() => setHelpOpen(true)}>
           <HelpCircle className="h-4 w-4 mr-2" />
           Help
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={onStartTour}>
+          <Route className="h-4 w-4 mr-2" />
+          Take a Tour
         </DropdownMenuItem>
         <DropdownMenuItem onClick={toggleDark}>
           {darkMode ? (

@@ -17,7 +17,7 @@ const db = vi.hoisted(() => {
     leadNote: { findMany: vi.fn(), create: vi.fn() },
     contact: { create: vi.fn() },
     deal: { create: vi.fn() },
-    crmUser: { findUniqueOrThrow: vi.fn(), update: vi.fn() },
+    crmUser: { findMany: vi.fn(), findUnique: vi.fn(), findUniqueOrThrow: vi.fn(), update: vi.fn() },
     creditTransaction: { create: vi.fn() },
     notification: { createMany: vi.fn() },
     auditLog: { create: vi.fn() },
@@ -49,6 +49,7 @@ function actor(overrides: Partial<Actor> = {}): Actor {
     telemarketerAccess: false,
     telemarketerId: null,
     leadsAccess: true,
+    delegatedAdviserIds: [],
     ...overrides,
   };
 }
@@ -86,6 +87,7 @@ function appointmentLead(overrides: object = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  db.crmUser.findMany.mockResolvedValue([]);
   db.$transaction.mockImplementation(async (cb: (tx: typeof db) => unknown) => cb(db));
 });
 
@@ -263,7 +265,7 @@ describe("convertLead", () => {
     ).rejects.toMatchObject({ code: "CONFLICT" });
   });
 
-  it("assigns deal to the adviser when actor is ADVISER with telemarketer access", async () => {
+  it("always creates the deal unassigned — an adviser claims it later (spending a credit)", async () => {
     const lead = { ...appointmentLead(), status: "KIV" as const };
     db.lead.findFirst.mockResolvedValue(lead);
     db.contact.create.mockResolvedValue({ id: "c1" });
@@ -273,8 +275,61 @@ describe("convertLead", () => {
     await convertLead(actor({ telemarketerAccess: true }), "lead-1", { appointment_date: "2026-07-01" });
 
     const dealData = db.deal.create.mock.calls[0]![0].data;
-    expect(dealData.assignedToId).toBe("u1");
+    expect(dealData.assignedToId).toBeUndefined();
     expect(dealData.telemarketerId).toBeUndefined();
+  });
+
+  it("assigns to a chosen adviser and spends their credit when a delegated TM books", async () => {
+    const lead = { ...appointmentLead(), status: "NA" as const };
+    db.lead.findFirst.mockResolvedValue(lead);
+    db.contact.create.mockResolvedValue({ id: "c1" });
+    db.deal.create.mockResolvedValue({ id: "d1" });
+    db.lead.update.mockResolvedValue({ ...lead, status: "APPOINTMENT" });
+    // adviser lookup: availability check + credit deduction read
+    db.crmUser.findUnique.mockResolvedValue({ id: "adv-1", role: "ADVISER", isActive: true, creditBalance: 3 });
+    db.crmUser.findUniqueOrThrow.mockResolvedValue({ id: "adv-1", role: "ADVISER", creditBalance: 3 });
+
+    const tm = tmActor({ id: "tm-1", delegatedAdviserIds: ["adv-1"] });
+    await convertLead(tm, "lead-1", { appointment_date: "2026-07-01", assigned_adviser_id: "adv-1" });
+
+    const dealData = db.deal.create.mock.calls[0]![0].data;
+    expect(dealData.assignedToId).toBe("adv-1");
+    expect(dealData.telemarketerId).toBe("tm-1");
+    expect(db.crmUser.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { creditBalance: { decrement: 1 } } }),
+    );
+    expect(db.creditTransaction.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ action: "CLAIM", balanceBefore: 3, balanceAfter: 2 }),
+      }),
+    );
+  });
+
+  it("forbids assigning to an adviser who did not delegate to the TM", async () => {
+    const lead = { ...appointmentLead(), status: "NA" as const };
+    db.lead.findFirst.mockResolvedValue(lead);
+    db.contact.create.mockResolvedValue({ id: "c1" });
+
+    const tm = tmActor({ id: "tm-1", delegatedAdviserIds: ["adv-1"] });
+    await expect(
+      convertLead(tm, "lead-1", { appointment_date: "2026-07-01", assigned_adviser_id: "adv-x" }),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("falls back to unassigned when the chosen adviser has no credit", async () => {
+    const lead = { ...appointmentLead(), status: "NA" as const };
+    db.lead.findFirst.mockResolvedValue(lead);
+    db.contact.create.mockResolvedValue({ id: "c1" });
+    db.deal.create.mockResolvedValue({ id: "d1" });
+    db.lead.update.mockResolvedValue({ ...lead, status: "APPOINTMENT" });
+    db.crmUser.findUnique.mockResolvedValue({ id: "adv-1", role: "ADVISER", isActive: true, creditBalance: 0 });
+
+    const tm = tmActor({ id: "tm-1", delegatedAdviserIds: ["adv-1"] });
+    await convertLead(tm, "lead-1", { appointment_date: "2026-07-01", assigned_adviser_id: "adv-1" });
+
+    const dealData = db.deal.create.mock.calls[0]![0].data;
+    expect(dealData.assignedToId).toBeUndefined();
+    expect(db.creditTransaction.create).not.toHaveBeenCalled();
   });
 });
 
@@ -309,10 +364,22 @@ describe("claimForCall", () => {
     expect(db.lead.updateMany).not.toHaveBeenCalled();
   });
 
-  it("forbids an adviser without telemarketer access", async () => {
+  it("forbids an adviser with neither telemarketer nor leads access", async () => {
     await expect(
-      claimForCall(actor({ role: "ADVISER", telemarketerAccess: false }), { count: 5 }),
+      claimForCall(
+        actor({ role: "ADVISER", telemarketerAccess: false, leadsAccess: false }),
+        { count: 5 },
+      ),
     ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("allows an adviser who has leads access to claim a calling pool", async () => {
+    db.lead.findMany.mockResolvedValue([]);
+    const result = await claimForCall(
+      actor({ role: "ADVISER", telemarketerAccess: false, leadsAccess: true }),
+      { count: 5 },
+    );
+    expect(result).toEqual([]);
   });
 });
 

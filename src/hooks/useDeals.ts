@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  claimDeal,
   convertLead,
   createDeal,
   createDealProposal,
@@ -21,6 +22,8 @@ import {
 } from "@/services/deals";
 import type { Deal, DealProposal, StageHistoryEntry } from "@/data/types";
 import { toast } from "@/store/useToastStore";
+import { useAuthStore } from "@/store/useAuthStore";
+import { userKeys } from "@/hooks/useUsers";
 
 export const dealKeys = {
   all: ["deals"] as const,
@@ -152,6 +155,37 @@ export function useMoveDealStage() {
       qc.invalidateQueries({ queryKey: dealKeys.detail(vars.dealId) });
       qc.invalidateQueries({ queryKey: dealKeys.all });
       qc.invalidateQueries({ queryKey: dealKeys.stageHistory(vars.dealId) });
+    },
+  });
+}
+
+export function useClaimDeal() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (dealId: string) => claimDeal(dealId),
+    onSuccess: (deal) => {
+      qc.setQueryData(dealKeys.detail(deal.id), deal);
+      updateDealInListCache(qc, deal);
+      // Claiming spends 1 credit for advisers (MASTER claims free) — reflect it in the
+      // signed-in profile so the credit badge updates without a full refetch.
+      const { currentUser, setCreditBalance } = useAuthStore.getState();
+      if (currentUser?.role === "ADVISER") {
+        setCreditBalance(Math.max(0, (currentUser.credit_balance ?? 0) - 1));
+      }
+      qc.invalidateQueries({ queryKey: userKeys.lists() });
+      toast.success("Deal claimed — 1 credit used.");
+    },
+    onError: (error) => {
+      const raw = error instanceof Error ? error.message : "";
+      const friendly = /insufficient credit/i.test(raw)
+        ? "You don't have enough credits to claim this deal."
+        : /already claimed/i.test(raw)
+          ? "This deal was just claimed by another adviser."
+          : `Couldn't claim the deal: ${raw || "unknown error"}`;
+      toast.error(friendly);
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: dealKeys.all });
     },
   });
 }

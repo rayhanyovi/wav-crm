@@ -29,6 +29,9 @@ export function deriveStatusColumns(
   if (nextStatus === "AVOID" && prevStatus !== "AVOID") {
     return { isAbandoned: true, abandonedAt: new Date() };
   }
+  if (prevStatus === "AVOID" && nextStatus !== "AVOID") {
+    return { isAbandoned: false, abandonedAt: null };
+  }
   return {};
 }
 

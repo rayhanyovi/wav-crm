@@ -68,7 +68,14 @@ export async function listDeals(actor: Actor, query: ListQuery): Promise<Paginat
   if (actor.role === "ADVISER") {
     where.OR = [{ assignedToId: actor.id }, { assignedToId: null }];
   } else if (actor.role === "TELEMARKETER") {
-    where.telemarketerId = actor.id;
+    // TMs see deals from their own leads, plus deals assigned to advisers who
+    // delegated dealing access to them (so they can work those on the adviser's behalf).
+    where.OR = [
+      { telemarketerId: actor.id },
+      ...(actor.delegatedAdviserIds.length > 0
+        ? [{ assignedToId: { in: actor.delegatedAdviserIds } }]
+        : []),
+    ];
   }
   // MASTER: no extra filter — sees all deals
 

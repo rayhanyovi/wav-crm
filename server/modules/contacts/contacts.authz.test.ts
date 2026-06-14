@@ -19,6 +19,7 @@ function actor(overrides: Partial<Actor> = {}): Actor {
     telemarketerAccess: false,
     telemarketerId: null,
     leadsAccess: true,
+    delegatedAdviserIds: [],
     ...overrides,
   };
 }
@@ -28,18 +29,26 @@ describe("contacts authz", () => {
     for (const role of ["MASTER", "ADVISER"] as const) {
       const a = actor({ role });
       expect(canListContacts(a)).toBe(true);
-      expect(canViewContact(a)).toBe(true);
+      expect(canViewContact(a, { createdBy: "other" })).toBe(true);
       expect(canCreateContact(a)).toBe(true);
-      expect(canUpdateContact(a)).toBe(true);
+      expect(canUpdateContact(a, { createdBy: "other" })).toBe(true);
     }
   });
 
-  it("TELEMARKETER cannot list, view, create, or update", () => {
-    const a = actor({ role: "TELEMARKETER" });
-    expect(canListContacts(a)).toBe(false);
-    expect(canViewContact(a)).toBe(false);
-    expect(canCreateContact(a)).toBe(false);
-    expect(canUpdateContact(a)).toBe(false);
+  it("TELEMARKETER can list/create, with view/update scoped by creator", () => {
+    const a = actor({ role: "TELEMARKETER", id: "tm-1" });
+    expect(canListContacts(a)).toBe(true);
+    expect(canCreateContact(a)).toBe(true);
+    expect(canViewContact(a, { createdBy: "tm-1" })).toBe(true);
+    expect(canUpdateContact(a, { createdBy: "tm-1" })).toBe(true);
+    expect(canViewContact(a, { createdBy: "other" })).toBe(false);
+    expect(canUpdateContact(a, { createdBy: "other" })).toBe(false);
+  });
+
+  it("TELEMARKETER can view/update contacts from shared advisers", () => {
+    const a = actor({ role: "TELEMARKETER", id: "tm-1" });
+    expect(canViewContact(a, { createdBy: "adv-1" }, ["adv-1"])).toBe(true);
+    expect(canUpdateContact(a, { createdBy: "adv-1" }, ["adv-1"])).toBe(true);
   });
 
   it("only MASTER can delete", () => {

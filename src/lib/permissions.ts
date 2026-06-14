@@ -75,5 +75,6 @@ export function hasLeadsAccess(user: User | null): boolean {
  */
 export function isColdCaller(user: User | null): boolean {
   if (!user) return false;
-  return isTelemarketer(user) || (isAdviser(user) && hasLeadsAccess(user));
+  // Master can do everything a TM/Adviser can, including working the cold-call pool.
+  return isMaster(user) || isTelemarketer(user) || (isAdviser(user) && hasLeadsAccess(user));
 }

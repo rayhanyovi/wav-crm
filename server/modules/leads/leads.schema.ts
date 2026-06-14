@@ -28,7 +28,7 @@ export const listQuerySchema = z.object({
     .optional()
     .transform((v) => v === true || v === "true"),
   page: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(1).max(100).default(25),
+  pageSize: z.coerce.number().int().min(1).max(500).default(25),
 });
 
 export const createLeadSchema = z.object({
@@ -84,6 +84,10 @@ export const convertLeadSchema = z.object({
   email: z.string().email().optional().or(z.literal("")).transform((v) => v || undefined),
   phone: z.string().trim().max(40).optional(),
   notes: z.string().max(5000).optional(),
+  // Optional: assign the new deal directly to this adviser and spend one of their
+  // credits (used when a delegated TM books on a specific adviser's behalf, or a
+  // MASTER books for an adviser). Omit to leave the deal unassigned (claim pool).
+  assigned_adviser_id: z.string().nullish(),
 });
 
 /** Body for POST /leads/claim-for-call — batch-claim leads into a TM session. */

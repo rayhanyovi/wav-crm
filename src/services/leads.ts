@@ -221,6 +221,9 @@ export async function convertLead(
     phone: payload.contact.phone,
     appointment_date: payload.appointment_date ?? new Date().toISOString().split("T")[0],
     appointment_time: payload.appointment_time,
+    // When set, the backend assigns the new deal to this adviser and spends one
+    // of their credits (delegated TM booking on their behalf, or a MASTER booking).
+    assigned_adviser_id: payload.deal?.assigned_to_id ?? undefined,
   });
   return { contact_id: res.data.contactId, deal_id: res.data.dealId };
 }

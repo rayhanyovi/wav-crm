@@ -1,5 +1,8 @@
-import "dotenv/config";
+import dotenv from "dotenv";
 import { z } from "zod";
+
+dotenv.config({ path: ".env.local" });
+dotenv.config();
 
 /**
  * Centralised, validated environment configuration.

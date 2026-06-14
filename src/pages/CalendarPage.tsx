@@ -49,7 +49,6 @@ import {
   ActivityResultBadge,
   ActivityTypeBadge,
 } from "@/components/common/StatusBadge";
-import { EmptyState } from "@/components/common/EmptyState";
 import { formatDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Activity, ActivityType } from "@/data/types";
@@ -418,79 +417,71 @@ export function CalendarPage() {
           ))}
         </div>
 
-        {filteredActivities.length === 0 ? (
-          <EmptyState
-            icon={CalendarDays}
-            title="No activities in view"
-            description="No appointments scheduled this month. Adjust filters or create a new appointment."
-          />
-        ) : (
-          <div className="grid grid-cols-7">
-            {monthDays.map((day) => {
-              const dayActivities = filteredActivities
-                .filter((activity) => isSameDay(getActivityDate(activity), day))
-                .sort(
-                  (a, b) =>
-                    getActivityDate(a).getTime() - getActivityDate(b).getTime(),
-                );
-              return (
-                <button
-                  key={day.toISOString()}
-                  type="button"
-                  onClick={() => setSelectedDate(day)}
-                  className={cn(
-                    "min-h-32 border-b border-r p-2 text-left align-top transition-colors hover:bg-muted/40",
-                    !isSameMonth(day, visibleMonth) &&
-                      "bg-muted/20 text-muted-foreground",
-                    isSameDay(day, new Date()) && "bg-primary/5",
-                  )}
-                >
-                  <div className="mb-2 flex items-center justify-between">
-                    <span
-                      className={cn(
-                        "text-xs font-medium",
-                        isSameDay(day, new Date()) &&
-                          "rounded-full bg-primary px-2 py-0.5 text-primary-foreground",
-                      )}
-                    >
-                      {format(day, "d")}
-                    </span>
-                    {dayActivities.length > 0 && (
-                      <Badge variant="outline" className="text-[10px]">
-                        {dayActivities.length}
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="space-y-1">
-                    {dayActivities.slice(0, 3).map((activity) => (
-                      <div
-                        key={activity.id}
-                        className="rounded border bg-background px-2 py-1 text-[11px] leading-tight shadow-sm"
-                      >
-                        <div className="flex items-center gap-1">
-                          <span className="font-medium">
-                            {format(getActivityDate(activity), "HH:mm")}
-                          </span>
-                          <span className="truncate text-muted-foreground">
-                            {activity.type.replace("_", " ")}
-                          </span>
-                        </div>
-                        <p className="truncate font-medium">
-                          {activity.subject}
-                        </p>
-                      </div>
-                    ))}
-                    {dayActivities.length > 3 && (
-                      <p className="px-1 text-[11px] text-muted-foreground">
-                        +{dayActivities.length - 3} more
-                      </p>
-                    )}
-                  </div>
-                </button>
+        <div className="grid grid-cols-7">
+          {monthDays.map((day) => {
+            const dayActivities = filteredActivities
+              .filter((activity) => isSameDay(getActivityDate(activity), day))
+              .sort(
+                (a, b) =>
+                  getActivityDate(a).getTime() - getActivityDate(b).getTime(),
               );
-            })}
-          </div>
-        )}
+            return (
+              <button
+                key={day.toISOString()}
+                type="button"
+                onClick={() => setSelectedDate(day)}
+                className={cn(
+                  "min-h-32 border-b border-r p-2 text-left align-top transition-colors hover:bg-muted/40",
+                  !isSameMonth(day, visibleMonth) &&
+                    "bg-muted/20 text-muted-foreground",
+                  isSameDay(day, new Date()) && "bg-primary/5",
+                )}
+              >
+                <div className="mb-2 flex items-center justify-between">
+                  <span
+                    className={cn(
+                      "text-xs font-medium",
+                      isSameDay(day, new Date()) &&
+                        "rounded-full bg-primary px-2 py-0.5 text-primary-foreground",
+                    )}
+                  >
+                    {format(day, "d")}
+                  </span>
+                  {dayActivities.length > 0 && (
+                    <Badge variant="outline" className="text-[10px]">
+                      {dayActivities.length}
+                    </Badge>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  {dayActivities.slice(0, 3).map((activity) => (
+                    <div
+                      key={activity.id}
+                      className="rounded border bg-background px-2 py-1 text-[11px] leading-tight shadow-sm"
+                    >
+                      <div className="flex items-center gap-1">
+                        <span className="font-medium">
+                          {format(getActivityDate(activity), "HH:mm")}
+                        </span>
+                        <span className="truncate text-muted-foreground">
+                          {activity.type.replace("_", " ")}
+                        </span>
+                      </div>
+                      <p className="truncate font-medium">
+                        {activity.subject}
+                      </p>
+                    </div>
+                  ))}
+                  {dayActivities.length > 3 && (
+                    <p className="px-1 text-[11px] text-muted-foreground">
+                      +{dayActivities.length - 3} more
+                    </p>
+                  )}
+                </div>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       <Sheet

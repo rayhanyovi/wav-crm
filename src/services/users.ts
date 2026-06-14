@@ -1,4 +1,3 @@
-import { supabase } from "@/lib/supabase";
 import { api, type Envelope, type Page } from "@/lib/api";
 import type { User } from "@/data/types";
 
@@ -103,7 +102,7 @@ export async function updateUser(id: string, payload: UpdateUserPayload): Promis
   return mapApiUser(res.data);
 }
 
-// ─── Onboarding / approval (still use Supabase RPCs — no API endpoints yet) ──
+// ─── Onboarding / approval (backend API) ─────────────────────────────────────
 
 export interface PendingUser {
   id: string;
@@ -114,42 +113,46 @@ export interface PendingUser {
   created_at: string;
 }
 
-export async function fetchPendingUsers(): Promise<PendingUser[]> {
-  const { data, error } = await supabase
-    .from("crm_users")
-    .select("id,name,email,requested_role,account_status,created_at")
-    .in("account_status", ["PENDING_APPROVAL", "PENDING_PROFILE"])
-    .order("created_at", { ascending: true });
+interface ApiPendingUser {
+  id: string;
+  name: string;
+  email: string;
+  requestedRole: string | null;
+  accountStatus: string;
+  createdAt: string;
+}
 
-  if (error) throw new Error(error.message);
-  return (data as PendingUser[]) ?? [];
+function mapPendingUser(r: ApiPendingUser): PendingUser {
+  return {
+    id: r.id,
+    name: r.name,
+    email: r.email,
+    requested_role: r.requestedRole,
+    account_status: r.accountStatus,
+    created_at: r.createdAt,
+  };
+}
+
+export async function fetchPendingUsers(): Promise<PendingUser[]> {
+  const res = await api.get<Envelope<ApiPendingUser[]>>("/api/users/pending");
+  return res.data.map(mapPendingUser);
 }
 
 export async function completeOnboarding(
   name: string,
   requestedRole: "ADVISER" | "TELEMARKETER",
 ): Promise<void> {
-  const { error } = await supabase.rpc("complete_onboarding", {
-    p_name: name,
-    p_requested_role: requestedRole,
-  });
-  if (error) throw new Error(error.message);
+  await api.post("/api/users/onboarding", { name, requested_role: requestedRole });
 }
 
 export async function activateSuperAdmin(): Promise<void> {
-  const { error } = await supabase.rpc("activate_super_admin");
-  if (error) throw new Error(error.message);
+  await api.post("/api/users/activate-super-admin");
 }
 
 export async function approveUser(id: string, role: User["role"]): Promise<void> {
-  const { error } = await supabase.rpc("approve_user", {
-    p_user_id: id,
-    p_role: role,
-  });
-  if (error) throw new Error(error.message);
+  await api.post(`/api/users/${id}/approve`, { role });
 }
 
 export async function rejectUser(id: string): Promise<void> {
-  const { error } = await supabase.rpc("reject_user", { p_user_id: id });
-  if (error) throw new Error(error.message);
+  await api.post(`/api/users/${id}/reject`);
 }
