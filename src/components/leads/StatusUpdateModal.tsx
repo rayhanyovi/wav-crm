@@ -33,6 +33,8 @@ interface StatusUpdateModalProps {
   newStatus: LeadStatus;
   open: boolean;
   onClose: () => void;
+  /** Fires after the status update + activity have been saved successfully. */
+  onUpdated?: (leadId: string, newStatus: LeadStatus) => void;
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -42,6 +44,7 @@ export function StatusUpdateModal({
   newStatus,
   open,
   onClose,
+  onUpdated,
 }: StatusUpdateModalProps) {
   const { currentUser } = useAuthStore();
   const updateLead     = useUpdateLead();
@@ -114,6 +117,7 @@ export function StatusUpdateModal({
       },
     );
 
+    onUpdated?.(lead.id, newStatus);
     onClose();
   };
 

@@ -167,9 +167,13 @@ export function LeadsPage() {
   // APPOINTMENT leads have been handed off to Deals — hide them here
   const preAppointmentLeads = scopedLeads.filter((l) => l.status !== "APPOINTMENT");
 
-  // Abandon filter — hide abandoned leads by default (Task #5)
+  // Abandon filter — hide abandoned leads by default (Task #5). AVOID is the
+  // abandon mechanism (the DB trigger sets is_abandoned), so treat an AVOID-status
+  // lead as abandoned immediately — this keeps the optimistic status flip in sync
+  // with the row's removal instead of waiting for the refetched is_abandoned flag.
+  const isAbandoned = (l: typeof leads[0]) => l.is_abandoned || l.status === "AVOID";
   const liveLeads = preAppointmentLeads.filter((l) =>
-    showAbandoned ? true : !l.is_abandoned
+    showAbandoned ? true : !isAbandoned(l)
   );
 
   const lastContactedAt = (id: string) => {
@@ -215,7 +219,7 @@ export function LeadsPage() {
       }
     });
 
-  const abandonedCount = scopedLeads.filter((l) => l.is_abandoned).length;
+  const abandonedCount = scopedLeads.filter(isAbandoned).length;
 
   // Reset to page 1 whenever any filter or sort changes
   useEffect(() => { setPage(1); }, [search, filterStatus, filterSource, showAbandoned, sort]);
@@ -229,10 +233,12 @@ export function LeadsPage() {
   const toggleSort = (key: SortKey) =>
     setSort((s) => (s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }));
 
-  // Lead → Deal conversion: fly a dot to the Deals tab and fade the row out.
-  const handleConverted = (leadId: string) => {
+  // Fade a row out (freezing the list so siblings hold their place), then fly a
+  // dot to a nav tab. Once the fade finishes we unfreeze and the row is gone —
+  // the rows below shift up to fill the gap.
+  const animateRowExit = (leadId: string, navHref: string) => {
     const el = rowRefs.current[leadId];
-    flyDotToNav(el, "/deals");
+    flyDotToNav(el, navHref);
     setExiting({ id: leadId, rows: filtered });
     const done = () => setExiting(null);
     if (el) {
@@ -247,6 +253,23 @@ export function LeadsPage() {
     } else {
       setTimeout(done, 450);
     }
+  };
+
+  // Lead → Deal conversion: fly a dot to the Deals tab and fade the row out.
+  const handleConverted = (leadId: string) => animateRowExit(leadId, "/deals");
+
+  // Will changing this lead to `newStatus` drop it out of the currently visible
+  // list? (AVOID gets abandoned & hidden; an active status filter no longer matches.)
+  const willLeaveList = (newStatus: LeadStatus) => {
+    if (newStatus === "AVOID" && !showAbandoned) return true;
+    if (filterStatus !== "ALL" && newStatus !== filterStatus) return true;
+    return false;
+  };
+
+  // After a status change from the action dropdown: only animate the fly-out when
+  // the lead actually leaves the list — otherwise it just updates its badge in place.
+  const handleStatusUpdated = (leadId: string, newStatus: LeadStatus) => {
+    if (willLeaveList(newStatus)) animateRowExit(leadId, "/deals");
   };
 
   const handleCreate = () => {
@@ -715,6 +738,7 @@ export function LeadsPage() {
           newStatus={pendingStatus.status}
           open={!!pendingStatus}
           onClose={() => setPendingStatus(null)}
+          onUpdated={handleStatusUpdated}
         />
       )}
 

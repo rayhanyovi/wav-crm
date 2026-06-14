@@ -45,6 +45,7 @@ import { StatusUpdateModal } from "@/components/leads/StatusUpdateModal";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { canEdit, canLogActivity, canManage, isAdviser } from "@/lib/permissions";
 import { buildGoogleCalendarUrl, downloadIcs } from "@/lib/calendar";
+import { toast } from "@/store/useToastStore";
 import type { LeadStatus, LeadSource, DealStage, Lead, AppointmentResult } from "@/data/types";
 
 // APPOINTMENT is excluded — once a lead reaches that status it lives in Deals
@@ -565,20 +566,34 @@ export function LeadDetailPage() {
                 {/* Claim / Return (Task #16) */}
                 {isAdviser(currentUser) && !lead.assigned_to_id && (
                   <div className="pt-1">
-                    <Button
-                      size="sm"
-                      className="w-full gap-1.5"
-                      disabled={(currentUser?.credit_balance ?? 0) < 1}
-                      onClick={() => {
-                        if (!currentUser) return;
-                        claimLeadMutation.mutate({ leadId: lead.id, userId: currentUser.id });
-                      }}
-                    >
-                      Claim Lead (1 credit)
-                    </Button>
-                    <p className="text-center text-xs text-muted-foreground mt-1">
-                      Your credits: {currentUser?.credit_balance ?? 0}
-                    </p>
+                    {(() => {
+                      const credits = currentUser?.credit_balance ?? 0;
+                      const noCredits = credits < 1;
+                      return (
+                        <>
+                          <Button
+                            size="sm"
+                            className="w-full gap-1.5"
+                            disabled={claimLeadMutation.isPending}
+                            onClick={() => {
+                              if (!currentUser) return;
+                              if (noCredits) {
+                                toast.error("You have no credits left — ask an admin to top up before claiming.");
+                                return;
+                              }
+                              claimLeadMutation.mutate({ leadId: lead.id, userId: currentUser.id });
+                            }}
+                          >
+                            {claimLeadMutation.isPending ? "Claiming…" : "Claim Lead (1 credit)"}
+                          </Button>
+                          <p className={`text-center text-xs mt-1 ${noCredits ? "text-destructive" : "text-muted-foreground"}`}>
+                            {noCredits
+                              ? "You have no credits left — ask an admin to top up."
+                              : `Your credits: ${credits}`}
+                          </p>
+                        </>
+                      );
+                    })()}
                   </div>
                 )}
                 {isAdviser(currentUser) && lead.assigned_to_id === currentUser?.id && (

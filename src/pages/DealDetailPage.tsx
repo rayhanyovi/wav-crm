@@ -362,6 +362,10 @@ export function DealDetailPage() {
     : deal.title;
 
   const canEdit = can(currentUser, "ADVISER") || currentUser?.role === "MASTER";
+  // Stage changes write to the deal — RLS only permits MASTER or the assigned
+  // owner. A released deal must be claimed before its stage can be changed.
+  const canManageStage =
+    currentUser?.role === "MASTER" || deal.assigned_to_id === currentUser?.id;
   const advisers = users.filter((u) => u.is_active && can(u, "ADVISER") && !can(u, "MASTER"));
 
   const handleMoveStage = async () => {
@@ -490,7 +494,7 @@ export function DealDetailPage() {
               Release
             </Button>
           )}
-          {canEdit && (
+          {canManageStage && (
             <Button size="sm" variant="outline" onClick={() => setStageModalOpen(true)}>
               Move Stage <ChevronRight className="h-3.5 w-3.5 ml-1" />
             </Button>

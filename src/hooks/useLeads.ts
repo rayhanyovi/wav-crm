@@ -8,6 +8,8 @@ import {
 } from "@/services/leads";
 import type { LeadFilters, CreateLeadPayload, UpdateLeadPayload, ConvertLeadPayload } from "@/services/leads";
 import type { Lead, LeadNote } from "@/data/types";
+import { useAuthStore } from "@/store/useAuthStore";
+import { toast } from "@/store/useToastStore";
 
 // ─── Query keys ──────────────────────────────────────────────────────────────
 
@@ -156,10 +158,16 @@ export function useClaimLead() {
   return useMutation({
     mutationFn: ({ leadId, userId }: { leadId: string; userId: string }) =>
       claimLead(leadId, userId),
-    onSuccess: () => {
+    onSuccess: (data) => {
+      // Keep the auth-store balance in sync so the credit count updates live
+      // (currentUser is loaded once at login and isn't part of the users query).
+      if (typeof data?.new_balance === "number")
+        useAuthStore.getState().setCreditBalance(data.new_balance);
       qc.invalidateQueries({ queryKey: ["leads"] });
       qc.invalidateQueries({ queryKey: ["users"] });
     },
+    onError: (err) =>
+      toast.error(`Couldn't claim lead: ${err instanceof Error ? err.message : "unknown error"}`),
   });
 }
 
@@ -180,10 +188,14 @@ export function useReturnLead() {
   return useMutation({
     mutationFn: ({ leadId, userId }: { leadId: string; userId: string }) =>
       returnLead(leadId, userId),
-    onSuccess: () => {
+    onSuccess: (data) => {
+      if (typeof data?.new_balance === "number")
+        useAuthStore.getState().setCreditBalance(data.new_balance);
       qc.invalidateQueries({ queryKey: ["leads"] });
       qc.invalidateQueries({ queryKey: ["users"] });
     },
+    onError: (err) =>
+      toast.error(`Couldn't return lead: ${err instanceof Error ? err.message : "unknown error"}`),
   });
 }
 

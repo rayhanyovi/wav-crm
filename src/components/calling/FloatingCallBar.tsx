@@ -1,7 +1,7 @@
 import { Phone, PhoneOff, ChevronUp } from "lucide-react";
 import { useCallSessionStore } from "@/store/useCallSessionStore";
 import { useAuthStore } from "@/store/useAuthStore";
-import { isTelemarketer } from "@/lib/permissions";
+import { isColdCaller } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { formatDuration } from "@/lib/format";
 
@@ -11,7 +11,7 @@ export function FloatingCallBar() {
     totalDurationSeconds, openPanel, stopSession,
   } = useCallSessionStore();
   const { currentUser } = useAuthStore();
-  const sessionLabel = isTelemarketer(currentUser) ? "TM Call Queue" : "Follow-up Queue";
+  const sessionLabel = isColdCaller(currentUser) ? "Call Queue" : "Follow-up Queue";
 
   return (
     <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50">

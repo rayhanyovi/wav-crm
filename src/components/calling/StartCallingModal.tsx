@@ -6,7 +6,7 @@ import { useCrmStore } from "@/store/useCrmStore";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useLeads, useClaimLeadsForCall } from "@/hooks/useLeads";
 import { useCallSessionStore } from "@/store/useCallSessionStore";
-import { isTelemarketer, isAdviser } from "@/lib/permissions";
+import { isAdviser, isColdCaller } from "@/lib/permissions";
 import { CALL_SESSION_SIZE } from "@/lib/callQueue";
 import type { Lead } from "@/data/types";
 
@@ -25,6 +25,10 @@ export function StartCallingModal({ open, onClose }: StartCallingModalProps) {
   const { startSession } = useCallSessionStore();
   const claimLeadsForCall = useClaimLeadsForCall();
 
+  // Advisers with "leads access" cold-call the shared NA pool exactly like a TM —
+  // they take on the calling job too. (Appointments are offline meetings, not calls.)
+  const usesColdPool = isColdCaller(currentUser);
+
   /**
    * TM queue: a shared pool of cold-call-ready leads — status NA, plus
    * COOLDOWN leads whose cooldown period has elapsed. Not restricted to
@@ -33,7 +37,7 @@ export function StartCallingModal({ open, onClose }: StartCallingModalProps) {
    * cooldown-expired leads float to the top.
    */
   const tmQueue = useMemo<Lead[]>(() => {
-    if (!currentUser || !isTelemarketer(currentUser)) return [];
+    if (!currentUser || !usesColdPool) return [];
     const now = Date.now();
     return leads
       .filter((l) => {
@@ -58,7 +62,7 @@ export function StartCallingModal({ open, onClose }: StartCallingModalProps) {
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       })
       .slice(0, CALL_SESSION_SIZE);
-  }, [leads, currentUser]);
+  }, [leads, currentUser, usesColdPool]);
 
   /**
    * Adviser queue: leads past the TM cold-call phase — i.e. leads that have
@@ -66,7 +70,8 @@ export function StartCallingModal({ open, onClose }: StartCallingModalProps) {
    * leads tied to deals the adviser owns that are in APPOINTMENT or later stages.
    */
   const adviserQueue = useMemo<Lead[]>(() => {
-    if (!currentUser || !isAdviser(currentUser)) return [];
+    // Advisers who cold-call (leads access on) use the shared pool instead.
+    if (!currentUser || !isAdviser(currentUser) || usesColdPool) return [];
 
     // Collect lead IDs from adviser's active deals (APPOINTMENT+)
     const dealLeadIds = new Set<string>(
@@ -98,15 +103,13 @@ export function StartCallingModal({ open, onClose }: StartCallingModalProps) {
         if (aAppt !== bAppt) return aAppt - bAppt;
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       });
-  }, [leads, deals, currentUser]);
+  }, [leads, deals, currentUser, usesColdPool]);
 
-  const isTM = isTelemarketer(currentUser);
-  const isAdv = isAdviser(currentUser);
-  const queue = isTM ? tmQueue : adviserQueue;
+  const queue = usesColdPool ? tmQueue : adviserQueue;
 
   const handleStart = () => {
     if (queue.length === 0 || !currentUser) return;
-    if (isTM) {
+    if (usesColdPool) {
       claimLeadsForCall.mutate({
         leadIds: queue.map((l) => l.id),
         userId: currentUser.id,
@@ -116,11 +119,11 @@ export function StartCallingModal({ open, onClose }: StartCallingModalProps) {
     onClose();
   };
 
-  const queueDescription = isTM
+  const queueDescription = usesColdPool
     ? `Up to ${CALL_SESSION_SIZE} leads from the shared NA pool, with bounced and cooldown-expired prospects first.`
     : "Leads past the TM cold-call phase — appointments to confirm and follow ups to close.";
 
-  const emptyMessage = isTM
+  const emptyMessage = usesColdPool
     ? "You have no workable leads in your queue right now."
     : "No leads ready for your follow-up calls yet. Leads appear here once a TM sets an appointment.";
 
@@ -141,7 +144,7 @@ export function StartCallingModal({ open, onClose }: StartCallingModalProps) {
               {/* Queue stat chips */}
               <div className="flex items-center gap-3 text-sm">
                 <span className="flex items-center gap-1.5 font-medium">
-                  {isTM ? (
+                  {usesColdPool ? (
                     <Users className="h-4 w-4 text-blue-500" />
                   ) : (
                     <Calendar className="h-4 w-4 text-green-500" />

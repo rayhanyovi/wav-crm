@@ -20,6 +20,7 @@ import {
   type UpdateDealProposalPayload,
 } from "@/services/deals";
 import type { Deal, DealProposal, StageHistoryEntry } from "@/data/types";
+import { toast } from "@/store/useToastStore";
 
 export const dealKeys = {
   all: ["deals"] as const,
@@ -130,13 +131,18 @@ export function useMoveDealStage() {
 
       return { previousDetail, previousLists };
     },
-    onError: (_error, vars, context) => {
+    onError: (error, vars, context) => {
       if (context?.previousDetail) {
         qc.setQueryData(dealKeys.detail(vars.dealId), context.previousDetail);
       }
       context?.previousLists?.forEach(([key, data]) => {
         qc.setQueryData(key, data);
       });
+      const raw = error instanceof Error ? error.message : "";
+      const friendly = /row-level security|violates row-level/i.test(raw)
+        ? "You can only change stage on deals assigned to you — claim this deal first."
+        : `Couldn't update the deal: ${raw || "unknown error"}`;
+      toast.error(friendly);
     },
     onSuccess: (deal) => {
       qc.setQueryData(dealKeys.detail(deal.id), deal);

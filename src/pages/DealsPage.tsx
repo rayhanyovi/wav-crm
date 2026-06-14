@@ -10,6 +10,7 @@ import { useCreateDeal, useDeals, useMoveDealStage, useUpdateDeal } from "@/hook
 import { useUpdateUser } from "@/hooks/useUsers";
 import { useCreateContact } from "@/hooks/useContacts";
 import { isAdviser as isAdviserRole } from "@/lib/permissions";
+import { toast } from "@/store/useToastStore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -339,6 +340,11 @@ export function DealsPage() {
                   ? `${lead.salutation ? lead.salutation + " " : ""}${lead.first_name} ${lead.last_name}`
                   : deal.title;
                 const isReleased = !deal.assigned_to_id && ADVISER_STAGES.includes(deal.stage);
+                // Stage changes / Mark as Lost write to the deal — RLS only allows
+                // that for MASTER or the assigned owner. Released deals must be
+                // claimed first, so only show the action menu when the user can write.
+                const canManageDeal =
+                  currentUser?.role === "MASTER" || deal.assigned_to_id === currentUser?.id;
 
                 return (
                   <TableRow
@@ -384,10 +390,13 @@ export function DealsPage() {
                             size="sm"
                             variant="outline"
                             className="gap-1 text-xs h-7 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400"
-                            disabled={(currentUser?.credit_balance ?? 0) < 1}
                             title="Claiming this client costs 1 credit"
                             onClick={() => {
                               if (!currentUser) return;
+                              if ((currentUser.credit_balance ?? 0) < 1) {
+                                toast.error("You have no credits left — ask an admin to top up before claiming.");
+                                return;
+                              }
                               updateDealMutation.mutate({
                                 id: deal.id,
                                 payload: { assigned_to_id: currentUser.id },
@@ -401,45 +410,47 @@ export function DealsPage() {
                             <UserPlus className="h-3 w-3" /> Claim (1 credit)
                           </Button>
                         )}
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-7 w-7">
-                              <MoreHorizontal className="h-3.5 w-3.5" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            {ALL_STAGES.filter((s) => s !== deal.stage && s !== "LOST").map((s) => (
-                              <DropdownMenuItem
-                                key={s}
-                                onClick={() => {
-                                  if (currentUser) {
-                                    moveStageMutation.mutate({
-                                      dealId: deal.id,
-                                      toStage: s,
-                                      userId: currentUser.id,
-                                    });
-                                  }
-                                }}
-                              >
-                                <DealStageBadge stage={s} />
-                              </DropdownMenuItem>
-                            ))}
-                            {deal.stage !== "LOST" && (
-                              <>
-                                <DropdownMenuSeparator />
+                        {canManageDeal && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-7 w-7">
+                                <MoreHorizontal className="h-3.5 w-3.5" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              {ALL_STAGES.filter((s) => s !== deal.stage && s !== "LOST").map((s) => (
                                 <DropdownMenuItem
-                                  className="text-destructive focus:text-destructive"
+                                  key={s}
                                   onClick={() => {
-                                    setLostReason("");
-                                    setPendingLost({ dealId: deal.id, title: deal.title });
+                                    if (currentUser) {
+                                      moveStageMutation.mutate({
+                                        dealId: deal.id,
+                                        toStage: s,
+                                        userId: currentUser.id,
+                                      });
+                                    }
                                   }}
                                 >
-                                  Mark as Lost
+                                  <DealStageBadge stage={s} />
                                 </DropdownMenuItem>
-                              </>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                              ))}
+                              {deal.stage !== "LOST" && (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    className="text-destructive focus:text-destructive"
+                                    onClick={() => {
+                                      setLostReason("");
+                                      setPendingLost({ dealId: deal.id, title: deal.title });
+                                    }}
+                                  >
+                                    Mark as Lost
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>

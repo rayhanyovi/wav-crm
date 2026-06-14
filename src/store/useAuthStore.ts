@@ -42,6 +42,8 @@ interface AuthState {
   login: (user: User) => void;
   loadSession: () => Promise<void>;
   logout: () => Promise<void>;
+  /** Update the signed-in user's credit balance in place (e.g. after claim/return). */
+  setCreditBalance: (balance: number) => void;
 }
 
 export function mapAuthProfile(profile: AuthProfileRow): User {
@@ -74,6 +76,8 @@ export const useAuthStore = create<AuthState>()(
       authReady: false,
       login: (user) =>
         set({ currentUser: user, accountStatus: "ACTIVE", authEmail: user.email, preConfiguredRole: null }),
+      setCreditBalance: (balance) =>
+        set((s) => (s.currentUser ? { currentUser: { ...s.currentUser, credit_balance: balance } } : {})),
       loadSession: async () => {
         const { data: sessionData } = await supabase.auth.getSession();
         const authUser = sessionData.session?.user;

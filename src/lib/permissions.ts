@@ -67,3 +67,13 @@ export function hasLeadsAccess(user: User | null): boolean {
   if (user.role !== "ADVISER") return true;
   return user.leads_access ?? true;
 }
+
+/**
+ * Works the shared cold-call lead pool: telemarketers, plus advisers who've been
+ * granted leads access (they take on the calling job too). Drives the calling
+ * session queue and the TM-style call-outcome flow (NA / KIV / AVOID / Appointment).
+ */
+export function isColdCaller(user: User | null): boolean {
+  if (!user) return false;
+  return isTelemarketer(user) || (isAdviser(user) && hasLeadsAccess(user));
+}

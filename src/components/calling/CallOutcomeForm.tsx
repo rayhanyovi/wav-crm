@@ -11,7 +11,7 @@ import { useCreateContact } from "@/hooks/useContacts";
 import { useCreateDeal, useDeals } from "@/hooks/useDeals";
 import { useUpdateLead } from "@/hooks/useLeads";
 import { useUpdateUser, useUsers } from "@/hooks/useUsers";
-import { isTelemarketer } from "@/lib/permissions";
+import { isColdCaller } from "@/lib/permissions";
 import {
   nextCreditBalanceAfterAppointmentClaim,
   resolveAppointmentDealAdviser,
@@ -40,7 +40,9 @@ interface CallOutcomeFormProps {
 
 export function CallOutcomeForm({ lead }: CallOutcomeFormProps) {
   const { currentUser } = useAuthStore();
-  const isTM = isTelemarketer(currentUser);
+  // Cold-callers (TMs + advisers with leads access) use the NA/KIV/AVOID/Appointment
+  // status flow; advisers without leads access get the post-handoff result picker.
+  const isTM = isColdCaller(currentUser);
 
   // Adviser-only result picker
   const [result, setResult] = useState<ActivityResult>(isTM ? "NO_ANSWER" : "COMPLETED");
