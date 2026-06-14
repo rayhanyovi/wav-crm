@@ -51,7 +51,7 @@ export function createApp(): Express {
   app.use(helmet());
   app.use(
     cors({
-      origin: env.CORS_ORIGINS,
+      origin: true,
       credentials: true,
     }),
   );
