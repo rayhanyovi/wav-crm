@@ -491,7 +491,7 @@ function CopySummaryCard({
           </p>
           {clientProfile && (
             <p>
-              Your risk profile is {clientProfile}.
+              Client risk profile is {clientProfile}.
             </p>
           )}
         </div>
@@ -788,7 +788,7 @@ export function PortfolioRiskCalculatorPage() {
                   `${i + 1}.  ${l.fund!.name}, ${l.allocation}% ${l.fund!.riskCategory}`
                 ).join('\n');
                 const profileLine = clientProfile
-                  ? `\nYour risk profile is ${clientProfile}.`
+                  ? `\nClient risk profile is ${clientProfile}.`
                   : '';
                 const text = `Funds available were shown and you have selected the following:\n${fundLines}\n\nThe overall risk classification of the funds selected by you is ${resultCategory}.${profileLine}`;
                 navigator.clipboard.writeText(text);
