@@ -13,6 +13,8 @@ export function AuthCallbackPage() {
   useEffect(() => {
     let settled = false;
 
+    const next = new URLSearchParams(window.location.search).get("next");
+
     const finish = async () => {
       if (settled) return;
       settled = true;
@@ -21,7 +23,7 @@ export function AuthCallbackPage() {
       const { currentUser, accountStatus } = useAuthStore.getState();
 
       if (currentUser) {
-        navigate("/", { replace: true });
+        navigate(next ?? "/", { replace: true });
       } else if (accountStatus === "PENDING_PROFILE") {
         navigate("/onboarding", { replace: true });
       } else if (

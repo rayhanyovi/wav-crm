@@ -21,6 +21,7 @@ interface AuthProfileRow {
   telemarketer_id: string | null;
   leads_access: boolean | null;
   created_at: string;
+  must_change_password?: boolean | null;
 }
 
 interface AuthState {
@@ -38,12 +39,15 @@ interface AuthState {
    * the role-selection step and self-activate via activate_super_admin().
    */
   preConfiguredRole: User["role"] | null;
+  /** True when user must set a new password before accessing the app. */
+  mustChangePassword: boolean;
   authReady: boolean;
   login: (user: User) => void;
   loadSession: () => Promise<void>;
   logout: () => Promise<void>;
   /** Update the signed-in user's credit balance in place (e.g. after claim/return). */
   setCreditBalance: (balance: number) => void;
+  clearMustChangePassword: () => void;
 }
 
 export function mapAuthProfile(profile: AuthProfileRow): User {
@@ -63,7 +67,7 @@ export function mapAuthProfile(profile: AuthProfileRow): User {
 }
 
 const PROFILE_COLS =
-  "id,name,email,role,avatar,is_active,credit_balance,telemarketer_access,telemarketer_id,leads_access,created_at,account_status,requested_role";
+  "id,name,email,role,avatar,is_active,credit_balance,telemarketer_access,telemarketer_id,leads_access,created_at,account_status,requested_role,must_change_password";
 
 export const useAuthStore = create<AuthState>()(
   persist(
@@ -73,9 +77,11 @@ export const useAuthStore = create<AuthState>()(
       authEmail: null,
       requestedRole: null,
       preConfiguredRole: null,
+      mustChangePassword: false,
       authReady: false,
       login: (user) =>
         set({ currentUser: user, accountStatus: "ACTIVE", authEmail: user.email, preConfiguredRole: null }),
+      clearMustChangePassword: () => set({ mustChangePassword: false }),
       setCreditBalance: (balance) =>
         set((s) => (s.currentUser ? { currentUser: { ...s.currentUser, credit_balance: balance } } : {})),
       loadSession: async () => {
@@ -124,6 +130,7 @@ export const useAuthStore = create<AuthState>()(
             authEmail: email,
             requestedRole: (profile.requested_role as string | null) ?? null,
             preConfiguredRole: null,
+            mustChangePassword: (profile.must_change_password as boolean | null) ?? false,
             authReady: true,
           });
           return;

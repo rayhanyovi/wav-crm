@@ -23,16 +23,18 @@ import { DealDetailPage } from "@/pages/DealDetailPage";
 import { ToolsPage } from "@/pages/ToolsPage";
 import { PortfolioRiskCalculatorPage } from "@/pages/PortfolioRiskCalculatorPage";
 import { NoAccessPage } from "@/pages/NoAccessPage";
+import { SetPasswordPage } from "@/pages/SetPasswordPage";
 import { canManage, roleLevel, hasLeadsAccess } from "@/lib/permissions";
 
 function ProtectedRoute({ children, minRole }: { children: React.ReactNode; minRole?: number }) {
-  const { currentUser, accountStatus } = useAuthStore();
+  const { currentUser, accountStatus, mustChangePassword } = useAuthStore();
   if (!currentUser) {
     if (accountStatus === "PENDING_PROFILE") return <Navigate to="/onboarding" replace />;
     if (accountStatus === "PENDING_APPROVAL" || accountStatus === "REJECTED")
       return <Navigate to="/pending" replace />;
     return <Navigate to="/login" replace />;
   }
+  if (mustChangePassword) return <Navigate to="/set-password" replace />;
   if (minRole !== undefined && roleLevel(currentUser.role) < minRole) return <NoAccessPage />;
   return <>{children}</>;
 }
@@ -71,6 +73,7 @@ export default function App() {
         element={currentUser ? <Navigate to="/" replace /> : <RegisterPage />}
       />
       <Route path="/auth/callback" element={<AuthCallbackPage />} />
+      <Route path="/set-password" element={<SetPasswordPage />} />
       <Route path="/onboarding" element={<OnboardingPage />} />
       <Route path="/pending" element={<PendingApprovalPage />} />
       <Route

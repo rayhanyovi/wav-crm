@@ -1,12 +1,13 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Lock, Mail, TrendingUp, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/lib/supabase";
 import { mapAuthProfile, useAuthStore } from "@/store/useAuthStore";
+import { useNavigate } from "react-router-dom";
 
 export function LoginPage() {
   const { login } = useAuthStore();
@@ -16,29 +17,26 @@ export function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Magic-link recovery mode (for users who haven't set a password yet)
-  const [linkMode, setLinkMode] = useState(false);
-  const [linkEmail, setLinkEmail] = useState("");
-  const [linkSent, setLinkSent] = useState(false);
-  const [linkError, setLinkError] = useState<string | null>(null);
-  const [linkSubmitting, setLinkSubmitting] = useState(false);
+  // "Set / reset password" mode — sends a password-reset email.
+  // Works for first-time users (no password yet) and forgot-password alike.
+  const [resetMode, setResetMode] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetSent, setResetSent] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
+  const [resetSubmitting, setResetSubmitting] = useState(false);
 
-  const sendMagicLink = async (event?: FormEvent) => {
-    event?.preventDefault();
-    setLinkSubmitting(true);
-    setLinkError(null);
-    const { error: otpError } = await supabase.auth.signInWithOtp({
-      email: linkEmail.trim().toLowerCase(),
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
-        shouldCreateUser: false, // Only allows existing accounts
-      },
-    });
-    setLinkSubmitting(false);
-    if (otpError) {
-      setLinkError(otpError.message);
+  const sendResetEmail = async () => {
+    setResetSubmitting(true);
+    setResetError(null);
+    const { error: resetErr } = await supabase.auth.resetPasswordForEmail(
+      resetEmail.trim().toLowerCase(),
+      { redirectTo: `${window.location.origin}/auth/callback?next=/set-password` },
+    );
+    setResetSubmitting(false);
+    if (resetErr) {
+      setResetError(resetErr.message);
     } else {
-      setLinkSent(true);
+      setResetSent(true);
     }
   };
 
@@ -115,7 +113,16 @@ export function LoginPage() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="password">Password</Label>
+              <button
+                type="button"
+                className="text-xs text-primary hover:underline"
+                onClick={() => { setResetEmail(email); setResetMode(true); setResetSent(false); setResetError(null); }}
+              >
+                Forgot / Set password?
+              </button>
+            </div>
             <div className="relative">
               <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -147,75 +154,65 @@ export function LoginPage() {
               Create an account
             </Link>
           </p>
-
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">or</span>
-            </div>
-          </div>
-
-          {!linkMode ? (
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full gap-2"
-              onClick={() => setLinkMode(true)}
-            >
-              <Send className="h-4 w-4" />
-              Sign in with a magic link
-            </Button>
-          ) : linkSent ? (
-            <div className="rounded-md border border-green-500/25 bg-green-500/10 px-3 py-3 text-sm text-green-700 dark:text-green-300 text-center">
-              Check your inbox — a sign-in link is on its way.
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <div className="space-y-2">
-                <Label htmlFor="link-email">Your email</Label>
-                <div className="relative">
-                  <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    id="link-email"
-                    type="email"
-                    value={linkEmail}
-                    onChange={(e) => setLinkEmail(e.target.value)}
-                    className="pl-9"
-                    autoComplete="email"
-                    placeholder="you@example.com"
-                    onKeyDown={(e) => { if (e.key === "Enter" && linkEmail.trim()) void sendMagicLink(); }}
-                  />
-                </div>
-              </div>
-              {linkError && (
-                <div className="rounded-md border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                  {linkError}
-                </div>
-              )}
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => setLinkMode(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="button"
-                  className="flex-1 gap-2"
-                  disabled={linkSubmitting || !linkEmail.trim()}
-                  onClick={() => void sendMagicLink()}
-                >
-                  <Send className="h-4 w-4" />
-                  {linkSubmitting ? "Sending…" : "Send link"}
-                </Button>
-              </div>
-            </div>
-          )}
         </form>
+
+        {/* ── Set / Reset password panel ───────────────────────────────────── */}
+        {resetMode && (
+          <div className="mt-6 rounded-xl border bg-card p-4 space-y-3">
+            <p className="text-sm font-medium">
+              {resetSent ? "Check your inbox" : "Set or reset your password"}
+            </p>
+            {resetSent ? (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  A password-setup link was sent to <strong>{resetEmail}</strong>.
+                  Click the link in the email to choose your password.
+                </p>
+                <Button variant="outline" size="sm" className="w-full" onClick={() => setResetMode(false)}>
+                  Back to sign in
+                </Button>
+              </>
+            ) : (
+              <>
+                <p className="text-xs text-muted-foreground">
+                  We'll email you a link. Click it to set (or reset) your password, then sign in normally.
+                </p>
+                <div className="space-y-2">
+                  <div className="relative">
+                    <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      type="email"
+                      value={resetEmail}
+                      onChange={(e) => setResetEmail(e.target.value)}
+                      className="pl-9"
+                      placeholder="you@example.com"
+                      onKeyDown={(e) => { if (e.key === "Enter" && resetEmail.trim()) void sendResetEmail(); }}
+                    />
+                  </div>
+                  {resetError && (
+                    <div className="rounded-md border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                      {resetError}
+                    </div>
+                  )}
+                  <div className="flex gap-2">
+                    <Button type="button" variant="outline" className="flex-1" onClick={() => setResetMode(false)}>
+                      Cancel
+                    </Button>
+                    <Button
+                      type="button"
+                      className="flex-1 gap-2"
+                      disabled={resetSubmitting || !resetEmail.trim()}
+                      onClick={() => void sendResetEmail()}
+                    >
+                      <Send className="h-4 w-4" />
+                      {resetSubmitting ? "Sending…" : "Send link"}
+                    </Button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
