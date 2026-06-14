@@ -2,6 +2,7 @@ import {
   Activity,
   CalendarDays,
   ChartPie,
+  FileText,
   Handshake,
   LayoutDashboard,
   Shield,
@@ -35,6 +36,7 @@ export const navItems: NavigationItem[] = [
     minRole: "ADVISER",
     children: [
       { href: "/tools/portfolio-risk", label: "Portfolio Risk Calculator", icon: ChartPie, minRole: "ADVISER" },
+      { href: "/tools/scripts",        label: "Script Writing",             icon: FileText, minRole: "MASTER"  },
     ],
   },
 ];

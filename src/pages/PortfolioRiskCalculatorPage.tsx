@@ -334,7 +334,7 @@ function FundBrowserModal({
         </div>
 
         {/* Table */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto">
+        <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto">
           <table className="w-full text-xs border-collapse">
             <thead className="sticky top-0 bg-muted/90 backdrop-blur-sm z-10 border-b">
               <tr>

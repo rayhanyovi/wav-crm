@@ -1,19 +1,33 @@
-import { ChartPie } from "lucide-react";
+import { ChartPie, FileText } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { useAuthStore } from "@/store/useAuthStore";
+import { canManage } from "@/lib/permissions";
 
-const tools = [
+const allTools = [
   {
     title: "Portfolio Risk Calculator",
     description: "Build a fund allocation and calculate weighted portfolio risk score against the SGA Fund Risk Matrix.",
     icon: ChartPie,
     href: "/tools/portfolio-risk",
     available: true,
+    masterOnly: false,
+  },
+  {
+    title: "Script Writing",
+    description: "Create and manage call scripts and talking points for the telemarketing team.",
+    icon: FileText,
+    href: "/tools/scripts",
+    available: true,
+    masterOnly: true,
   },
 ];
 
 export function ToolsPage() {
   const navigate = useNavigate();
+  const { currentUser } = useAuthStore();
+  const isMaster = canManage(currentUser);
+  const tools = allTools.filter((t) => !t.masterOnly || isMaster);
 
   return (
     <div className="p-6 space-y-6">

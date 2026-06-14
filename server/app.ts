@@ -17,6 +17,7 @@ import { callSessionsRouter } from "./modules/call-sessions/callSessions.routes.
 import { fundsRouter, productsRouter, bundlesRouter } from "./modules/catalog/catalog.routes.js";
 import { usersRouter } from "./modules/users/users.routes.js";
 import { auditLogsRouter } from "./modules/audit-logs/auditLogs.routes.js";
+import { scriptsRouter } from "./modules/scripts/scripts.routes.js";
 
 // Global rate limiter: 200 req / 15 min per IP
 const globalLimiter = rateLimit({
@@ -83,6 +84,7 @@ export function createApp(): Express {
   app.use("/api/bundles", bundlesRouter);
   app.use("/api/users", usersRouter);
   app.use("/api/audit-logs", auditLogsRouter);
+  app.use("/api/scripts", scriptsRouter);
 
   // 404 for unmatched routes, then the central error handler (must be last).
   app.use(notFoundHandler);

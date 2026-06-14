@@ -581,3 +581,17 @@ model SgaFundPlatformAvailability {
   @@unique([fundId, platformName, sourceSheet, sourceRowNumber])
   @@map("sga_fund_platform_availability")
 }
+
+// ─── Scripts ─────────────────────────────────────────────────────────────────
+
+model Script {
+  id        String    @id @default(uuid()) @db.Uuid
+  title     String
+  content   String    @default("")
+  createdBy String    @map("created_by")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz
+
+  @@map("scripts")
+}

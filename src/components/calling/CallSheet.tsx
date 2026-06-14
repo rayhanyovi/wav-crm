@@ -23,6 +23,7 @@ import { formatCurrency, formatDate } from "@/lib/format";
 import type { Lead, FinancialGoal, RiskTolerance, InvestmentHorizon } from "@/data/types";
 import { Link } from "react-router-dom";
 import { useAuthStore } from "@/store/useAuthStore";
+import { useScripts } from "@/hooks/useScripts";
 
 const GOAL_LABELS: Record<FinancialGoal, string> = {
   RETIREMENT: "Retirement", EDUCATION: "Education Fund", WEALTH_GROWTH: "Wealth Growth",
@@ -48,6 +49,8 @@ export function CallSheet({ lead }: CallSheetProps) {
   const { data: convertedContact } = useContact(lead?.converted_contact_id);
   const updateLeadMutation = useUpdateLead();
   const { currentUser } = useAuthStore();
+  const { data: scripts = [] } = useScripts();
+  const [selectedScriptId, setSelectedScriptId] = useState<string | null>(null);
   const [editingFF, setEditingFF] = useState(false);
   const [ffForm, setFfForm] = useState({
     financial_goal: "" as FinancialGoal | "",
@@ -187,6 +190,36 @@ export function CallSheet({ lead }: CallSheetProps) {
                 </p>
               </div>
             </div>
+          </div>
+
+          {/* Scripts */}
+          <div className="rounded-lg border p-3 text-sm space-y-2">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              Scripts
+            </p>
+            {scripts.length === 0 ? (
+              <p className="text-xs text-muted-foreground">No scripts available.</p>
+            ) : (
+              <div className="space-y-1.5">
+                {scripts.map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => setSelectedScriptId(selectedScriptId === s.id ? null : s.id)}
+                    className="w-full text-left rounded-md border px-2.5 py-1.5 text-xs hover:bg-muted transition-colors"
+                  >
+                    <span className="font-medium">{s.title}</span>
+                    <span className="ml-1.5 text-muted-foreground">
+                      {selectedScriptId === s.id ? "▲" : "▼"}
+                    </span>
+                    {selectedScriptId === s.id && s.content && (
+                      <p className="mt-1.5 text-foreground whitespace-pre-wrap leading-relaxed">
+                        {s.content}
+                      </p>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </TabsContent>
 

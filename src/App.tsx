@@ -22,6 +22,7 @@ import { DealsPage } from "@/pages/DealsPage";
 import { DealDetailPage } from "@/pages/DealDetailPage";
 import { ToolsPage } from "@/pages/ToolsPage";
 import { PortfolioRiskCalculatorPage } from "@/pages/PortfolioRiskCalculatorPage";
+import { ScriptWritingPage } from "@/pages/ScriptWritingPage";
 import { NoAccessPage } from "@/pages/NoAccessPage";
 import { SetPasswordPage } from "@/pages/SetPasswordPage";
 import { canManage, roleLevel, hasLeadsAccess } from "@/lib/permissions";
@@ -96,6 +97,7 @@ export default function App() {
         <Route path="deals/:id" element={<DealDetailPage />} />
         <Route path="tools" element={<ToolsPage />} />
         <Route path="tools/portfolio-risk" element={<PortfolioRiskCalculatorPage />} />
+        <Route path="tools/scripts" element={<ProtectedRoute minRole={2}><ScriptWritingPage /></ProtectedRoute>} />
         <Route path="team" element={<ProtectedRoute minRole={2}><TeamPage /></ProtectedRoute>} />
         <Route path="team/:id" element={<TeamProfileRoute />} />
         <Route path="audit-logs" element={<ProtectedRoute minRole={2}><AuditLogsPage /></ProtectedRoute>} />
