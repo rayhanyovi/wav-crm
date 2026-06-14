@@ -18,16 +18,32 @@ function actor(overrides: Partial<Actor> = {}): Actor {
 }
 
 describe("leads.authz", () => {
-  describe("canListLeads / canUpdateLead (pool access)", () => {
+  describe("canListLeads / canUpdateLead (row access)", () => {
     it("allows MASTER and TELEMARKETER", () => {
       expect(canListLeads(actor({ role: "MASTER" }))).toBe(true);
       expect(canListLeads(actor({ role: "TELEMARKETER" }))).toBe(true);
-      expect(canUpdateLead(actor({ role: "MASTER" }))).toBe(true);
+      expect(canUpdateLead(actor({ role: "MASTER" }), {
+        assignedToId: null,
+        telemarketerOwnerId: null,
+        adviserOwnerId: null,
+      })).toBe(true);
     });
 
-    it("allows ADVISER only with telemarketer access (mirrors RLS)", () => {
-      expect(canListLeads(actor({ role: "ADVISER", telemarketerAccess: true }))).toBe(true);
-      expect(canListLeads(actor({ role: "ADVISER", telemarketerAccess: false }))).toBe(false);
+    it("allows ADVISER to list, with rows filtered in service", () => {
+      expect(canListLeads(actor({ role: "ADVISER", telemarketerAccess: false }))).toBe(true);
+    });
+
+    it("allows TELEMARKETER to update only their own row", () => {
+      expect(canUpdateLead(actor({ role: "TELEMARKETER", id: "tm" }), {
+        assignedToId: "tm",
+        telemarketerOwnerId: "tm",
+        adviserOwnerId: null,
+      })).toBe(true);
+      expect(canUpdateLead(actor({ role: "TELEMARKETER", id: "tm" }), {
+        assignedToId: null,
+        telemarketerOwnerId: null,
+        adviserOwnerId: null,
+      })).toBe(false);
     });
   });
 

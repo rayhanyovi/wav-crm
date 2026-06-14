@@ -30,3 +30,5 @@ dist-ssr
 
 # Prisma generated client (regenerated via prisma generate / postinstall)
 prisma/generated/
+
+.vercel

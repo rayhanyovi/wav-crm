@@ -16,7 +16,11 @@ const EnvSchema = z.object({
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
   DIRECT_URL: z.string().optional(),
 
-  // Phase 1 auth: verify Supabase access tokens (HS256) locally.
+  // Supabase auth. Legacy projects use HS256 with SUPABASE_JWT_SECRET; newer
+  // projects can issue ES256 access tokens via JWKS.
+  SUPABASE_URL: z.string().url().optional(),
+  VITE_SUPABASE_URL: z.string().url().optional(),
+  SUPABASE_JWKS_URL: z.string().url().optional(),
   SUPABASE_JWT_SECRET: z.string().min(1, "SUPABASE_JWT_SECRET is required"),
   SUPABASE_JWT_AUD: z.string().default("authenticated"),
 });

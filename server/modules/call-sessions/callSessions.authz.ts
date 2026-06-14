@@ -4,3 +4,7 @@ import type { Actor } from "../../middleware/context.js";
 export function canCreateCallSession(actor: Actor): boolean {
   return actor.role === "MASTER" || actor.role === "TELEMARKETER" || actor.role === "ADVISER";
 }
+
+export function canListCallSessions(actor: Actor): boolean {
+  return actor.role === "MASTER" || actor.role === "TELEMARKETER" || actor.role === "ADVISER";
+}

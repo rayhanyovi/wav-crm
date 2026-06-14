@@ -62,10 +62,18 @@ describe("listLeads", () => {
     expect(db.lead.findMany.mock.calls[0]![0]).toMatchObject({ skip: 10, take: 10 });
   });
 
-  it("forbids an adviser without telemarketer access", async () => {
-    await expect(
-      listLeads(actor({ role: "ADVISER", telemarketerAccess: false }), { page: 1, pageSize: 25 } as never),
-    ).rejects.toMatchObject({ code: "FORBIDDEN", status: 403 });
+  it("filters adviser leads to assigned/adviser-owned rows", async () => {
+    db.lead.findMany.mockResolvedValue([{ id: "l1" }]);
+    db.lead.count.mockResolvedValue(1);
+
+    await listLeads(actor({ role: "ADVISER", id: "adv-1", telemarketerAccess: false }), {
+      page: 1,
+      pageSize: 25,
+    } as never);
+
+    expect(db.lead.findMany.mock.calls[0]![0].where).toMatchObject({
+      OR: [{ assignedToId: "adv-1" }, { adviserOwnerId: "adv-1" }],
+    });
   });
 });
 
@@ -78,7 +86,7 @@ describe("getLead", () => {
 
 describe("updateLead side-effects", () => {
   it("sets abandonment + records status history + audits on NA→AVOID", async () => {
-    const prev = { id: "l1", status: "NA", firstName: "A", lastName: "B", assignedToId: null, telemarketerOwnerId: null, bounceCount: 0 };
+    const prev = { id: "l1", status: "NA", firstName: "A", lastName: "B", assignedToId: "u1", telemarketerOwnerId: "u1", adviserOwnerId: null, bounceCount: 0 };
     db.lead.findFirst.mockResolvedValue(prev);
     db.lead.update.mockResolvedValue({ ...prev, status: "AVOID", isAbandoned: true });
 
@@ -96,7 +104,7 @@ describe("updateLead side-effects", () => {
   });
 
   it("does not write status history when status is unchanged", async () => {
-    const prev = { id: "l1", status: "NA", firstName: "A", lastName: "B", assignedToId: null, telemarketerOwnerId: null, bounceCount: 0 };
+    const prev = { id: "l1", status: "NA", firstName: "A", lastName: "B", assignedToId: "u1", telemarketerOwnerId: "u1", adviserOwnerId: null, bounceCount: 0 };
     db.lead.findFirst.mockResolvedValue(prev);
     db.lead.update.mockResolvedValue({ ...prev, notes: "hi" });
 

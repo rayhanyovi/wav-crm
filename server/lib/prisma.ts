@@ -16,6 +16,35 @@ import { isProd } from "../config/env.js";
  */
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
+function ensureSupabasePoolerUrlIsPrismaSafe(): void {
+  const raw = process.env.DATABASE_URL;
+  if (!raw) return;
+
+  try {
+    const url = new URL(raw);
+    const isSupabaseTransactionPooler =
+      url.hostname.endsWith(".pooler.supabase.com") && url.port === "6543";
+
+    if (!isSupabaseTransactionPooler) return;
+
+    let changed = false;
+    if (!url.searchParams.has("pgbouncer")) {
+      url.searchParams.set("pgbouncer", "true");
+      changed = true;
+    }
+    if (!url.searchParams.has("connection_limit")) {
+      url.searchParams.set("connection_limit", "1");
+      changed = true;
+    }
+
+    if (changed) process.env.DATABASE_URL = url.toString();
+  } catch {
+    // env.ts already validates that DATABASE_URL is present. Leave unusual DSNs as-is.
+  }
+}
+
+ensureSupabasePoolerUrlIsPrismaSafe();
+
 export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({

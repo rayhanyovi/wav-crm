@@ -71,14 +71,28 @@ export async function listLeads(actor: Actor, query: ListQuery): Promise<Paginat
   if (!query.includeAbandoned) where.isAbandoned = false;
   if (query.status) where.status = query.status;
   if (query.source) where.source = query.source;
-  if (query.search) {
-    where.OR = [
-      { firstName: { contains: query.search, mode: "insensitive" } },
-      { lastName: { contains: query.search, mode: "insensitive" } },
-      { email: { contains: query.search, mode: "insensitive" } },
-      { phone: { contains: query.search } },
-    ];
-  }
+
+  const scopeFilter: Prisma.LeadWhereInput | null =
+    actor.role === "MASTER"
+      ? null
+      : actor.role === "TELEMARKETER"
+        ? { OR: [{ telemarketerOwnerId: actor.id }, { telemarketerOwnerId: null }] }
+        : { OR: [{ assignedToId: actor.id }, { adviserOwnerId: actor.id }] };
+
+  const searchFilter: Prisma.LeadWhereInput | null = query.search
+    ? {
+        OR: [
+          { firstName: { contains: query.search, mode: "insensitive" } },
+          { lastName: { contains: query.search, mode: "insensitive" } },
+          { email: { contains: query.search, mode: "insensitive" } },
+          { phone: { contains: query.search } },
+        ],
+      }
+    : null;
+
+  if (scopeFilter && searchFilter) where.AND = [scopeFilter, searchFilter];
+  else if (scopeFilter) Object.assign(where, scopeFilter);
+  else if (searchFilter) Object.assign(where, searchFilter);
 
   const [data, total] = await Promise.all([
     prisma.lead.findMany({
@@ -94,9 +108,9 @@ export async function listLeads(actor: Actor, query: ListQuery): Promise<Paginat
 }
 
 export async function getLead(actor: Actor, id: string): Promise<Lead> {
-  if (!canViewLead(actor)) throw new ForbiddenError("Not allowed to view leads");
   const lead = await prisma.lead.findFirst({ where: { id, deletedAt: null } });
   if (!lead) throw new NotFoundError("Lead not found");
+  if (!canViewLead(actor, lead)) throw new ForbiddenError("Not allowed to view leads");
   return lead;
 }
 
@@ -138,11 +152,10 @@ export async function createLead(actor: Actor, input: CreateLeadInput): Promise<
 }
 
 export async function updateLead(actor: Actor, id: string, input: UpdateLeadInput): Promise<Lead> {
-  if (!canUpdateLead(actor)) throw new ForbiddenError("Not allowed to update leads");
-
   return prisma.$transaction(async (tx) => {
     const prev = await tx.lead.findFirst({ where: { id, deletedAt: null } });
     if (!prev) throw new NotFoundError("Lead not found");
+    if (!canUpdateLead(actor, prev)) throw new ForbiddenError("Not allowed to update leads");
 
     const data = toPrismaUpdate(input);
     const nextStatus = (input.status ?? prev.status) as Lead["status"];
@@ -181,6 +194,29 @@ export async function softDeleteLead(actor: Actor, id: string): Promise<void> {
  * Idempotent if actor already owns it; 409 if no credits or already claimed.
  */
 export async function claimLead(actor: Actor, id: string): Promise<Lead> {
+  if (actor.role === "TELEMARKETER") {
+    return prisma.$transaction(async (tx) => {
+      const lead = await tx.lead.findFirst({ where: { id, deletedAt: null } });
+      if (!lead) throw new NotFoundError("Lead not found");
+      if (lead.status !== "NA" && lead.status !== "COOLDOWN") {
+        throw new ConflictError("Only calling-pool leads can be claimed by telemarketers");
+      }
+      if (lead.telemarketerOwnerId && lead.telemarketerOwnerId !== actor.id) {
+        throw new ConflictError("Lead is already claimed by another telemarketer");
+      }
+      if (lead.telemarketerOwnerId === actor.id) return lead;
+
+      const next = await tx.lead.update({
+        where: { id },
+        data: { telemarketerOwnerId: actor.id, assignedToId: actor.id },
+      });
+
+      await emitLeadNotifications(tx, lead, next);
+      await writeAuditLog(tx, { userId: actor.id, action: "UPDATE", entityId: id, old: lead, next });
+      return next;
+    });
+  }
+
   if (!canClaimAppointmentLead(actor)) throw new ForbiddenError("Only advisers can claim leads");
 
   return prisma.$transaction(async (tx) => {
@@ -228,6 +264,27 @@ export async function claimLead(actor: Actor, id: string): Promise<Lead> {
  * ADVISER (or MASTER) returns a claimed APPOINTMENT lead — refunds 1 credit.
  */
 export async function returnLead(actor: Actor, id: string): Promise<Lead> {
+  if (actor.role === "TELEMARKETER") {
+    return prisma.$transaction(async (tx) => {
+      const lead = await tx.lead.findFirst({ where: { id, deletedAt: null } });
+      if (!lead) throw new NotFoundError("Lead not found");
+      if (lead.telemarketerOwnerId !== actor.id) {
+        throw new ForbiddenError("You don't own this lead");
+      }
+      if (lead.adviserOwnerId) {
+        throw new ConflictError("Lead is already owned by an adviser");
+      }
+
+      const next = await tx.lead.update({
+        where: { id },
+        data: { telemarketerOwnerId: null, assignedToId: null },
+      });
+
+      await writeAuditLog(tx, { userId: actor.id, action: "UPDATE", entityId: id, old: lead, next });
+      return next;
+    });
+  }
+
   if (!canClaimAppointmentLead(actor)) throw new ForbiddenError("Only advisers can return leads");
 
   return prisma.$transaction(async (tx) => {
@@ -395,9 +452,9 @@ export async function claimForCall(
 // ─── Lead notes ─────────────────────────────────────────────────────────────
 
 export async function getLeadNotes(actor: Actor, leadId: string): Promise<LeadNote[]> {
-  if (!canViewLead(actor)) throw new ForbiddenError("Not allowed to view leads");
   const lead = await prisma.lead.findFirst({ where: { id: leadId, deletedAt: null } });
   if (!lead) throw new NotFoundError("Lead not found");
+  if (!canViewLead(actor, lead)) throw new ForbiddenError("Not allowed to view leads");
   return prisma.leadNote.findMany({ where: { leadId }, orderBy: { createdAt: "desc" } });
 }
 
@@ -406,9 +463,9 @@ export async function addLeadNote(
   leadId: string,
   input: AddNoteInput,
 ): Promise<LeadNote> {
-  if (!canViewLead(actor)) throw new ForbiddenError("Not allowed to add notes to leads");
   const lead = await prisma.lead.findFirst({ where: { id: leadId, deletedAt: null } });
   if (!lead) throw new NotFoundError("Lead not found");
+  if (!canViewLead(actor, lead)) throw new ForbiddenError("Not allowed to add notes to leads");
   return prisma.leadNote.create({
     data: { leadId, content: input.content, createdBy: actor.id },
   });
@@ -420,9 +477,9 @@ export async function getLeadStatusHistory(
   actor: Actor,
   leadId: string,
 ): Promise<LeadStatusHistory[]> {
-  if (!canViewLead(actor)) throw new ForbiddenError("Not allowed to view leads");
   const lead = await prisma.lead.findFirst({ where: { id: leadId, deletedAt: null } });
   if (!lead) throw new NotFoundError("Lead not found");
+  if (!canViewLead(actor, lead)) throw new ForbiddenError("Not allowed to view leads");
   return prisma.leadStatusHistory.findMany({
     where: { leadId },
     orderBy: { changedAt: "desc" },

@@ -1,5 +1,6 @@
 import type { RequestHandler } from "express";
 import jwt from "jsonwebtoken";
+import { createPublicKey, type JsonWebKey, type KeyObject } from "node:crypto";
 import { env } from "../config/env.js";
 import { prisma } from "../lib/prisma.js";
 import { ForbiddenError, UnauthenticatedError } from "../lib/errors.js";
@@ -8,21 +9,87 @@ import type { Actor, CrmRole } from "./context.js";
 const VALID_ROLES: ReadonlySet<string> = new Set(["MASTER", "ADVISER", "TELEMARKETER"]);
 
 /**
- * Pluggable token verification. Phase 1 verifies the Supabase HS256 access
- * token locally. To move off Supabase later, swap this implementation (e.g. a
- * self-issued JWT verifier) without touching the rest of the codebase.
+ * Pluggable token verification. Supports Supabase's legacy HS256 project secret
+ * tokens and newer asymmetric ES256 access tokens exposed through JWKS.
  */
 export interface TokenVerifier {
   /** Returns the auth user id (`sub`) or throws UnauthenticatedError. */
-  verify(token: string): { authUserId: string; email?: string };
+  verify(token: string): Promise<{ authUserId: string; email?: string }>;
+}
+
+interface Jwk {
+  kid?: string;
+  alg?: string;
+  kty: string;
+  use?: string;
+  key_ops?: string[];
+  crv?: string;
+  x?: string;
+  y?: string;
+  n?: string;
+  e?: string;
+}
+
+let jwksCache: { expiresAt: number; keys: Jwk[] } | null = null;
+
+function getJwksUrl(): string | null {
+  if (env.SUPABASE_JWKS_URL) return env.SUPABASE_JWKS_URL;
+  const supabaseUrl = env.SUPABASE_URL ?? env.VITE_SUPABASE_URL;
+  if (!supabaseUrl) return null;
+  return `${supabaseUrl.replace(/\/$/, "")}/auth/v1/.well-known/jwks.json`;
+}
+
+async function fetchJwks(): Promise<Jwk[]> {
+  const now = Date.now();
+  if (jwksCache && jwksCache.expiresAt > now) return jwksCache.keys;
+
+  const url = getJwksUrl();
+  if (!url) throw new UnauthenticatedError("Supabase JWKS URL is not configured");
+
+  const res = await fetch(url, { headers: { Accept: "application/json" } });
+  if (!res.ok) throw new UnauthenticatedError("Unable to load Supabase signing keys");
+
+  const body = (await res.json()) as { keys?: Jwk[] };
+  const keys = Array.isArray(body.keys) ? body.keys : [];
+  jwksCache = { keys, expiresAt: now + 10 * 60 * 1000 };
+  return keys;
+}
+
+async function publicKeyForToken(token: string): Promise<KeyObject> {
+  const decoded = jwt.decode(token, { complete: true });
+  if (!decoded || typeof decoded === "string") {
+    throw new UnauthenticatedError("Malformed access token");
+  }
+
+  const { alg, kid } = decoded.header;
+  const keys = await fetchJwks();
+  const jwk = keys.find((key) => (!kid || key.kid === kid) && (!alg || !key.alg || key.alg === alg));
+  if (!jwk) throw new UnauthenticatedError("Unknown access token signing key");
+
+  return createPublicKey({ key: jwk as JsonWebKey, format: "jwk" });
 }
 
 export const supabaseJwtVerifier: TokenVerifier = {
-  verify(token) {
+  async verify(token) {
     try {
-      const payload = jwt.verify(token, env.SUPABASE_JWT_SECRET, {
+      const decoded = jwt.decode(token, { complete: true });
+      if (!decoded || typeof decoded === "string") {
+        throw new UnauthenticatedError("Malformed access token");
+      }
+
+      const alg = decoded.header.alg;
+      const key =
+        alg === "HS256"
+          ? env.SUPABASE_JWT_SECRET
+          : alg === "ES256"
+            ? await publicKeyForToken(token)
+            : null;
+
+      if (!key) throw new UnauthenticatedError("Unsupported access token algorithm");
+
+      const payload = jwt.verify(token, key, {
         audience: env.SUPABASE_JWT_AUD,
-        algorithms: ["HS256"],
+        algorithms: alg === "HS256" ? ["HS256"] : ["ES256"],
       });
       if (typeof payload === "string" || !payload.sub) {
         throw new UnauthenticatedError("Malformed access token");
@@ -52,7 +119,7 @@ export function requireAuth(verifier: TokenVerifier = supabaseJwtVerifier): Requ
       const token = bearerToken(req.headers.authorization);
       if (!token) throw new UnauthenticatedError("Missing bearer token");
 
-      const { authUserId } = verifier.verify(token);
+      const { authUserId } = await verifier.verify(token);
 
       const user = await prisma.crmUser.findFirst({ where: { authUserId } });
       if (!user) throw new UnauthenticatedError("No CRM profile for this account");

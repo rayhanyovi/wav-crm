@@ -2,8 +2,35 @@ import type { CallSession } from "../../../prisma/generated/client/index.js";
 import { prisma } from "../../lib/prisma.js";
 import { ConflictError, ForbiddenError } from "../../lib/errors.js";
 import type { Actor } from "../../middleware/context.js";
-import { canCreateCallSession } from "./callSessions.authz.js";
-import type { CreateCallSessionInput } from "./callSessions.schema.js";
+import { canCreateCallSession, canListCallSessions } from "./callSessions.authz.js";
+import type { CreateCallSessionInput, ListQuery } from "./callSessions.schema.js";
+
+export interface Paginated<T> {
+  data: T[];
+  page: number;
+  pageSize: number;
+  total: number;
+}
+
+export async function listCallSessions(
+  actor: Actor,
+  query: ListQuery,
+): Promise<Paginated<CallSession>> {
+  if (!canListCallSessions(actor)) throw new ForbiddenError("Not allowed to view call sessions");
+
+  const where = actor.role === "MASTER" ? {} : { userId: actor.id };
+  const [data, total] = await Promise.all([
+    prisma.callSession.findMany({
+      where,
+      orderBy: { startedAt: "desc" },
+      skip: (query.page - 1) * query.pageSize,
+      take: query.pageSize,
+    }),
+    prisma.callSession.count({ where }),
+  ]);
+
+  return { data, total, page: query.page, pageSize: query.pageSize };
+}
 
 export async function saveCallSession(
   actor: Actor,

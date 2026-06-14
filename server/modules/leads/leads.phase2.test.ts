@@ -141,8 +141,27 @@ describe("claimLead", () => {
     expect(db.creditTransaction.create).not.toHaveBeenCalled();
   });
 
-  it("forbids a TELEMARKETER from claiming", async () => {
-    await expect(claimLead(tmActor(), "lead-1")).rejects.toMatchObject({ code: "FORBIDDEN" });
+  it("lets a TELEMARKETER claim an unclaimed calling-pool lead", async () => {
+    const lead = appointmentLead({ status: "NA" });
+    const claimedLead = { ...lead, telemarketerOwnerId: "u1", assignedToId: "u1" };
+    db.lead.findFirst.mockResolvedValue(lead);
+    db.lead.update.mockResolvedValue(claimedLead);
+
+    const result = await claimLead(tmActor(), "lead-1");
+
+    expect(result.telemarketerOwnerId).toBe("u1");
+    expect(db.lead.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { telemarketerOwnerId: "u1", assignedToId: "u1" },
+      }),
+    );
+    expect(db.creditTransaction.create).not.toHaveBeenCalled();
+  });
+
+  it("returns 409 when a TELEMARKETER claims a non-pool lead", async () => {
+    db.lead.findFirst.mockResolvedValue(appointmentLead());
+
+    await expect(claimLead(tmActor(), "lead-1")).rejects.toMatchObject({ code: "CONFLICT" });
   });
 
   it("returns 409 when lead is not at APPOINTMENT status", async () => {

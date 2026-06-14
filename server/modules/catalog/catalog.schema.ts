@@ -10,7 +10,7 @@ export const productsQuerySchema = z.object({
   active_only: z
     .union([z.boolean(), z.enum(["true", "false"])])
     .optional()
-    .transform((v) => v === true || v === "true"),
+    .transform((v) => v === undefined || v === true || v === "true"),
 });
 
 export type FundsQuery = z.infer<typeof fundsQuerySchema>;
