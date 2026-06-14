@@ -172,7 +172,7 @@ export function LoginPage() {
               Check your inbox — a sign-in link is on its way.
             </div>
           ) : (
-            <form onSubmit={sendMagicLink} className="space-y-3">
+            <div className="space-y-3">
               <div className="space-y-2">
                 <Label htmlFor="link-email">Your email</Label>
                 <div className="relative">
@@ -185,7 +185,7 @@ export function LoginPage() {
                     className="pl-9"
                     autoComplete="email"
                     placeholder="you@example.com"
-                    required
+                    onKeyDown={(e) => { if (e.key === "Enter" && linkEmail.trim()) void sendMagicLink(); }}
                   />
                 </div>
               </div>
@@ -203,12 +203,17 @@ export function LoginPage() {
                 >
                   Cancel
                 </Button>
-                <Button type="submit" className="flex-1 gap-2" disabled={linkSubmitting}>
+                <Button
+                  type="button"
+                  className="flex-1 gap-2"
+                  disabled={linkSubmitting || !linkEmail.trim()}
+                  onClick={() => void sendMagicLink()}
+                >
                   <Send className="h-4 w-4" />
                   {linkSubmitting ? "Sending…" : "Send link"}
                 </Button>
               </div>
-            </form>
+            </div>
           )}
         </form>
       </div>
