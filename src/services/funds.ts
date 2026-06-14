@@ -113,7 +113,10 @@ function readStoredCache(): SgaFundsCache | null {
     const raw = window.localStorage.getItem(FUND_CACHE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<SgaFundsCache>;
-    if (!parsed.version || !Array.isArray(parsed.funds)) return null;
+    if (!parsed.version || !Array.isArray(parsed.funds) || parsed.funds.length === 0) {
+      window.localStorage.removeItem(FUND_CACHE_KEY);
+      return null;
+    }
     memoryCache = {
       version: parsed.version,
       cachedAt: typeof parsed.cachedAt === "number" ? parsed.cachedAt : 0,
@@ -206,20 +209,30 @@ async function fetchAllSgaFundsFromApi(): Promise<SgaFund[]> {
   return funds;
 }
 
+function fallbackVersion(funds: SgaFund[]) {
+  const fingerprint = `${funds.length}:${funds[0]?.id ?? "empty"}:${funds.at(-1)?.id ?? "empty"}`;
+  return `fallback:${fingerprint}`;
+}
+
 export async function fetchSgaFundsCatalog(): Promise<SgaFund[]> {
   const cached = readStoredCache();
 
+  let meta: FundsMeta | null = null;
   try {
-    const meta = await fetchSgaFundsMeta();
-    if (cached?.version === meta.version) return cached.funds;
-
-    const funds = await fetchAllSgaFundsFromApi();
-    writeStoredCache({ version: meta.version, cachedAt: Date.now(), funds });
-    return funds;
-  } catch (error) {
+    meta = await fetchSgaFundsMeta();
+  } catch {
     if (cached) return cached.funds;
-    throw error;
   }
+
+  if (meta && cached?.version === meta.version) return cached.funds;
+
+  const funds = await fetchAllSgaFundsFromApi();
+  writeStoredCache({
+    version: meta?.version ?? fallbackVersion(funds),
+    cachedAt: Date.now(),
+    funds,
+  });
+  return funds;
 }
 
 export async function fetchSgaFunds(options: FetchSgaFundsOptions = {}): Promise<SgaFund[]> {

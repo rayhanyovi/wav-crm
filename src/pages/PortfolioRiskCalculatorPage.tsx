@@ -169,6 +169,7 @@ function FundBrowserModal({
   funds,
   loading,
   refreshing,
+  error,
   open,
   onClose,
   addedKeys,
@@ -177,6 +178,7 @@ function FundBrowserModal({
   funds: SgaFund[];
   loading: boolean;
   refreshing: boolean;
+  error?: Error | null;
   open: boolean;
   onClose: () => void;
   addedKeys: Set<string>;
@@ -352,6 +354,13 @@ function FundBrowserModal({
                     Loading funds…
                   </td>
                 </tr>
+              ) : error ? (
+                <tr>
+                  <td colSpan={6} className="text-center py-16 text-muted-foreground">
+                    <AlertCircle className="h-4 w-4 mx-auto mb-2 text-destructive" />
+                    Unable to load funds. Please refresh and try again.
+                  </td>
+                </tr>
               ) : filteredFunds.length === 0 ? (
                 <tr><td colSpan={6} className="text-center py-16 text-muted-foreground">No funds match your filters</td></tr>
               ) : visibleFunds.map((f) => {
@@ -519,7 +528,7 @@ const EMPTY_LINE = (): PortfolioLine => ({ id: makeId(), fund: null, allocation:
 
 export function PortfolioRiskCalculatorPage() {
   const navigate = useNavigate();
-  const { data: funds = [], isLoading: fundsLoading, isFetching: fundsFetching } = useSgaFunds();
+  const { data: funds = [], isLoading: fundsLoading, isFetching: fundsFetching, error: fundsError } = useSgaFunds();
   const [lines, setLines] = useState<PortfolioLine[]>([EMPTY_LINE(), EMPTY_LINE()]);
   const [showMatrix, setShowMatrix] = useState(false);
   const [showBrowser, setShowBrowser] = useState(false);
@@ -842,6 +851,7 @@ export function PortfolioRiskCalculatorPage() {
         funds={funds}
         loading={fundsLoading && funds.length === 0}
         refreshing={fundsFetching && funds.length > 0}
+        error={fundsError}
         open={showBrowser}
         onClose={() => setShowBrowser(false)}
         addedKeys={addedKeys}
