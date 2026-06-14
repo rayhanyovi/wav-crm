@@ -2,6 +2,9 @@ import { z } from "zod";
 
 export const fundsQuerySchema = z.object({
   search: z.string().trim().min(1).max(120).optional(),
+  sourceSheet: z.string().trim().min(1).max(80).optional(),
+  insurer: z.string().trim().min(1).max(80).optional(),
+  platform: z.string().trim().min(1).max(80).optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(500).default(25),
 });

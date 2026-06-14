@@ -9,6 +9,7 @@ export interface SgaFund {
   id?: string;
   sourceSheet?: string;
   sourceRowNumber?: number;
+  sourceSheets?: string[];
   isin: string;
   name: string;
   manager: string;
@@ -19,7 +20,16 @@ export interface SgaFund {
   riskRating: number; // 1–12
   currency: string;
   dividendYield: number | null;       // Est. yield % from Refinitiv, null = no dividend
+  dividendDate?: string | null;
   dividendFrequency: DividendFrequency | null;
+  insurers?: string[];
+  platformAvailability?: Record<string, string>;
+  platformRows?: Array<{
+    platformName: string;
+    availabilityValue: string;
+    sourceSheet: string;
+    sourceRowNumber: number;
+  }>;
 }
 
 // Risk rating → category mapping (from SGA Fund Risk Matrix)

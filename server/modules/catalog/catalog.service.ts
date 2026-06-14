@@ -9,14 +9,51 @@ export interface Paginated<T> {
   total: number;
 }
 
-export async function listFunds(query: FundsQuery): Promise<Paginated<SgaFund>> {
+function mapCatalogFund(row: SgaFund) {
+  return {
+    ...row,
+    platformAvailability: row.platformAvailability,
+    sourceSheets: row.sourceSheets,
+    insurers: row.insurers,
+  };
+}
+
+export async function listFunds(query: FundsQuery): Promise<Paginated<ReturnType<typeof mapCatalogFund>>> {
   const where: Prisma.SgaFundWhereInput = {};
+  const and: Prisma.SgaFundWhereInput[] = [];
   if (query.search) {
-    where.OR = [
-      { fundName: { contains: query.search, mode: "insensitive" } },
-      { isin: { contains: query.search, mode: "insensitive" } },
-    ];
+    and.push({
+      OR: [
+        { fundName: { contains: query.search, mode: "insensitive" } },
+        { isin: { contains: query.search, mode: "insensitive" } },
+      ],
+    });
   }
+  if (query.sourceSheet) {
+    and.push({
+      sourceRows: {
+        some: { sheetName: { contains: query.sourceSheet, mode: "insensitive" } },
+      },
+    });
+  }
+  if (query.insurer) {
+    and.push({
+      sourceRows: {
+        some: { insurer: { contains: query.insurer, mode: "insensitive" } },
+      },
+    });
+  }
+  if (query.platform) {
+    and.push({
+      platformRows: {
+        some: {
+          platformName: { equals: query.platform, mode: "insensitive" },
+          availabilityValue: { notIn: ["NO", "No", "no", "-", "N/A", "n/a"] },
+        },
+      },
+    });
+  }
+  if (and.length > 0) where.AND = and;
 
   const [data, total] = await Promise.all([
     prisma.sgaFund.findMany({
@@ -28,7 +65,7 @@ export async function listFunds(query: FundsQuery): Promise<Paginated<SgaFund>> 
     prisma.sgaFund.count({ where }),
   ]);
 
-  return { data, total, page: query.page, pageSize: query.pageSize };
+  return { data: data.map(mapCatalogFund), total, page: query.page, pageSize: query.pageSize };
 }
 
 export async function listProducts(query: ProductsQuery): Promise<Product[]> {

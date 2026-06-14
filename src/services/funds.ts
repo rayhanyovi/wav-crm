@@ -8,6 +8,7 @@ interface ApiSgaFund {
   id: string;
   sourceSheet: string;
   sourceRowNumber: number;
+  sourceSheets: string[];
   isin: string;
   fundManagementCompany: string | null;
   fundName: string;
@@ -18,7 +19,23 @@ interface ApiSgaFund {
   riskClassification: string | null;
   riskRating: string | number | null;
   dividendYield: string | number | null;
+  dividendDate: string | null;
   dividendFrequency: string | null;
+  insurers: string[];
+  platformAvailability: Record<string, string>;
+  platformRows?: Array<{
+    platformName: string;
+    availabilityValue: string;
+    sourceSheet: string;
+    sourceRowNumber: number;
+  }>;
+}
+
+export interface FetchSgaFundsOptions {
+  search?: string;
+  sourceSheet?: string;
+  insurer?: string;
+  platform?: string;
 }
 
 function mapFund(row: ApiSgaFund): SgaFund {
@@ -31,6 +48,7 @@ function mapFund(row: ApiSgaFund): SgaFund {
     id: row.id,
     sourceSheet: row.sourceSheet,
     sourceRowNumber: row.sourceRowNumber,
+    sourceSheets: row.sourceSheets ?? [],
     isin: row.isin,
     name: row.fundName,
     manager: row.fundManagementCompany ?? "",
@@ -41,11 +59,15 @@ function mapFund(row: ApiSgaFund): SgaFund {
     riskRating,
     currency: row.currency ?? "",
     dividendYield: asNumber(row.dividendYield) ?? null,
+    dividendDate: row.dividendDate ?? null,
     dividendFrequency: (row.dividendFrequency as SgaFund["dividendFrequency"]) ?? null,
+    insurers: row.insurers ?? [],
+    platformAvailability: row.platformAvailability ?? {},
+    platformRows: row.platformRows ?? [],
   };
 }
 
-export async function fetchSgaFunds(search?: string): Promise<SgaFund[]> {
+export async function fetchSgaFunds(options: FetchSgaFundsOptions = {}): Promise<SgaFund[]> {
   const pageSize = 500;
   const funds: SgaFund[] = [];
   let page = 1;
@@ -55,7 +77,10 @@ export async function fetchSgaFunds(search?: string): Promise<SgaFund[]> {
     const res = await api.get<Page<ApiSgaFund>>("/api/funds", {
       page,
       pageSize,
-      ...(search ? { search } : {}),
+      ...(options.search ? { search: options.search } : {}),
+      ...(options.sourceSheet ? { sourceSheet: options.sourceSheet } : {}),
+      ...(options.insurer ? { insurer: options.insurer } : {}),
+      ...(options.platform ? { platform: options.platform } : {}),
     });
     funds.push(...res.data.map(mapFund));
     total = res.total;

@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
@@ -10,6 +11,27 @@ dotenv.config({ path: ".env" });
 
 const DEFAULT_WORKBOOK = "/Users/rayhan/Downloads/WAV's copy of SGA Master Fund List.xlsx";
 const workbookPath = process.argv[2] ? path.resolve(process.argv[2]) : DEFAULT_WORKBOOK;
+
+const SOURCE_SHEETS = {
+  master: "SGA Master List",
+  dividend: "Dividend paying Funds",
+  ilp: "ILP Funds",
+};
+
+const PLATFORM_COLUMNS = [
+  "CPF-OA",
+  "CPF-SA",
+  "Navi",
+  "iFAST",
+  "PSPL (FAME)",
+  "Singlife",
+  "FWD",
+  "Manulife",
+  "Tokio Marine",
+  "Income",
+  "HSBC Life",
+  "Etiqa",
+];
 
 function prismaUrl() {
   const url = process.env.DATABASE_URL;
@@ -35,9 +57,19 @@ function clean(value) {
   return String(value).replace(/\s+/g, " ").trim();
 }
 
+function normalized(value) {
+  return clean(value).toLowerCase();
+}
+
 function nullable(value) {
   const text = clean(value);
   if (!text || text === "-" || /^null$/i.test(text)) return null;
+  return text;
+}
+
+function requiredText(value) {
+  const text = clean(value);
+  if (!text || /^null$/i.test(text)) return null;
   return text;
 }
 
@@ -52,20 +84,29 @@ function numberOrNull(value) {
 
 function dateOrNull(value) {
   if (value == null || value === "" || value === "-") return null;
-  if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()));
+  }
   if (typeof value === "number" && Number.isFinite(value)) {
     const parsed = XLSX.SSF.parse_date_code(value);
     if (!parsed) return null;
     return new Date(Date.UTC(parsed.y, parsed.m - 1, parsed.d));
   }
   const parsed = new Date(clean(value));
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
+  if (Number.isNaN(parsed.getTime())) return null;
+  return new Date(Date.UTC(parsed.getUTCFullYear(), parsed.getUTCMonth(), parsed.getUTCDate()));
+}
+
+function jsonValue(value) {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString();
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  return value ?? null;
 }
 
 function headerMap(row) {
   const map = new Map();
   row.forEach((value, index) => {
-    const key = clean(value).toLowerCase();
+    const key = normalized(value);
     if (key) map.set(key, index);
   });
   return map;
@@ -73,7 +114,7 @@ function headerMap(row) {
 
 function cell(row, map, ...names) {
   for (const name of names) {
-    const index = map.get(name.toLowerCase());
+    const index = map.get(normalized(name));
     if (index != null) return row[index];
   }
   return null;
@@ -82,16 +123,34 @@ function cell(row, map, ...names) {
 function rowObject(row, headers) {
   const raw = {};
   headers.forEach((header, index) => {
-    raw[clean(header) || `column_${index + 1}`] = row[index] ?? null;
+    raw[clean(header) || `column_${index + 1}`] = jsonValue(row[index]);
   });
   return raw;
 }
 
-function stableFundId(sheetName, rowNumber, isin, fundName) {
-  const slug = [sheetName, rowNumber, isin, fundName]
-    .map((part) => clean(part).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "x")
-    .join("-");
-  return `fund-${slug}`.slice(0, 220);
+function slug(value) {
+  return clean(value).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "x";
+}
+
+function digest(value) {
+  return crypto.createHash("sha1").update(value).digest("hex").slice(0, 12);
+}
+
+function fundKey(row) {
+  return [row.isin, row.fundName, row.currency].map((value) => normalized(value)).join("::");
+}
+
+function stableFundId(row) {
+  const key = fundKey(row);
+  return `fund-${slug(row.isin)}-${slug(row.currency)}-${digest(key)}`;
+}
+
+function stableSourceRowId(sheetName, rowNumber) {
+  return `sga-row-${slug(sheetName)}-${rowNumber}`;
+}
+
+function stablePlatformId(sourceRowId, platformName) {
+  return `sga-platform-${sourceRowId}-${digest(platformName)}`;
 }
 
 function rowsFromSheet(workbook, sheetName) {
@@ -103,84 +162,35 @@ function rowsFromSheet(workbook, sheetName) {
   });
 }
 
+function findSheetName(workbook, expectedName) {
+  const sheetName = workbook.SheetNames.find((name) => clean(name) === expectedName);
+  if (!sheetName) throw new Error(`Could not find sheet: ${expectedName}`);
+  return sheetName;
+}
+
 function findHeaderIndex(rows) {
-  return rows.findIndex((row) => row.some((value) => clean(value).toLowerCase() === "isin"));
+  return rows.findIndex((row) => row.some((value) => normalized(value) === "isin"));
 }
 
-function dividendKey(isin, fundName) {
-  return `${clean(isin).toUpperCase()}::${clean(fundName).toLowerCase()}`;
-}
-
-function parseDividendRows(workbook) {
-  const dividends = new Map();
-  for (const sheetName of ["Dividend paying Funds", "Dividend paying Funds (work)"]) {
-    if (!workbook.SheetNames.includes(sheetName)) continue;
-    const rows = rowsFromSheet(workbook, sheetName);
-    const headerIndex = findHeaderIndex(rows);
-    if (headerIndex < 0) continue;
-    const headers = rows[headerIndex].map(clean);
-    const map = headerMap(headers);
-
-    rows.slice(headerIndex + 1).forEach((row) => {
-      const isin = nullable(cell(row, map, "ISIN"));
-      const fundName = nullable(cell(row, map, "Fund Name"));
-      if (!isin || !fundName) return;
-      dividends.set(dividendKey(isin, fundName), {
-        dividendYield: numberOrNull(cell(row, map, "Est. Dividend Yield (%)", "Dividend Yield")),
-        lastDividendExDate: dateOrNull(cell(row, map, "Last Dividend Ex-Date", "Last Dividend \nEx-Date", "Dividend Date")),
-        dividendFrequency: nullable(cell(row, map, "Dividend Frequency")),
-      });
-    });
-  }
-  return dividends;
-}
-
-function parseMasterFunds(workbook) {
-  const sheetName = workbook.SheetNames.find((name) => clean(name) === "SGA Master List");
-  if (!sheetName) throw new Error("Could not find SGA Master List sheet");
-
+function parseSheetRows(workbook, expectedName) {
+  const sheetName = findSheetName(workbook, expectedName);
   const rows = rowsFromSheet(workbook, sheetName);
-  const headerIndex = findHeaderIndex(rows);
-  if (headerIndex < 0) throw new Error("Could not find SGA Master List header row");
+  const headerIndex = expectedName === SOURCE_SHEETS.ilp ? 0 : findHeaderIndex(rows);
+  if (headerIndex < 0) throw new Error(`Could not find header row for ${expectedName}`);
 
   const headers = rows[headerIndex].map(clean);
+  if (expectedName === SOURCE_SHEETS.ilp) headers[0] = "ISIN";
   const map = headerMap(headers);
-  const dividends = parseDividendRows(workbook);
 
-  return rows.slice(headerIndex + 1).flatMap((row, index) => {
+  return rows.slice(headerIndex + 1).map((row, index) => {
     const sourceRowNumber = headerIndex + index + 2;
-    const isin = nullable(cell(row, map, "ISIN"));
-    const fundName = nullable(cell(row, map, "Fund Name"));
-    if (!isin || !fundName) return [];
-
-    const platforms = {};
-    [
-      "CPF-OA",
-      "CPF-SA",
-      "Navi",
-      "iFAST",
-      "PSPL (FAME)",
-      "Singlife",
-      "FWD",
-      "Manulife",
-      "Tokio Marine",
-      "Income",
-      "HSBC Life",
-      "Etiqa",
-    ].forEach((name) => {
-      const value = nullable(cell(row, map, name));
-      if (value) platforms[name] = value;
-    });
-
-    const dividend = dividends.get(dividendKey(isin, fundName)) ?? {};
-
-    return {
-      id: stableFundId(sheetName, sourceRowNumber, isin, fundName),
-      sourceSheet: sheetName,
+    const parsed = {
+      sheetName,
       sourceRowNumber,
-      isin,
+      isin: requiredText(cell(row, map, "ISIN")),
       fundManagementCompany: nullable(cell(row, map, "Fund Management Company")),
-      fundName,
+      insurer: nullable(cell(row, map, "Insurer")),
+      fundName: nullable(cell(row, map, "Fund Name")),
       currency: nullable(cell(row, map, "Currency")),
       assetClass: nullable(cell(row, map, "Asset Class")),
       geographicFocus: nullable(cell(row, map, "Geographic Focus")),
@@ -190,29 +200,213 @@ function parseMasterFunds(workbook) {
       managementFee: numberOrNull(cell(row, map, "Management Fee")),
       totalExpenseRatio: numberOrNull(cell(row, map, "Total Expense Ratio")),
       inceptionDate: dateOrNull(cell(row, map, "Inception Date")),
-      dividendYield: dividend.dividendYield ?? null,
-      lastDividendExDate: dividend.lastDividendExDate ?? null,
-      dividendFrequency: dividend.dividendFrequency ?? null,
-      platformAvailability: platforms,
+      dividendYield: numberOrNull(cell(row, map, "Est. Dividend Yield (%)", "Dividend Yield")),
+      dividendDate: dateOrNull(cell(row, map, "Last Dividend Ex-Date", "Last Dividend \nEx-Date", "Dividend Date")),
+      dividendFrequency: nullable(cell(row, map, "Dividend Frequency")),
       rawData: rowObject(row, headers),
+      platformAvailability: {},
     };
+
+    for (const platformName of PLATFORM_COLUMNS) {
+      const value = nullable(cell(row, map, platformName));
+      if (value) parsed.platformAvailability[platformName] = value;
+    }
+
+    if (!parsed.isin || !parsed.fundName || !parsed.currency) {
+      throw new Error(
+        `Invalid ${sheetName} row ${sourceRowNumber}: ISIN, Fund Name, and Currency are required`,
+      );
+    }
+
+    return parsed;
   });
+}
+
+function pick(current, incoming) {
+  return current ?? incoming ?? null;
+}
+
+function mergeCanonicalFund(fund, row) {
+  fund.sourceSheets.add(row.sheetName);
+  fund.sourceRows.push(row);
+  if (row.insurer) fund.insurers.add(row.insurer);
+
+  fund.fundManagementCompany = pick(fund.fundManagementCompany, row.fundManagementCompany);
+  fund.assetClass = pick(fund.assetClass, row.assetClass);
+  fund.geographicFocus = pick(fund.geographicFocus, row.geographicFocus);
+  fund.sgaClassification = pick(fund.sgaClassification, row.sgaClassification);
+  fund.riskClassification = pick(fund.riskClassification, row.riskClassification);
+  fund.riskRating = pick(fund.riskRating, row.riskRating);
+  fund.managementFee = pick(fund.managementFee, row.managementFee);
+  fund.totalExpenseRatio = pick(fund.totalExpenseRatio, row.totalExpenseRatio);
+  fund.inceptionDate = pick(fund.inceptionDate, row.inceptionDate);
+  fund.dividendYield = pick(fund.dividendYield, row.dividendYield);
+  fund.dividendDate = pick(fund.dividendDate, row.dividendDate);
+  fund.dividendFrequency = pick(fund.dividendFrequency, row.dividendFrequency);
+
+  for (const [platformName, value] of Object.entries(row.platformAvailability)) {
+    const existing = fund.platformAvailability[platformName];
+    if (!existing || (existing === "NO" && value !== "NO")) {
+      fund.platformAvailability[platformName] = value;
+    }
+  }
+}
+
+function buildCatalog(workbook) {
+  const sourceRows = [
+    ...parseSheetRows(workbook, SOURCE_SHEETS.master),
+    ...parseSheetRows(workbook, SOURCE_SHEETS.dividend),
+    ...parseSheetRows(workbook, SOURCE_SHEETS.ilp),
+  ];
+
+  const funds = new Map();
+  for (const row of sourceRows) {
+    const key = fundKey(row);
+    if (!funds.has(key)) {
+      funds.set(key, {
+        id: stableFundId(row),
+        sourceSheet: row.sheetName,
+        sourceRowNumber: row.sourceRowNumber,
+        sourceSheets: new Set(),
+        isin: row.isin,
+        fundManagementCompany: row.fundManagementCompany,
+        fundName: row.fundName,
+        currency: row.currency,
+        assetClass: row.assetClass,
+        geographicFocus: row.geographicFocus,
+        sgaClassification: row.sgaClassification,
+        riskClassification: row.riskClassification,
+        riskRating: row.riskRating,
+        managementFee: row.managementFee,
+        totalExpenseRatio: row.totalExpenseRatio,
+        inceptionDate: row.inceptionDate,
+        dividendYield: row.dividendYield,
+        dividendDate: row.dividendDate,
+        dividendFrequency: row.dividendFrequency,
+        insurers: new Set(row.insurer ? [row.insurer] : []),
+        platformAvailability: { ...row.platformAvailability },
+        sourceRows: [],
+      });
+    }
+    mergeCanonicalFund(funds.get(key), row);
+  }
+
+  const fundRows = [];
+  const provenanceRows = [];
+  const platformRows = [];
+
+  for (const fund of funds.values()) {
+    fundRows.push({
+      id: fund.id,
+      sourceSheet: fund.sourceSheet,
+      sourceRowNumber: fund.sourceRowNumber,
+      sourceSheets: [...fund.sourceSheets],
+      isin: fund.isin,
+      fundManagementCompany: fund.fundManagementCompany,
+      fundName: fund.fundName,
+      currency: fund.currency,
+      assetClass: fund.assetClass,
+      geographicFocus: fund.geographicFocus,
+      sgaClassification: fund.sgaClassification,
+      riskClassification: fund.riskClassification,
+      riskRating: fund.riskRating,
+      managementFee: fund.managementFee,
+      totalExpenseRatio: fund.totalExpenseRatio,
+      inceptionDate: fund.inceptionDate,
+      dividendYield: fund.dividendYield,
+      dividendDate: fund.dividendDate,
+      lastDividendExDate: fund.dividendDate,
+      dividendFrequency: fund.dividendFrequency,
+      insurers: [...fund.insurers],
+      platformAvailability: fund.platformAvailability,
+      rawData: {
+        canonicalKey: fundKey(fund),
+        sourceSheets: [...fund.sourceSheets],
+        sourceRowCount: fund.sourceRows.length,
+      },
+    });
+
+    for (const row of fund.sourceRows) {
+      const sourceRowId = stableSourceRowId(row.sheetName, row.sourceRowNumber);
+      provenanceRows.push({
+        id: sourceRowId,
+        fundId: fund.id,
+        sheetName: row.sheetName,
+        sourceRowNumber: row.sourceRowNumber,
+        isin: row.isin,
+        fundManagementCompany: row.fundManagementCompany,
+        insurer: row.insurer,
+        fundName: row.fundName,
+        currency: row.currency,
+        assetClass: row.assetClass,
+        geographicFocus: row.geographicFocus,
+        sgaClassification: row.sgaClassification,
+        riskClassification: row.riskClassification,
+        riskRating: row.riskRating,
+        managementFee: row.managementFee,
+        totalExpenseRatio: row.totalExpenseRatio,
+        inceptionDate: row.inceptionDate,
+        dividendYield: row.dividendYield,
+        dividendDate: row.dividendDate,
+        dividendFrequency: row.dividendFrequency,
+        rawData: row.rawData,
+      });
+
+      for (const [platformName, value] of Object.entries(row.platformAvailability)) {
+        platformRows.push({
+          id: stablePlatformId(sourceRowId, platformName),
+          fundId: fund.id,
+          sourceRowId,
+          platformName,
+          availabilityValue: value,
+          sourceSheet: row.sheetName,
+          sourceRowNumber: row.sourceRowNumber,
+        });
+      }
+    }
+  }
+
+  return { fundRows, provenanceRows, platformRows, sourceRows };
+}
+
+async function createManyInBatches(model, rows, size = 500) {
+  for (let index = 0; index < rows.length; index += size) {
+    await model.createMany({ data: rows.slice(index, index + size) });
+  }
 }
 
 async function main() {
   if (!fs.existsSync(workbookPath)) throw new Error(`Workbook not found: ${workbookPath}`);
   const workbook = XLSX.readFile(workbookPath, { cellDates: true });
-  const funds = parseMasterFunds(workbook);
+  const { fundRows, provenanceRows, platformRows, sourceRows } = buildCatalog(workbook);
 
-  console.log(`Parsed ${funds.length} SGA Master List funds from ${workbookPath}`);
-  await prisma.sgaFund.deleteMany({});
+  console.log(`Parsed ${sourceRows.length} source rows from ${workbookPath}`);
+  console.log(`Built ${fundRows.length} canonical SGA funds`);
 
-  for (let index = 0; index < funds.length; index += 500) {
-    await prisma.sgaFund.createMany({ data: funds.slice(index, index + 500) });
-  }
+  await prisma.$transaction(async (tx) => {
+    await tx.sgaFundPlatformAvailability.deleteMany({});
+    await tx.sgaFundSourceRow.deleteMany({});
+    await tx.sgaFund.deleteMany({});
+    await createManyInBatches(tx.sgaFund, fundRows);
+    await createManyInBatches(tx.sgaFundSourceRow, provenanceRows);
+    await createManyInBatches(tx.sgaFundPlatformAvailability, platformRows);
+  }, { timeout: 60_000 });
 
-  const count = await prisma.sgaFund.count();
-  console.log(`Imported ${count} rows into public.sga_funds`);
+  const [fundCount, sourceCount, platformCount, bySheet] = await Promise.all([
+    prisma.sgaFund.count(),
+    prisma.sgaFundSourceRow.count(),
+    prisma.sgaFundPlatformAvailability.count(),
+    prisma.sgaFundSourceRow.groupBy({
+      by: ["sheetName"],
+      _count: { _all: true },
+      orderBy: { sheetName: "asc" },
+    }),
+  ]);
+
+  console.log(`Imported ${fundCount} rows into public.sga_funds`);
+  console.log(`Imported ${sourceCount} rows into public.sga_fund_source_rows`);
+  console.log(`Imported ${platformCount} rows into public.sga_fund_platform_availability`);
+  console.table(bySheet.map((row) => ({ sheet: row.sheetName, rows: row._count._all })));
 }
 
 main()

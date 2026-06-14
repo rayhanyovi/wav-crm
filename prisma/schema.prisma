@@ -505,6 +505,7 @@ model SgaFund {
   id                   String    @id
   sourceSheet          String    @map("source_sheet")
   sourceRowNumber      Int       @map("source_row_number")
+  sourceSheets         String[]  @default([]) @map("source_sheets")
   isin                 String
   fundManagementCompany String?  @map("fund_management_company")
   fundName             String    @map("fund_name")
@@ -518,11 +519,64 @@ model SgaFund {
   totalExpenseRatio    Decimal?  @map("total_expense_ratio") @db.Decimal
   inceptionDate        DateTime? @map("inception_date") @db.Date
   dividendYield        Decimal?  @map("dividend_yield") @db.Decimal
+  dividendDate         DateTime? @map("dividend_date") @db.Date
   lastDividendExDate   DateTime? @map("last_dividend_ex_date") @db.Date
   dividendFrequency    String?   @map("dividend_frequency")
+  insurers             String[]  @default([])
   platformAvailability Json      @default("{}") @map("platform_availability")
   rawData              Json      @default("{}") @map("raw_data")
   seededAt             DateTime  @default(now()) @map("seeded_at") @db.Timestamptz
 
+  sourceRows   SgaFundSourceRow[]
+  platformRows SgaFundPlatformAvailability[]
+
   @@map("sga_funds")
+}
+
+model SgaFundSourceRow {
+  id                    String    @id
+  fundId                String    @map("fund_id")
+  sheetName             String    @map("sheet_name")
+  sourceRowNumber       Int       @map("source_row_number")
+  isin                  String?
+  fundManagementCompany String?   @map("fund_management_company")
+  insurer               String?
+  fundName              String?   @map("fund_name")
+  currency              String?
+  assetClass            String?   @map("asset_class")
+  geographicFocus       String?   @map("geographic_focus")
+  sgaClassification     String?   @map("sga_classification")
+  riskClassification    String?   @map("risk_classification")
+  riskRating            Decimal?  @map("risk_rating") @db.Decimal
+  managementFee         Decimal?  @map("management_fee") @db.Decimal
+  totalExpenseRatio     Decimal?  @map("total_expense_ratio") @db.Decimal
+  inceptionDate         DateTime? @map("inception_date") @db.Date
+  dividendYield         Decimal?  @map("dividend_yield") @db.Decimal
+  dividendDate          DateTime? @map("dividend_date") @db.Date
+  dividendFrequency     String?   @map("dividend_frequency")
+  rawData               Json      @default("{}") @map("raw_data")
+  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  fund      SgaFund                       @relation(fields: [fundId], references: [id], onDelete: Cascade)
+  platforms SgaFundPlatformAvailability[]
+
+  @@unique([sheetName, sourceRowNumber])
+  @@map("sga_fund_source_rows")
+}
+
+model SgaFundPlatformAvailability {
+  id                String   @id
+  fundId            String   @map("fund_id")
+  sourceRowId       String?  @map("source_row_id")
+  platformName      String   @map("platform_name")
+  availabilityValue String   @map("availability_value")
+  sourceSheet       String   @map("source_sheet")
+  sourceRowNumber   Int      @map("source_row_number")
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  fund      SgaFund           @relation(fields: [fundId], references: [id], onDelete: Cascade)
+  sourceRow SgaFundSourceRow? @relation(fields: [sourceRowId], references: [id], onDelete: Cascade)
+
+  @@unique([fundId, platformName, sourceSheet, sourceRowNumber])
+  @@map("sga_fund_platform_availability")
 }
