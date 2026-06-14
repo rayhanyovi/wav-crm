@@ -1,14 +1,24 @@
-import type { Activity, Deal } from "@/data/types";
+import type { Activity, Deal, Lead } from "@/data/types";
 
-export function getLastContactedDate(leadId: string, activities: Activity[]): string | null {
+export function getLastContactedDate(
+  leadId: string,
+  activities: Activity[],
+  lead?: Pick<Lead, "last_contacted_at">,
+): string | null {
   const leadActivities = activities.filter(
     (a) => a.lead_id === leadId && a.completed_at && !a.deleted_at
   );
-  if (!leadActivities.length) return null;
   leadActivities.sort((a, b) =>
     new Date(b.completed_at!).getTime() - new Date(a.completed_at!).getTime()
   );
-  return leadActivities[0].completed_at ?? null;
+  const latestActivity = leadActivities[0]?.completed_at ?? null;
+
+  if (lead?.last_contacted_at && latestActivity) {
+    return new Date(lead.last_contacted_at) >= new Date(latestActivity)
+      ? lead.last_contacted_at
+      : latestActivity;
+  }
+  return lead?.last_contacted_at ?? latestActivity;
 }
 
 export function getLeadActivities(leadId: string, activities: Activity[]): Activity[] {

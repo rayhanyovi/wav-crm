@@ -128,6 +128,7 @@ export interface Lead extends FactFindFields {
   cooldown_until?: string;     // set when TM marks "Rejected"; lead re-enters NA pool after this date
   converted_contact_id?: string;
   converted_at?: string;
+  last_contacted_at?: string;
   created_by: string;
   created_at: string;
   updated_at: string;

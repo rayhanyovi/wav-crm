@@ -103,6 +103,33 @@ export async function emitLeadNotifications(tx: Tx, prev: Lead, next: Lead): Pro
   if (rows.length > 0) await tx.notification.createMany({ data: rows });
 }
 
+const STATUS_LABELS: Record<string, string> = {
+  NA: "NA",
+  APPOINTMENT: "Appointment",
+  NOT_INTERESTED: "Not Interested",
+  AVOID: "Avoid",
+  KIV: "KIV",
+  OTHERS: "Others",
+  COOLDOWN: "Cooldown",
+};
+
+/** Auto-creates a LeadNote entry when status changes, so the transition is visible in the Notes Log. */
+export async function recordStatusNote(
+  tx: Tx,
+  args: { leadId: string; prevStatus: Lead["status"]; nextStatus: Lead["status"]; changedBy: string },
+): Promise<void> {
+  if (args.prevStatus === args.nextStatus) return;
+  const from = STATUS_LABELS[args.prevStatus] ?? args.prevStatus;
+  const to = STATUS_LABELS[args.nextStatus] ?? args.nextStatus;
+  await tx.leadNote.create({
+    data: {
+      leadId: args.leadId,
+      content: `Status changed from ${from} to ${to}`,
+      createdBy: args.changedBy,
+    },
+  });
+}
+
 /** Port of fn_audit_log for the leads table. */
 export async function writeAuditLog(
   tx: Tx,

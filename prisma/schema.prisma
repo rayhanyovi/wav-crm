@@ -198,6 +198,7 @@ model Lead {
   convertedContactId     String?            @map("converted_contact_id")
   convertedAt            DateTime?          @map("converted_at") @db.Timestamptz
   cooldownUntil          DateTime?          @map("cooldown_until") @db.Timestamptz
+  lastContactedAt        DateTime?          @map("last_contacted_at") @db.Timestamptz
   financialGoal          FinancialGoal?     @map("financial_goal")
   riskTolerance          RiskTolerance?     @map("risk_tolerance")
   investmentHorizon      InvestmentHorizon? @map("investment_horizon")

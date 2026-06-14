@@ -176,8 +176,8 @@ export function LeadsPage() {
     showAbandoned ? true : !isAbandoned(l)
   );
 
-  const lastContactedAt = (id: string) => {
-    const d = getLastContactedDate(id, activities);
+  const lastContactedAt = (lead: typeof liveLeads[0]) => {
+    const d = getLastContactedDate(lead.id, activities, lead);
     return d ? new Date(d).getTime() : 0;
   };
 
@@ -205,7 +205,7 @@ export function LeadsPage() {
         case "source":
           return mult * a.source.localeCompare(b.source);
         case "lastContacted":
-          return mult * (lastContactedAt(a.id) - lastContactedAt(b.id));
+          return mult * (lastContactedAt(a) - lastContactedAt(b));
         case "created":
         default: {
           // For TM on the default sort: recently bounced (no-show) NA leads float up so they recall first
@@ -291,7 +291,7 @@ export function LeadsPage() {
 
   const selectedLead = leads.find((l) => l.id === selectedLeadId);
   const selectedLastContacted = selectedLead
-    ? getLastContactedDate(selectedLead.id, activities)
+    ? getLastContactedDate(selectedLead.id, activities, selectedLead)
     : null;
   const selectedActivities = selectedLead
     ? activities
@@ -428,7 +428,7 @@ export function LeadsPage() {
             </TableHeader>
             <TableBody>
               {paginatedLeads.map((lead) => {
-                const lastContacted = getLastContactedDate(lead.id, activities);
+                const lastContacted = getLastContactedDate(lead.id, activities, lead);
                 return (
                   <TableRow
                     key={lead.id}

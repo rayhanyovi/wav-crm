@@ -26,6 +26,7 @@ import {
   deriveStatusColumns,
   emitLeadNotifications,
   recordStatusHistory,
+  recordStatusNote,
   writeAuditLog,
 } from "./leads.sideEffects.js";
 
@@ -192,11 +193,19 @@ export async function updateLead(actor: Actor, id: string, input: UpdateLeadInpu
 
     const data = toPrismaUpdate(input);
     const nextStatus = (input.status ?? prev.status) as Lead["status"];
+    const statusChanged = nextStatus !== prev.status;
     Object.assign(data, deriveStatusColumns(prev.status, nextStatus));
+    if (statusChanged) data.lastContactedAt = new Date();
 
     const next = await tx.lead.update({ where: { id }, data });
 
     await recordStatusHistory(tx, {
+      leadId: id,
+      prevStatus: prev.status,
+      nextStatus: next.status,
+      changedBy: actor.id,
+    });
+    await recordStatusNote(tx, {
       leadId: id,
       prevStatus: prev.status,
       nextStatus: next.status,
