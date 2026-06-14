@@ -41,6 +41,7 @@ interface ApiLead {
   bounceCount: number | null;
   convertedContactId: string | null;
   convertedAt: string | null;
+  lastContactedAt: string | null;
   financialGoal: string | null;
   riskTolerance: string | null;
   investmentHorizon: string | null;
@@ -86,6 +87,7 @@ function mapLead(r: ApiLead): Lead {
     bounce_count: r.bounceCount ?? undefined,
     converted_contact_id: r.convertedContactId ?? undefined,
     converted_at: r.convertedAt ?? undefined,
+    last_contacted_at: r.lastContactedAt ?? undefined,
     financial_goal: (r.financialGoal as Lead["financial_goal"]) ?? undefined,
     risk_tolerance: (r.riskTolerance as Lead["risk_tolerance"]) ?? undefined,
     investment_horizon: (r.investmentHorizon as Lead["investment_horizon"]) ?? undefined,
