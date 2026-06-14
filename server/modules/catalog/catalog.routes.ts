@@ -13,6 +13,7 @@ fundsRouter.use(requireAuth());
 productsRouter.use(requireAuth());
 bundlesRouter.use(requireAuth());
 
+fundsRouter.get("/meta", asyncHandler(controller.getFundsMeta));
 fundsRouter.get("/", validate({ query: fundsQuerySchema }), asyncHandler(controller.listFunds));
 productsRouter.get("/", validate({ query: productsQuerySchema }), asyncHandler(controller.listProducts));
 bundlesRouter.get("/", validate({ query: productsQuerySchema }), asyncHandler(controller.listBundles));

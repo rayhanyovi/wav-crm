@@ -7,6 +7,11 @@ export async function listFunds(req: Request, res: Response): Promise<void> {
   res.json(result);
 }
 
+export async function getFundsMeta(_req: Request, res: Response): Promise<void> {
+  const result = await service.getFundsMeta();
+  res.json(result);
+}
+
 export async function listProducts(req: Request, res: Response): Promise<void> {
   const products = await service.listProducts(req.query as unknown as ProductsQuery);
   res.json({ data: products });

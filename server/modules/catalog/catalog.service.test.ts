@@ -4,6 +4,7 @@ const db = vi.hoisted(() => ({
   sgaFund: {
     findMany: vi.fn(),
     count: vi.fn(),
+    aggregate: vi.fn(),
   },
   product: {
     findMany: vi.fn(),
@@ -15,7 +16,7 @@ const db = vi.hoisted(() => ({
 
 vi.mock("../../lib/prisma.js", () => ({ prisma: db }));
 
-const { listFunds } = await import("./catalog.service.js");
+const { getFundsMeta, listFunds } = await import("./catalog.service.js");
 
 beforeEach(() => vi.clearAllMocks());
 
@@ -33,6 +34,8 @@ describe("listFunds", () => {
       skip: 0,
       take: 25,
     });
+    expect(db.sgaFund.findMany.mock.calls[0]![0].select.rawData).toBeUndefined();
+    expect(db.sgaFund.findMany.mock.calls[0]![0].select.fundName).toBe(true);
   });
 
   it("filters search by fund name or ISIN", async () => {
@@ -84,5 +87,19 @@ describe("listFunds", () => {
       { OR: [{ riskRating: 1 }, { riskRating: 4 }] },
       { dividendYield: { not: null } },
     ]);
+  });
+});
+
+describe("getFundsMeta", () => {
+  it("returns total and a stable version from count and latest seed timestamp", async () => {
+    db.sgaFund.aggregate.mockResolvedValue({
+      _count: { _all: 1694 },
+      _max: { seededAt: new Date("2026-06-14T19:24:56.351Z") },
+    });
+
+    await expect(getFundsMeta()).resolves.toEqual({
+      total: 1694,
+      version: "1694:2026-06-14T19:24:56.351Z",
+    });
   });
 });

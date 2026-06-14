@@ -1,4 +1,4 @@
-import type { Bundle, Prisma, Product, SgaFund } from "../../../prisma/generated/client/index.js";
+import type { Bundle, Prisma, Product } from "../../../prisma/generated/client/index.js";
 import { prisma } from "../../lib/prisma.js";
 import type { FundsQuery, ProductsQuery } from "./catalog.schema.js";
 
@@ -9,13 +9,31 @@ export interface Paginated<T> {
   total: number;
 }
 
-function mapCatalogFund(row: SgaFund) {
-  return {
-    ...row,
-    platformAvailability: row.platformAvailability,
-    sourceSheets: row.sourceSheets,
-    insurers: row.insurers,
-  };
+const fundSelect = {
+  id: true,
+  sourceSheet: true,
+  sourceRowNumber: true,
+  sourceSheets: true,
+  isin: true,
+  fundManagementCompany: true,
+  fundName: true,
+  currency: true,
+  assetClass: true,
+  geographicFocus: true,
+  sgaClassification: true,
+  riskClassification: true,
+  riskRating: true,
+  dividendYield: true,
+  dividendDate: true,
+  dividendFrequency: true,
+  insurers: true,
+  platformAvailability: true,
+} satisfies Prisma.SgaFundSelect;
+
+type CatalogFund = Prisma.SgaFundGetPayload<{ select: typeof fundSelect }>;
+
+function mapCatalogFund(row: CatalogFund) {
+  return row;
 }
 
 function parseRiskRatings(value: string | undefined): number[] {
@@ -83,6 +101,7 @@ export async function listFunds(query: FundsQuery): Promise<Paginated<ReturnType
   const [data, total] = await Promise.all([
     prisma.sgaFund.findMany({
       where,
+      select: fundSelect,
       orderBy: { fundName: "asc" },
       skip: (query.page - 1) * query.pageSize,
       take: query.pageSize,
@@ -91,6 +110,16 @@ export async function listFunds(query: FundsQuery): Promise<Paginated<ReturnType
   ]);
 
   return { data: data.map(mapCatalogFund), total, page: query.page, pageSize: query.pageSize };
+}
+
+export async function getFundsMeta(): Promise<{ total: number; version: string }> {
+  const result = await prisma.sgaFund.aggregate({
+    _count: { _all: true },
+    _max: { seededAt: true },
+  });
+  const total = result._count._all;
+  const latestSeededAt = result._max.seededAt?.toISOString() ?? "empty";
+  return { total, version: `${total}:${latestSeededAt}` };
 }
 
 export async function listProducts(query: ProductsQuery): Promise<Product[]> {

@@ -31,6 +31,11 @@ interface ApiSgaFund {
   }>;
 }
 
+interface FundsMeta {
+  total: number;
+  version: string;
+}
+
 export interface FetchSgaFundsOptions {
   search?: string;
   sourceSheet?: string;
@@ -41,6 +46,15 @@ export interface FetchSgaFundsOptions {
   riskRatings?: number[];
   hasDividend?: boolean;
 }
+
+interface SgaFundsCache {
+  version: string;
+  cachedAt: number;
+  funds: SgaFund[];
+}
+
+const FUND_CACHE_KEY = "wav:sga-funds:v1";
+let memoryCache: SgaFundsCache | null = null;
 
 function mapFund(row: ApiSgaFund): SgaFund {
   const riskRating = asNumber(row.riskRating) ?? 12;
@@ -84,6 +98,52 @@ function paramsForOptions(options: FetchSgaFundsOptions) {
   };
 }
 
+function canUseStorage() {
+  try {
+    return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
+  } catch {
+    return false;
+  }
+}
+
+function readStoredCache(): SgaFundsCache | null {
+  if (memoryCache) return memoryCache;
+  if (!canUseStorage()) return null;
+  try {
+    const raw = window.localStorage.getItem(FUND_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<SgaFundsCache>;
+    if (!parsed.version || !Array.isArray(parsed.funds)) return null;
+    memoryCache = {
+      version: parsed.version,
+      cachedAt: typeof parsed.cachedAt === "number" ? parsed.cachedAt : 0,
+      funds: parsed.funds,
+    };
+    return memoryCache;
+  } catch {
+    window.localStorage.removeItem(FUND_CACHE_KEY);
+    return null;
+  }
+}
+
+function writeStoredCache(cache: SgaFundsCache) {
+  memoryCache = cache;
+  if (!canUseStorage()) return;
+  try {
+    window.localStorage.setItem(FUND_CACHE_KEY, JSON.stringify(cache));
+  } catch {
+    window.localStorage.removeItem(FUND_CACHE_KEY);
+  }
+}
+
+export function getCachedSgaFundsSnapshot(): SgaFund[] | undefined {
+  return readStoredCache()?.funds;
+}
+
+export async function fetchSgaFundsMeta(): Promise<FundsMeta> {
+  return api.get<FundsMeta>("/api/funds/meta");
+}
+
 export async function fetchSgaFundsPage(
   options: FetchSgaFundsOptions = {},
   page = 1,
@@ -101,18 +161,68 @@ export async function fetchSgaFundsPage(
   };
 }
 
-export async function fetchSgaFunds(options: FetchSgaFundsOptions = {}): Promise<SgaFund[]> {
+function searchText(fund: SgaFund) {
+  return `${fund.name} ${fund.manager} ${fund.isin} ${fund.sgaClass}`.toLowerCase();
+}
+
+function matchesLocalFilters(fund: SgaFund, options: FetchSgaFundsOptions) {
+  const q = options.search?.trim().toLowerCase();
+  if (q && !searchText(fund).includes(q)) return false;
+  if (options.sourceSheet && !fund.sourceSheets?.some((sheet) => sheet.toLowerCase().includes(options.sourceSheet!.toLowerCase()))) {
+    return false;
+  }
+  if (options.insurer && !fund.insurers?.some((insurer) => insurer.toLowerCase().includes(options.insurer!.toLowerCase()))) {
+    return false;
+  }
+  if (options.platform) {
+    const availability = fund.platformAvailability?.[options.platform];
+    if (!availability || ["NO", "No", "no", "-", "N/A", "n/a"].includes(availability)) return false;
+  }
+  if (options.assetClass && fund.assetClass.toLowerCase() !== options.assetClass.toLowerCase()) return false;
+  if (options.riskCategory && fund.riskCategory.toLowerCase() !== options.riskCategory.toLowerCase()) return false;
+  if (options.riskRatings?.length && !options.riskRatings.includes(fund.riskRating)) return false;
+  if (options.hasDividend && fund.dividendYield == null) return false;
+  return true;
+}
+
+export function filterSgaFunds(funds: SgaFund[], options: FetchSgaFundsOptions = {}) {
+  if (Object.keys(options).length === 0) return funds;
+  return funds.filter((fund) => matchesLocalFilters(fund, options));
+}
+
+async function fetchAllSgaFundsFromApi(): Promise<SgaFund[]> {
   const pageSize = 500;
   const funds: SgaFund[] = [];
   let page = 1;
   let total = 0;
 
   do {
-    const res = await fetchSgaFundsPage(options, page, pageSize);
+    const res = await fetchSgaFundsPage({}, page, pageSize);
     funds.push(...res.data);
     total = res.total;
     page += 1;
   } while (funds.length < total);
 
   return funds;
+}
+
+export async function fetchSgaFundsCatalog(): Promise<SgaFund[]> {
+  const cached = readStoredCache();
+
+  try {
+    const meta = await fetchSgaFundsMeta();
+    if (cached?.version === meta.version) return cached.funds;
+
+    const funds = await fetchAllSgaFundsFromApi();
+    writeStoredCache({ version: meta.version, cachedAt: Date.now(), funds });
+    return funds;
+  } catch (error) {
+    if (cached) return cached.funds;
+    throw error;
+  }
+}
+
+export async function fetchSgaFunds(options: FetchSgaFundsOptions = {}): Promise<SgaFund[]> {
+  const funds = await fetchSgaFundsCatalog();
+  return filterSgaFunds(funds, options);
 }
