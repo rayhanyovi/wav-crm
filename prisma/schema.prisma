@@ -1,0 +1,528 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// WAV CRM — Prisma schema (full, introspected from live Supabase DB)
+//
+// Source of truth: public schema, project auyynqzrhwsxbtukrbri
+// Last sync: 2026-06-14
+//
+// To refresh: npm run prisma:pull (requires .env.server with DATABASE_URL)
+// ─────────────────────────────────────────────────────────────────────────────
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "./generated/client"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─── Enums ──────────────────────────────────────────────────────────────────
+
+enum LeadStatus {
+  NA
+  APPOINTMENT
+  NOT_INTERESTED
+  AVOID
+  KIV
+  OTHERS
+  COOLDOWN
+
+  @@map("lead_status")
+}
+
+enum LeadSource {
+  AP_MARKETING
+  LP_MARKETING
+  OWN_SOURCE
+  OTHERS
+
+  @@map("lead_source")
+}
+
+enum AppointmentResult {
+  MET
+  NO_SHOW
+  RESCHEDULED
+  CANCELLED
+
+  @@map("appointment_result")
+}
+
+enum ActivityType {
+  CALL
+  EMAIL
+  MEETING
+  TASK
+  NOTE
+  FOLLOW_UP
+
+  @@map("activity_type")
+}
+
+enum ActivityResult {
+  COMPLETED
+  NO_ANSWER
+  FOLLOW_UP_NEEDED
+  MEETING_SCHEDULED
+  CANCELLED
+  FAILED
+
+  @@map("activity_result")
+}
+
+enum DealStage {
+  CALLING
+  APPOINTMENT
+  PROPOSAL
+  SUBMITTED
+  WON
+  LOST
+
+  @@map("deal_stage")
+}
+
+enum DealProposalStatus {
+  DRAFT
+  PRESENTED
+  ACCEPTED
+  REJECTED
+
+  @@map("deal_proposal_status")
+}
+
+enum FinancialGoal {
+  RETIREMENT
+  EDUCATION
+  WEALTH_GROWTH
+  INCOME
+  EMERGENCY_FUND
+  OTHER
+
+  @@map("financial_goal")
+}
+
+enum RiskTolerance {
+  CONSERVATIVE
+  MODERATE
+  BALANCED
+  GROWTH
+  AGGRESSIVE
+
+  @@map("risk_tolerance")
+}
+
+enum InvestmentHorizon {
+  SHORT
+  MEDIUM
+  LONG
+
+  @@map("investment_horizon")
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  STAGE_CHANGE
+  ASSIGNMENT_CHANGE
+  STATUS_CHANGE
+  CONVERSION
+  ARCHIVE
+
+  @@map("audit_action")
+}
+
+enum CreditAction {
+  RETURN
+  CLAIM
+  ADMIN_ASSIGN
+
+  @@map("credit_action")
+}
+
+// ─── Core models ────────────────────────────────────────────────────────────
+
+model CrmUser {
+  id                 String   @id
+  authUserId         String?  @map("auth_user_id") @db.Uuid
+  name               String
+  email              String
+  role               String?
+  avatar             String?
+  isActive           Boolean  @default(true) @map("is_active")
+  creditBalance      Int      @default(0) @map("credit_balance")
+  telemarketerAccess Boolean  @default(false) @map("telemarketer_access")
+  telemarketerId     String?  @map("telemarketer_id")
+  phone              String?
+  accountStatus      String   @default("ACTIVE") @map("account_status")
+  requestedRole      String?  @map("requested_role")
+  leadsAccess        Boolean  @default(true) @map("leads_access")
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("crm_users")
+}
+
+model Lead {
+  id                     String             @id
+  salutation             String?
+  firstName              String             @map("first_name")
+  lastName               String             @default("-") @map("last_name")
+  email                  String?
+  phone                  String?
+  age                    Int?
+  gender                 String?
+  residentialStatus      String?            @map("residential_status")
+  incomeRange            String?            @map("income_range")
+  zipcode                String?
+  source                 LeadSource         @default(OTHERS)
+  status                 LeadStatus         @default(NA)
+  personality            String?
+  preferredContactMethod String?            @map("preferred_contact_method")
+  bestTimeToCall         String?            @map("best_time_to_call")
+  notes                  String?
+  appointmentDate        String?            @map("appointment_date")
+  appointmentTime        String?            @map("appointment_time")
+  appointmentResult      AppointmentResult? @map("appointment_result")
+  isAbandoned            Boolean            @default(false) @map("is_abandoned")
+  abandonedAt            DateTime?          @map("abandoned_at") @db.Timestamptz
+  otherStatusNote        String?            @map("other_status_note")
+  productsDiscussed      String[]           @default([]) @map("products_discussed")
+  assignedToId           String?            @map("assigned_to_id")
+  telemarketerOwnerId    String?            @map("telemarketer_owner_id")
+  adviserOwnerId         String?            @map("adviser_owner_id")
+  bounceCount            Int                @default(0) @map("bounce_count")
+  lastBouncedAt          DateTime?          @map("last_bounced_at") @db.Timestamptz
+  convertedContactId     String?            @map("converted_contact_id")
+  convertedAt            DateTime?          @map("converted_at") @db.Timestamptz
+  cooldownUntil          DateTime?          @map("cooldown_until") @db.Timestamptz
+  financialGoal          FinancialGoal?     @map("financial_goal")
+  riskTolerance          RiskTolerance?     @map("risk_tolerance")
+  investmentHorizon      InvestmentHorizon? @map("investment_horizon")
+  monthlyInvestable      Decimal?           @map("monthly_investable") @db.Decimal
+  existingInvestments    String?            @map("existing_investments")
+  factFindNotes          String?            @map("fact_find_notes")
+  factFindDone           Boolean?           @map("fact_find_done")
+  createdBy              String             @map("created_by")
+  createdAt              DateTime           @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt              DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt              DateTime?          @map("deleted_at") @db.Timestamptz
+
+  statusHistory    LeadStatusHistory[]
+  notes_rel        LeadNote[]
+  deals            Deal[]
+  activities       Activity[]
+  creditTx         CreditTransaction[]
+
+  @@map("leads")
+}
+
+model LeadStatusHistory {
+  id        String     @id @default(uuid())
+  leadId    String     @map("lead_id")
+  status    LeadStatus
+  changedAt DateTime   @default(now()) @map("changed_at") @db.Timestamptz
+  changedBy String     @map("changed_by")
+  note      String?
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@map("lead_status_history")
+}
+
+model LeadNote {
+  id        String   @id @default(uuid())
+  leadId    String   @map("lead_id")
+  content   String
+  createdBy String   @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@map("lead_notes")
+}
+
+model Contact {
+  id                  String             @id
+  firstName           String             @map("first_name")
+  lastName            String             @default("-") @map("last_name")
+  email               String?
+  phone               String?
+  title               String?
+  source              LeadSource         @default(OTHERS)
+  financialGoal       FinancialGoal?     @map("financial_goal")
+  riskTolerance       RiskTolerance?     @map("risk_tolerance")
+  investmentHorizon   InvestmentHorizon? @map("investment_horizon")
+  monthlyInvestable   Decimal?           @map("monthly_investable") @db.Decimal
+  existingInvestments String?            @map("existing_investments")
+  factFindNotes       String?            @map("fact_find_notes")
+  factFindDone        Boolean?           @map("fact_find_done")
+  createdBy           String             @map("created_by")
+  createdAt           DateTime           @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt           DateTime?          @map("deleted_at") @db.Timestamptz
+
+  notes      ContactNote[]
+  deals      Deal[]
+  activities Activity[]
+
+  @@map("contacts")
+}
+
+model ContactNote {
+  id        String   @id @default(uuid())
+  contactId String   @map("contact_id")
+  content   String
+  createdBy String   @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@map("contact_notes")
+}
+
+model Deal {
+  id                  String             @id
+  title               String
+  value               Decimal            @default(0) @db.Decimal
+  stage               DealStage          @default(CALLING)
+  leadId              String?            @map("lead_id")
+  contactId           String             @map("contact_id")
+  telemarketerId      String?            @map("telemarketer_id")
+  assignedToId        String?            @map("assigned_to_id")
+  expectedCloseDate   String?            @map("expected_close_date")
+  lostReason          String?            @map("lost_reason")
+  closedAt            DateTime?          @map("closed_at") @db.Timestamptz
+  insurer             String?
+  insurerRef          String?            @map("insurer_ref")
+  submittedAt         DateTime?          @map("submitted_at") @db.Timestamptz
+  policyNumber        String?            @map("policy_number")
+  financialGoal       FinancialGoal?     @map("financial_goal")
+  riskTolerance       RiskTolerance?     @map("risk_tolerance")
+  investmentHorizon   InvestmentHorizon? @map("investment_horizon")
+  monthlyInvestable   Decimal?           @map("monthly_investable") @db.Decimal
+  existingInvestments String?            @map("existing_investments")
+  factFindNotes       String?            @map("fact_find_notes")
+  factFindDone        Boolean            @default(false) @map("fact_find_done")
+  createdBy           String             @map("created_by")
+  createdAt           DateTime           @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt           DateTime?          @map("deleted_at") @db.Timestamptz
+
+  lead         Lead?          @relation(fields: [leadId], references: [id])
+  contact      Contact        @relation(fields: [contactId], references: [id])
+  stageHistory StageHistory[]
+  proposals    DealProposal[]
+  activities   Activity[]
+
+  @@map("deals")
+}
+
+model StageHistory {
+  id        String    @id @default(uuid())
+  dealId    String    @map("deal_id")
+  fromStage DealStage? @map("from_stage")
+  toStage   DealStage  @map("to_stage")
+  changedBy String    @map("changed_by")
+  note      String?
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@map("stage_history")
+}
+
+model DealProposal {
+  id         String             @id
+  dealId     String             @map("deal_id")
+  name       String
+  status     DealProposalStatus @default(DRAFT)
+  totalValue Decimal            @default(0) @map("total_value") @db.Decimal
+  notes      String?
+  createdBy  String             @map("created_by")
+  createdAt  DateTime           @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt  DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  deal  Deal                @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  lines DealProposalLine[]
+
+  @@map("deal_proposals")
+}
+
+model DealProposalLine {
+  id            String  @id
+  proposalId    String  @map("proposal_id")
+  fundIsin      String  @map("fund_isin")
+  fundName      String  @map("fund_name")
+  riskRating    Int     @map("risk_rating")
+  allocationPct Decimal @map("allocation_pct") @db.Decimal
+
+  proposal DealProposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+
+  @@map("deal_proposal_lines")
+}
+
+model Activity {
+  id          String          @id
+  type        ActivityType
+  subject     String
+  description String?
+  result      ActivityResult?
+  scheduledAt DateTime?       @map("scheduled_at") @db.Timestamptz
+  completedAt DateTime?       @map("completed_at") @db.Timestamptz
+  metadata    Json            @default("{}")
+  dealId      String?         @map("deal_id")
+  contactId   String?         @map("contact_id")
+  leadId      String?         @map("lead_id")
+  assignedToId String?        @map("assigned_to_id")
+  createdBy   String          @map("created_by")
+  createdAt   DateTime        @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt   DateTime?       @map("deleted_at") @db.Timestamptz
+
+  deal    Deal?    @relation(fields: [dealId], references: [id])
+  contact Contact? @relation(fields: [contactId], references: [id])
+  lead    Lead?    @relation(fields: [leadId], references: [id])
+  comments Comment[]
+
+  @@map("activities")
+}
+
+model Comment {
+  id         String   @id @default(uuid())
+  activityId String   @map("activity_id")
+  text       String
+  createdBy  String   @map("created_by")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  activity Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+
+  @@map("comments")
+}
+
+model Notification {
+  id          String    @id @default(uuid())
+  recipientId String    @map("recipient_id")
+  type        String
+  title       String
+  message     String
+  entityType  String    @map("entity_type")
+  entityId    String    @map("entity_id")
+  isRead      Boolean   @default(false) @map("is_read")
+  readAt      DateTime? @map("read_at") @db.Timestamptz
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("notifications")
+}
+
+model AuditLog {
+  id         String      @id @default(uuid())
+  userId     String      @map("user_id")
+  action     AuditAction
+  entityType String      @map("entity_type")
+  entityId   String      @map("entity_id")
+  metadata   Json        @default("{}")
+  createdAt  DateTime    @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("audit_logs")
+}
+
+model CreditTransaction {
+  id            String       @id @default(uuid())
+  userId        String       @map("user_id")
+  leadId        String?      @map("lead_id")
+  action        CreditAction
+  balanceBefore Int          @map("balance_before")
+  balanceAfter  Int          @map("balance_after")
+  createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz
+
+  lead Lead? @relation(fields: [leadId], references: [id])
+
+  @@map("credit_transactions")
+}
+
+model CallSession {
+  id                   String    @id
+  userId               String    @map("user_id")
+  startedAt            DateTime  @map("started_at") @db.Timestamptz
+  endedAt              DateTime? @map("ended_at") @db.Timestamptz
+  totalDurationSeconds Int       @default(0) @map("total_duration_seconds")
+  callsMade            Int       @default(0) @map("calls_made")
+  pickups              Int       @default(0)
+  leadIds              String[]  @default([]) @map("lead_ids")
+
+  @@map("call_sessions")
+}
+
+// ─── Catalog / read-only reference ──────────────────────────────────────────
+
+model Product {
+  id           String   @id
+  name         String
+  ticker       String
+  description  String?
+  category     String
+  riskScore    Int      @default(5) @map("risk_score")
+  annualReturn Decimal? @map("annual_return") @db.Decimal
+  marketCap    String?  @map("market_cap")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  bundles BundleProduct[]
+
+  @@map("products")
+}
+
+model Bundle {
+  id          String   @id
+  name        String
+  description String?
+  riskScore   Int      @default(5) @map("risk_score")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  products BundleProduct[]
+
+  @@map("bundles")
+}
+
+model BundleProduct {
+  bundleId      String  @map("bundle_id")
+  productId     String  @map("product_id")
+  allocationPct Decimal @default(0) @map("allocation_pct") @db.Decimal
+
+  bundle  Bundle  @relation(fields: [bundleId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([bundleId, productId])
+  @@map("bundle_products")
+}
+
+model SgaFund {
+  id                   String    @id
+  sourceSheet          String    @map("source_sheet")
+  sourceRowNumber      Int       @map("source_row_number")
+  isin                 String
+  fundManagementCompany String?  @map("fund_management_company")
+  fundName             String    @map("fund_name")
+  currency             String?
+  assetClass           String?   @map("asset_class")
+  geographicFocus      String?   @map("geographic_focus")
+  sgaClassification    String?   @map("sga_classification")
+  riskClassification   String?   @map("risk_classification")
+  riskRating           Decimal?  @map("risk_rating") @db.Decimal
+  managementFee        Decimal?  @map("management_fee") @db.Decimal
+  totalExpenseRatio    Decimal?  @map("total_expense_ratio") @db.Decimal
+  inceptionDate        DateTime? @map("inception_date") @db.Date
+  dividendYield        Decimal?  @map("dividend_yield") @db.Decimal
+  lastDividendExDate   DateTime? @map("last_dividend_ex_date") @db.Date
+  dividendFrequency    String?   @map("dividend_frequency")
+  platformAvailability Json      @default("{}") @map("platform_availability")
+  rawData              Json      @default("{}") @map("raw_data")
+  seededAt             DateTime  @default(now()) @map("seeded_at") @db.Timestamptz
+
+  @@map("sga_funds")
+}
