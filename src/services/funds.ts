@@ -36,6 +36,10 @@ export interface FetchSgaFundsOptions {
   sourceSheet?: string;
   insurer?: string;
   platform?: string;
+  assetClass?: string;
+  riskCategory?: string;
+  riskRatings?: number[];
+  hasDividend?: boolean;
 }
 
 function mapFund(row: ApiSgaFund): SgaFund {
@@ -67,6 +71,36 @@ function mapFund(row: ApiSgaFund): SgaFund {
   };
 }
 
+function paramsForOptions(options: FetchSgaFundsOptions) {
+  return {
+    ...(options.search ? { search: options.search } : {}),
+    ...(options.sourceSheet ? { sourceSheet: options.sourceSheet } : {}),
+    ...(options.insurer ? { insurer: options.insurer } : {}),
+    ...(options.platform ? { platform: options.platform } : {}),
+    ...(options.assetClass ? { assetClass: options.assetClass } : {}),
+    ...(options.riskCategory ? { riskCategory: options.riskCategory } : {}),
+    ...(options.riskRatings?.length ? { riskRatings: options.riskRatings.join(",") } : {}),
+    ...(options.hasDividend ? { hasDividend: true } : {}),
+  };
+}
+
+export async function fetchSgaFundsPage(
+  options: FetchSgaFundsOptions = {},
+  page = 1,
+  pageSize = 50,
+): Promise<Page<SgaFund>> {
+  const res = await api.get<Page<ApiSgaFund>>("/api/funds", {
+    page,
+    pageSize,
+    ...paramsForOptions(options),
+  });
+
+  return {
+    ...res,
+    data: res.data.map(mapFund),
+  };
+}
+
 export async function fetchSgaFunds(options: FetchSgaFundsOptions = {}): Promise<SgaFund[]> {
   const pageSize = 500;
   const funds: SgaFund[] = [];
@@ -74,15 +108,8 @@ export async function fetchSgaFunds(options: FetchSgaFundsOptions = {}): Promise
   let total = 0;
 
   do {
-    const res = await api.get<Page<ApiSgaFund>>("/api/funds", {
-      page,
-      pageSize,
-      ...(options.search ? { search: options.search } : {}),
-      ...(options.sourceSheet ? { sourceSheet: options.sourceSheet } : {}),
-      ...(options.insurer ? { insurer: options.insurer } : {}),
-      ...(options.platform ? { platform: options.platform } : {}),
-    });
-    funds.push(...res.data.map(mapFund));
+    const res = await fetchSgaFundsPage(options, page, pageSize);
+    funds.push(...res.data);
     total = res.total;
     page += 1;
   } while (funds.length < total);

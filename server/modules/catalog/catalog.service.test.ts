@@ -44,10 +44,12 @@ describe("listFunds", () => {
     expect(db.sgaFund.findMany.mock.calls[0]![0].where.AND[0].OR).toEqual([
       { fundName: { contains: "dimensional", mode: "insensitive" } },
       { isin: { contains: "dimensional", mode: "insensitive" } },
+      { fundManagementCompany: { contains: "dimensional", mode: "insensitive" } },
+      { sgaClassification: { contains: "dimensional", mode: "insensitive" } },
     ]);
   });
 
-  it("combines source sheet, insurer, and platform filters", async () => {
+  it("combines source sheet, insurer, platform, and browser filters", async () => {
     db.sgaFund.findMany.mockResolvedValue([]);
     db.sgaFund.count.mockResolvedValue(0);
 
@@ -55,6 +57,10 @@ describe("listFunds", () => {
       sourceSheet: "ILP Funds",
       insurer: "FWD",
       platform: "iFAST",
+      assetClass: "Bond",
+      riskCategory: "Moderate",
+      riskRatings: "1,4",
+      hasDividend: true,
       page: 2,
       pageSize: 10,
     } as never);
@@ -73,6 +79,10 @@ describe("listFunds", () => {
           },
         },
       },
+      { assetClass: { equals: "Bond", mode: "insensitive" } },
+      { riskClassification: { equals: "Moderate", mode: "insensitive" } },
+      { OR: [{ riskRating: 1 }, { riskRating: 4 }] },
+      { dividendYield: { not: null } },
     ]);
   });
 });

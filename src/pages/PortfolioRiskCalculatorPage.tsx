@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { ArrowLeft, Plus, Trash2, Search, AlertCircle, ChevronDown, BookOpen, PlusCircle, Check, Banknote, Copy, CheckCheck } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Search, AlertCircle, ChevronDown, BookOpen, PlusCircle, Check, Banknote, Copy, CheckCheck, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,13 +12,24 @@ import {
   type SgaFund,
   type RiskCategory,
 } from "@/data/sgaFunds";
-import { useSgaFunds } from "@/hooks/useFunds";
+import { useInfiniteSgaFunds, useSgaFunds } from "@/hooks/useFunds";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface PortfolioLine {
   id: string;
   fund: SgaFund | null;
   allocation: number; // 0–100
+}
+
+function useDebouncedValue<T>(value: T, delayMs = 250) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const id = window.setTimeout(() => setDebouncedValue(value), delayMs);
+    return () => window.clearTimeout(id);
+  }, [value, delayMs]);
+
+  return debouncedValue;
 }
 
 // ── Risk Matrix display data ──────────────────────────────────────────────────
@@ -166,13 +177,11 @@ const RISK_OPTIONS: RiskCategory[] = ['Conservative', 'Moderate', 'Balanced', 'G
 const RATING_OPTIONS = [1,2,3,4,5,6,7,8,9,10,11,12];
 
 function FundBrowserModal({
-  funds,
   open,
   onClose,
   addedKeys,
   onAdd,
 }: {
-  funds: SgaFund[];
   open: boolean;
   onClose: () => void;
   addedKeys: Set<string>;
@@ -183,35 +192,84 @@ function FundBrowserModal({
   const [filterRisk, setFilterRisk] = useState<RiskCategory | null>(null);
   const [filterRatings, setFilterRatings] = useState<number[]>([]);
   const [filterDividend, setFilterDividend] = useState<boolean>(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const debouncedSearch = useDebouncedValue(search.trim(), 250);
 
   const toggleRating = (r: number) =>
     setFilterRatings((prev) => prev.includes(r) ? prev.filter((x) => x !== r) : [...prev, r]);
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return funds.filter((f) => {
-      if (filterAsset && f.assetClass !== filterAsset) return false;
-      if (filterRisk && f.riskCategory !== filterRisk) return false;
-      if (filterRatings.length > 0 && !filterRatings.includes(f.riskRating)) return false;
-      if (filterDividend && f.dividendYield === null) return false;
-      if (!q) return true;
-      return (
-        f.name.toLowerCase().includes(q) ||
-        f.manager.toLowerCase().includes(q) ||
-        f.sgaClass.toLowerCase().includes(q) ||
-        f.isin.toLowerCase().includes(q)
-      );
-    });
-  }, [funds, search, filterAsset, filterRisk, filterRatings, filterDividend]);
+  const queryOptions = useMemo(
+    () => ({
+      search: debouncedSearch || undefined,
+      assetClass: filterAsset ?? undefined,
+      riskCategory: filterRisk ?? undefined,
+      riskRatings: filterRatings.length > 0 ? [...filterRatings].sort((a, b) => a - b) : undefined,
+      hasDividend: filterDividend || undefined,
+    }),
+    [debouncedSearch, filterAsset, filterRisk, filterRatings, filterDividend],
+  );
+
+  const {
+    data,
+    isLoading,
+    isFetching,
+    isFetchingNextPage,
+    fetchNextPage,
+    hasNextPage,
+  } = useInfiniteSgaFunds(queryOptions, 50, open);
+
+  const funds = useMemo(() => data?.pages.flatMap((page) => page.data) ?? [], [data]);
+  const totalFunds = data?.pages[0]?.total ?? 0;
 
   const hasFilters = !!(search || filterAsset || filterRisk || filterRatings.length || filterDividend);
+  const isSearching = search.trim() !== debouncedSearch;
+
+  useEffect(() => {
+    if (!open) return;
+    setSearch('');
+    setFilterAsset(null);
+    setFilterRisk(null);
+    setFilterRatings([]);
+    setFilterDividend(false);
+    scrollRef.current?.scrollTo({ top: 0 });
+  }, [open]);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: 0 });
+  }, [queryOptions]);
+
+  useEffect(() => {
+    const root = scrollRef.current;
+    const sentinel = sentinelRef.current;
+    if (!root || !sentinel || !hasNextPage || isFetchingNextPage) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) fetchNextPage();
+      },
+      { root, rootMargin: "260px 0px", threshold: 0 },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage, funds.length]);
+
+  const clearFilters = () => {
+    setSearch('');
+    setFilterAsset(null);
+    setFilterRisk(null);
+    setFilterRatings([]);
+    setFilterDividend(false);
+  };
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent className="max-w-5xl h-[82vh] flex flex-col p-0 gap-0">
         <DialogHeader className="px-5 pt-5 pb-3 border-b shrink-0">
           <DialogTitle>Fund Browser</DialogTitle>
-          <p className="text-xs text-muted-foreground">Browse funds and add to your portfolio — {filtered.length} fund{filtered.length !== 1 ? 's' : ''} shown</p>
+          <p className="text-xs text-muted-foreground">
+            {isLoading ? 'Loading funds…' : `${funds.length} of ${totalFunds} fund${totalFunds !== 1 ? 's' : ''} shown`}
+          </p>
         </DialogHeader>
 
         {/* Filters */}
@@ -221,6 +279,9 @@ function FundBrowserModal({
             <Input value={search} onChange={(e) => setSearch(e.target.value)}
               placeholder="Search name, manager, ISIN, or SGA class…"
               className="pl-8 h-8 text-xs" autoFocus />
+            {(isSearching || (isFetching && !isFetchingNextPage)) && (
+              <Loader2 className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 animate-spin text-muted-foreground" />
+            )}
           </div>
 
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
@@ -267,7 +328,7 @@ function FundBrowserModal({
               Has Dividend
             </button>
             {hasFilters && (
-              <button onClick={() => { setSearch(''); setFilterAsset(null); setFilterRisk(null); setFilterRatings([]); setFilterDividend(false); }}
+              <button onClick={clearFilters}
                 className="text-[10px] text-muted-foreground hover:text-foreground underline shrink-0">
                 Clear all
               </button>
@@ -276,7 +337,7 @@ function FundBrowserModal({
         </div>
 
         {/* Table */}
-        <div className="flex-1 overflow-y-auto">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto">
           <table className="w-full text-xs border-collapse">
             <thead className="sticky top-0 bg-muted/90 backdrop-blur-sm z-10 border-b">
               <tr>
@@ -289,9 +350,16 @@ function FundBrowserModal({
               </tr>
             </thead>
             <tbody className="divide-y">
-              {filtered.length === 0 ? (
+              {isLoading || isSearching ? (
+                <tr>
+                  <td colSpan={6} className="text-center py-16 text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" />
+                    Loading funds…
+                  </td>
+                </tr>
+              ) : funds.length === 0 ? (
                 <tr><td colSpan={6} className="text-center py-16 text-muted-foreground">No funds match your filters</td></tr>
-              ) : filtered.map((f) => {
+              ) : funds.map((f) => {
                 const key = f.isin + f.name;
                 const added = addedKeys.has(key);
                 return (
@@ -332,6 +400,18 @@ function FundBrowserModal({
               })}
             </tbody>
           </table>
+          <div ref={sentinelRef} className="h-12 flex items-center justify-center text-xs text-muted-foreground">
+            {isFetchingNextPage ? (
+              <span className="inline-flex items-center gap-2">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Loading more funds…
+              </span>
+            ) : hasNextPage && funds.length > 0 ? (
+              <span>Scroll for more</span>
+            ) : funds.length > 0 ? (
+              <span>End of list</span>
+            ) : null}
+          </div>
         </div>
       </DialogContent>
     </Dialog>
@@ -769,7 +849,6 @@ export function PortfolioRiskCalculatorPage() {
       </div>
 
       <FundBrowserModal
-        funds={funds}
         open={showBrowser}
         onClose={() => setShowBrowser(false)}
         addedKeys={addedKeys}

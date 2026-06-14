@@ -5,6 +5,13 @@ export const fundsQuerySchema = z.object({
   sourceSheet: z.string().trim().min(1).max(80).optional(),
   insurer: z.string().trim().min(1).max(80).optional(),
   platform: z.string().trim().min(1).max(80).optional(),
+  assetClass: z.string().trim().min(1).max(80).optional(),
+  riskCategory: z.string().trim().min(1).max(40).optional(),
+  riskRatings: z.string().trim().min(1).max(80).optional(),
+  hasDividend: z
+    .union([z.boolean(), z.enum(["true", "false"])])
+    .optional()
+    .transform((v) => v === true || v === "true"),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(500).default(25),
 });

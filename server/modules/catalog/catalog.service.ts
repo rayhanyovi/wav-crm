@@ -18,6 +18,14 @@ function mapCatalogFund(row: SgaFund) {
   };
 }
 
+function parseRiskRatings(value: string | undefined): number[] {
+  if (!value) return [];
+  return value
+    .split(",")
+    .map((part) => Number(part.trim()))
+    .filter((rating) => Number.isInteger(rating) && rating >= 1 && rating <= 12);
+}
+
 export async function listFunds(query: FundsQuery): Promise<Paginated<ReturnType<typeof mapCatalogFund>>> {
   const where: Prisma.SgaFundWhereInput = {};
   const and: Prisma.SgaFundWhereInput[] = [];
@@ -26,6 +34,8 @@ export async function listFunds(query: FundsQuery): Promise<Paginated<ReturnType
       OR: [
         { fundName: { contains: query.search, mode: "insensitive" } },
         { isin: { contains: query.search, mode: "insensitive" } },
+        { fundManagementCompany: { contains: query.search, mode: "insensitive" } },
+        { sgaClassification: { contains: query.search, mode: "insensitive" } },
       ],
     });
   }
@@ -52,6 +62,21 @@ export async function listFunds(query: FundsQuery): Promise<Paginated<ReturnType
         },
       },
     });
+  }
+  if (query.assetClass) {
+    and.push({ assetClass: { equals: query.assetClass, mode: "insensitive" } });
+  }
+  if (query.riskCategory) {
+    and.push({ riskClassification: { equals: query.riskCategory, mode: "insensitive" } });
+  }
+  const riskRatings = parseRiskRatings(query.riskRatings);
+  if (riskRatings.length > 0) {
+    and.push({
+      OR: riskRatings.map((rating) => ({ riskRating: rating })),
+    });
+  }
+  if (query.hasDividend) {
+    and.push({ dividendYield: { not: null } });
   }
   if (and.length > 0) where.AND = and;
 
