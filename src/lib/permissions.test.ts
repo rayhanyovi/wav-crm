@@ -10,6 +10,8 @@ import {
   isAdviser,
   isTelemarketer,
   canLogActivity,
+  hasLeadsAccess,
+  isColdCaller,
 } from "./permissions";
 import type { User, UserRole } from "@/data/types";
 
@@ -89,5 +91,30 @@ describe("role predicates", () => {
     expect(isAdviser(adviser)).toBe(true);
     expect(isTelemarketer(tele)).toBe(true);
     expect(isMaster(null)).toBe(false);
+  });
+});
+
+describe("lead access and cold-calling predicates", () => {
+  it("denies lead access for null users", () => {
+    expect(hasLeadsAccess(null)).toBe(false);
+    expect(isColdCaller(null)).toBe(false);
+  });
+
+  it("allows non-advisers into leads by role", () => {
+    expect(hasLeadsAccess(master)).toBe(true);
+    expect(hasLeadsAccess(tele)).toBe(true);
+  });
+
+  it("uses the adviser lead-access toggle with a default of true", () => {
+    expect(hasLeadsAccess({ ...adviser, leads_access: undefined })).toBe(true);
+    expect(hasLeadsAccess({ ...adviser, leads_access: true })).toBe(true);
+    expect(hasLeadsAccess({ ...adviser, leads_access: false })).toBe(false);
+  });
+
+  it("treats masters, telemarketers, and lead-enabled advisers as cold callers", () => {
+    expect(isColdCaller(master)).toBe(true);
+    expect(isColdCaller(tele)).toBe(true);
+    expect(isColdCaller({ ...adviser, leads_access: true })).toBe(true);
+    expect(isColdCaller({ ...adviser, leads_access: false })).toBe(false);
   });
 });

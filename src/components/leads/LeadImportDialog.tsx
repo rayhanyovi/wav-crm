@@ -1,6 +1,6 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import * as XLSX from "xlsx";
-import { Upload, AlertCircle, CheckCircle2, X, Layers } from "lucide-react";
+import { Upload, AlertCircle, CheckCircle2, X, Layers, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -26,7 +26,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useAuthStore } from "@/store/useAuthStore";
-import { useBulkCreateLeads } from "@/hooks/useLeads";
+import { useBulkCreateLeads, useLeads } from "@/hooks/useLeads";
 import { isTelemarketer } from "@/lib/permissions";
 import type { LeadStatus, LeadSource } from "@/data/types";
 
@@ -162,6 +162,14 @@ function normalisePhone(raw: string): string | undefined {
   return cleaned || undefined;
 }
 
+// Digits-only key for duplicate matching (ignores +, spaces, dashes). Returns
+// null for missing / too-short values so those rows are never flagged as dupes.
+function phoneKey(raw?: string | null): string | null {
+  if (!raw) return null;
+  const digits = raw.replace(/\D/g, "");
+  return digits.length >= 6 ? digits : null;
+}
+
 interface ParsedRow {
   salutation?: string;
   first_name: string;
@@ -246,18 +254,48 @@ const SOURCE_LABELS: Record<LeadSource, string> = {
 export function LeadImportDialog({ open, onClose }: Props) {
   const { currentUser } = useAuthStore();
   const bulkCreateMutation = useBulkCreateLeads();
+  // Existing leads (shared react-query cache) — used to detect phone duplicates.
+  const { data: existingLeads = [] } = useLeads({ includeAbandoned: true });
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [text, setText] = useState("");
   const [parsed, setParsed] = useState<ParsedRow[]>([]);
   const [importing, setImporting] = useState(false);
-  const [done, setDone] = useState<{ ok: number; skipped: number } | null>(null);
+  const [skipDuplicates, setSkipDuplicates] = useState(true);
+  const [done, setDone] = useState<{ ok: number; skipped: number; duplicates: number } | null>(null);
   const [defaultSource, setDefaultSource] = useState<LeadSource>("AP_MARKETING");
   const [fileName, setFileName] = useState<string | null>(null);
   // Multi-sheet support
   const [sheetNames, setSheetNames] = useState<string[]>([]);
   const [selectedSheet, setSelectedSheet] = useState(0);
   const [xlsxBuffer, setXlsxBuffer] = useState<ArrayBuffer | null>(null);
+
+  // ── Duplicate detection (by phone) ──────────────────────────────────────────
+  const existingPhones = useMemo(() => {
+    const s = new Set<string>();
+    for (const l of existingLeads) {
+      const k = phoneKey(l.phone);
+      if (k) s.add(k);
+    }
+    return s;
+  }, [existingLeads]);
+
+  // Per-row duplicate reason, index-aligned with `parsed`.
+  // "existing" = phone already in the system; "file" = repeated earlier in this file.
+  const dupFlags = useMemo<(null | "existing" | "file")[]>(() => {
+    const seen = new Set<string>();
+    return parsed.map((r) => {
+      const k = phoneKey(r.phone);
+      if (!k) return null;
+      let reason: "existing" | "file" | null = null;
+      if (existingPhones.has(k)) reason = "existing";
+      else if (seen.has(k)) reason = "file";
+      seen.add(k);
+      return reason;
+    });
+  }, [parsed, existingPhones]);
+
+  const duplicateCount = dupFlags.filter(Boolean).length;
 
   const applyDefaultSource = (rows: ParsedRow[]): ParsedRow[] =>
     rows.map((r) =>
@@ -312,11 +350,13 @@ export function LeadImportDialog({ open, onClose }: Props) {
     if (!currentUser) return;
     setImporting(true);
     const isTm = isTelemarketer(currentUser);
-    const validRows = parsed.filter((r) => r._valid);
-    const skipped = parsed.length - validRows.length;
-    const ok = validRows.length;
+    // Import valid rows, skipping phone duplicates unless the user opted to keep them.
+    const rows = parsed.filter((r, i) => r._valid && (!skipDuplicates || !dupFlags[i]));
+    const skipped = parsed.filter((r) => !r._valid).length;
+    const duplicates = skipDuplicates ? parsed.filter((r, i) => r._valid && dupFlags[i]).length : 0;
+    const ok = rows.length;
 
-    const payloads = validRows.map((row) => ({
+    const payloads = rows.map((row) => ({
       salutation: row.salutation,
       first_name: row.first_name,
       last_name: row.last_name,
@@ -339,7 +379,7 @@ export function LeadImportDialog({ open, onClose }: Props) {
     bulkCreateMutation.mutate(payloads, {
       onSuccess: () => {
         setImporting(false);
-        setDone({ ok, skipped });
+        setDone({ ok, skipped, duplicates });
       },
       onError: () => {
         setImporting(false);
@@ -355,11 +395,14 @@ export function LeadImportDialog({ open, onClose }: Props) {
     setSheetNames([]);
     setSelectedSheet(0);
     setXlsxBuffer(null);
+    setSkipDuplicates(true);
     onClose();
   };
 
   const validRows = parsed.filter((r) => r._valid);
   const invalidRows = parsed.filter((r) => !r._valid);
+  // What will actually be created: valid rows, minus duplicates when skipping is on.
+  const importRows = parsed.filter((r, i) => r._valid && (!skipDuplicates || !dupFlags[i]));
   const previewRows = parsed.slice(0, 6);
 
   return (
@@ -472,15 +515,30 @@ export function LeadImportDialog({ open, onClose }: Props) {
               {/* Parse feedback */}
               {parsed.length > 0 && (
                 <div className="space-y-2">
-                  <div className="flex items-center gap-3 text-sm">
+                  <div className="flex flex-wrap items-center gap-3 text-sm">
                     <span className="flex items-center gap-1 text-green-600 dark:text-green-400">
                       <CheckCircle2 className="h-4 w-4" />
-                      {validRows.length} valid
+                      {importRows.length} will import
                     </span>
+                    {duplicateCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setSkipDuplicates((s) => !s)}
+                        className={`flex items-center gap-1 rounded px-1.5 py-0.5 transition-colors ${
+                          skipDuplicates
+                            ? "text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
+                            : "text-muted-foreground line-through hover:bg-muted"
+                        }`}
+                        title={skipDuplicates ? "Click to import duplicates anyway" : "Click to skip duplicates"}
+                      >
+                        <Copy className="h-4 w-4" />
+                        {duplicateCount} duplicate{duplicateCount === 1 ? "" : "s"}{skipDuplicates ? " skipped" : " kept"}
+                      </button>
+                    )}
                     {invalidRows.length > 0 && (
                       <span className="flex items-center gap-1 text-destructive">
                         <AlertCircle className="h-4 w-4" />
-                        {invalidRows.length} will be skipped (missing name)
+                        {invalidRows.length} skipped (missing name)
                       </span>
                     )}
                   </div>
@@ -500,11 +558,19 @@ export function LeadImportDialog({ open, onClose }: Props) {
                       </TableHeader>
                       <TableBody>
                         {previewRows.map((row, i) => (
-                          <TableRow key={i} className={!row._valid ? "opacity-50" : ""}>
+                          <TableRow
+                            key={i}
+                            className={!row._valid || (skipDuplicates && dupFlags[i]) ? "opacity-50" : ""}
+                          >
                             <TableCell className="text-xs">
                               {[row.salutation, row.first_name, row.last_name].filter(Boolean).join(" ")}
                               {!row._valid && (
                                 <span className="ml-1 text-destructive text-[10px]">({row._error})</span>
+                              )}
+                              {row._valid && dupFlags[i] && (
+                                <span className="ml-1 text-amber-600 dark:text-amber-400 text-[10px]">
+                                  (duplicate{dupFlags[i] === "file" ? " in file" : ""})
+                                </span>
                               )}
                             </TableCell>
                             <TableCell className="text-xs">{row.phone ?? "—"}</TableCell>
@@ -535,6 +601,11 @@ export function LeadImportDialog({ open, onClose }: Props) {
             <div className="flex flex-col items-center justify-center py-10 gap-3 text-center">
               <CheckCircle2 className="h-12 w-12 text-green-500" />
               <h3 className="text-lg font-semibold">{done.ok} leads imported</h3>
+              {done.duplicates > 0 && (
+                <p className="text-sm text-amber-600 dark:text-amber-400">
+                  {done.duplicates} duplicate{done.duplicates === 1 ? "" : "s"} skipped (phone already exists)
+                </p>
+              )}
               {done.skipped > 0 && (
                 <p className="text-sm text-muted-foreground">{done.skipped} rows skipped (missing name)</p>
               )}
@@ -548,10 +619,10 @@ export function LeadImportDialog({ open, onClose }: Props) {
             <>
               <Button variant="outline" onClick={handleClose}>Cancel</Button>
               <Button
-                disabled={validRows.length === 0 || importing}
+                disabled={importRows.length === 0 || importing}
                 onClick={handleImport}
               >
-                {importing ? "Importing…" : `Import ${validRows.length} Leads`}
+                {importing ? "Importing…" : `Import ${importRows.length} Leads`}
               </Button>
             </>
           ) : (

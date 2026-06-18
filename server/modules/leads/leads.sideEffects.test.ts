@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { Lead } from "../../../prisma/generated/client/index.js";
-import { buildLeadNotifications, deriveStatusColumns } from "./leads.sideEffects.js";
+import { buildLeadNotifications, deriveStatusColumns, recordStatusNote } from "./leads.sideEffects.js";
 
 function lead(overrides: Partial<Lead> = {}): Lead {
   return {
@@ -66,7 +66,54 @@ describe("buildLeadNotifications", () => {
     expect(rows).toEqual([expect.objectContaining({ type: "LEAD_BOUNCED", recipientId: "tm-1" })]);
   });
 
+  it("falls back to a generic name and omits the date when both are missing", () => {
+    const prev = lead({ status: "NA", assignedToId: "adv-1", firstName: " ", lastName: " " });
+    const next = lead({ status: "APPOINTMENT", assignedToId: "adv-1", firstName: " ", lastName: " ", appointmentDate: null });
+    const rows = buildLeadNotifications(prev, next);
+    expect(rows[0]?.message).toContain("A lead");
+    expect(rows[0]?.message).not.toMatch(/\d{4}-\d{2}-\d{2}/);
+  });
+
+  it("does not emit LEAD_BOUNCED when there is no previous TM owner", () => {
+    const rows = buildLeadNotifications(
+      lead({ telemarketerOwnerId: null, bounceCount: 0 }),
+      lead({ telemarketerOwnerId: null, bounceCount: 1 }),
+    );
+    expect(rows.find((r) => r.type === "LEAD_BOUNCED")).toBeUndefined();
+  });
+
   it("emits nothing for an inert update", () => {
     expect(buildLeadNotifications(lead(), lead())).toEqual([]);
+  });
+});
+
+describe("recordStatusNote", () => {
+  it("writes a human-readable note for a status change", async () => {
+    const create = vi.fn();
+    await recordStatusNote({ leadNote: { create } } as never, {
+      leadId: "l1", prevStatus: "NA", nextStatus: "KIV", changedBy: "u1",
+    });
+    const data = create.mock.calls[0]![0].data;
+    expect(data).toMatchObject({ leadId: "l1", createdBy: "u1" });
+    expect(data.content).toContain("NA");
+    expect(data.content).toContain("KIV");
+  });
+
+  it("skips writing a note when the status is unchanged", async () => {
+    const create = vi.fn();
+    await recordStatusNote({ leadNote: { create } } as never, {
+      leadId: "l1", prevStatus: "NA", nextStatus: "NA", changedBy: "u1",
+    });
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the raw status codes for unmapped statuses (both sides)", async () => {
+    const create = vi.fn();
+    await recordStatusNote({ leadNote: { create } } as never, {
+      leadId: "l1", prevStatus: "WEIRD_FROM" as never, nextStatus: "WEIRD_TO" as never, changedBy: "u1",
+    });
+    const content = create.mock.calls[0]![0].data.content;
+    expect(content).toContain("WEIRD_FROM");
+    expect(content).toContain("WEIRD_TO");
   });
 });

@@ -26,6 +26,10 @@ const EnvSchema = z.object({
   SUPABASE_JWKS_URL: z.string().url().optional(),
   SUPABASE_JWT_SECRET: z.string().min(1, "SUPABASE_JWT_SECRET is required"),
   SUPABASE_JWT_AUD: z.string().default("authenticated"),
+  DEV_AUTH_ENABLED: z
+    .string()
+    .default("false")
+    .transform((v) => ["1", "true", "yes", "on"].includes(v.trim().toLowerCase())),
 });
 
 function loadEnv() {

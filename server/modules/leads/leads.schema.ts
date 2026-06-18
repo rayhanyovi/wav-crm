@@ -40,6 +40,14 @@ export const createLeadSchema = z.object({
   status: leadStatus.default("NA"),
   notes: z.string().max(5000).optional(),
   assigned_to_id: z.string().optional(),
+  telemarketer_owner_id: z.string().optional(),
+  // Demographic fields — populated during bulk import
+  salutation: z.string().max(20).optional(),
+  age: z.number().int().min(0).max(150).optional(),
+  gender: z.string().max(20).optional(),
+  residential_status: z.string().max(60).optional(),
+  income_range: z.string().max(60).optional(),
+  zipcode: z.string().max(20).optional(),
   // created_by is taken from the authenticated actor, never the client.
 });
 
@@ -73,6 +81,10 @@ export const updateLeadSchema = z
     converted_contact_id: z.string().nullish(),
     fact_find_done: z.boolean().nullish(),
     fact_find_notes: z.string().max(5000).nullish(),
+    // Scheduled callback ("call me back at 2PM")
+    callback_at: z.string().datetime().nullish(),
+    callback_assigned_to: z.string().nullish(),
+    callback_note: z.string().max(500).nullish(),
   })
   .partial()
   .refine((obj) => Object.keys(obj).length > 0, { message: "Empty update payload" });
@@ -94,9 +106,19 @@ export const convertLeadSchema = z.object({
   assigned_adviser_id: z.string().nullish(),
 });
 
-/** Body for POST /leads/claim-for-call — batch-claim leads into a TM session. */
+/** Body for POST /leads/claim-for-call — batch-claim leads into a TM session.
+ *  When `leadIds` is provided, only those specific (still-available) leads are
+ *  locked — used by filtered sessions and the single-lead "Call" button so the
+ *  leads shown to the TM are the leads actually soft-locked. Falls back to
+ *  count-based pooling when `leadIds` is omitted. */
 export const claimForCallSchema = z.object({
   count: z.number().int().min(1).max(50).default(15),
+  leadIds: z.array(z.string()).min(1).max(50).optional(),
+});
+
+/** Body for POST /leads/:id/merge-duplicates — keep :id, fold source rows into it. */
+export const mergeDuplicateLeadsSchema = z.object({
+  source_ids: z.array(z.string().min(1)).min(1).max(25),
 });
 
 /** Body for POST /leads/:id/notes */
@@ -109,4 +131,5 @@ export type CreateLeadInput = z.infer<typeof createLeadSchema>;
 export type UpdateLeadInput = z.infer<typeof updateLeadSchema>;
 export type ConvertLeadInput = z.infer<typeof convertLeadSchema>;
 export type ClaimForCallInput = z.infer<typeof claimForCallSchema>;
+export type MergeDuplicateLeadsInput = z.infer<typeof mergeDuplicateLeadsSchema>;
 export type AddNoteInput = z.infer<typeof addNoteSchema>;

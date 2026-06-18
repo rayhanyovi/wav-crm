@@ -27,6 +27,9 @@ interface ApiLead {
   phone: string | null;
   age: number | null;
   gender: string | null;
+  residentialStatus: string | null;
+  incomeRange: string | null;
+  zipcode: string | null;
   status: LeadStatus;
   source: LeadSource;
   notes: string | null;
@@ -42,6 +45,9 @@ interface ApiLead {
   convertedContactId: string | null;
   convertedAt: string | null;
   lastContactedAt: string | null;
+  callbackAt: string | null;
+  callbackAssignedTo: string | null;
+  callbackNote: string | null;
   financialGoal: string | null;
   riskTolerance: string | null;
   investmentHorizon: string | null;
@@ -73,6 +79,9 @@ function mapLead(r: ApiLead): Lead {
     phone: r.phone ?? undefined,
     age: r.age ?? undefined,
     gender: r.gender ?? undefined,
+    residential_status: r.residentialStatus ?? undefined,
+    income_range: r.incomeRange ?? undefined,
+    zipcode: r.zipcode ?? undefined,
     status: r.status,
     source: r.source,
     notes: r.notes ?? undefined,
@@ -88,6 +97,9 @@ function mapLead(r: ApiLead): Lead {
     converted_contact_id: r.convertedContactId ?? undefined,
     converted_at: r.convertedAt ?? undefined,
     last_contacted_at: r.lastContactedAt ?? undefined,
+    callback_at: r.callbackAt ?? undefined,
+    callback_assigned_to: r.callbackAssignedTo ?? undefined,
+    callback_note: r.callbackNote ?? undefined,
     financial_goal: (r.financialGoal as Lead["financial_goal"]) ?? undefined,
     risk_tolerance: (r.riskTolerance as Lead["risk_tolerance"]) ?? undefined,
     investment_horizon: (r.investmentHorizon as Lead["investment_horizon"]) ?? undefined,
@@ -155,6 +167,13 @@ export async function createLead(payload: CreateLeadPayload): Promise<Lead> {
     status: payload.status ?? "NA",
     notes: payload.notes,
     assigned_to_id: payload.assigned_to_id,
+    telemarketer_owner_id: payload.telemarketer_owner_id,
+    salutation: payload.salutation,
+    age: payload.age,
+    gender: payload.gender,
+    residential_status: payload.residential_status,
+    income_range: payload.income_range,
+    zipcode: payload.zipcode,
   });
   return mapLead(res.data);
 }
@@ -172,6 +191,54 @@ export async function deleteLead(id: string): Promise<void> {
   await api.delete(`/api/leads/${id}`);
 }
 
+export interface MergeDuplicateLeadsResult {
+  lead: Lead;
+  merged_source_ids: string[];
+  moved: {
+    notes: number;
+    status_history: number;
+    activities: number;
+    deals: number;
+    credit_transactions: number;
+    notifications: number;
+  };
+}
+
+interface ApiMergeDuplicateLeadsResult {
+  lead: ApiLead;
+  mergedSourceIds: string[];
+  moved: {
+    notes: number;
+    statusHistory: number;
+    activities: number;
+    deals: number;
+    creditTransactions: number;
+    notifications: number;
+  };
+}
+
+export async function mergeDuplicateLeads(
+  targetId: string,
+  sourceIds: string[],
+): Promise<MergeDuplicateLeadsResult> {
+  const res = await api.post<Envelope<ApiMergeDuplicateLeadsResult>>(
+    `/api/leads/${targetId}/merge-duplicates`,
+    { source_ids: sourceIds },
+  );
+  return {
+    lead: mapLead(res.data.lead),
+    merged_source_ids: res.data.mergedSourceIds,
+    moved: {
+      notes: res.data.moved.notes,
+      status_history: res.data.moved.statusHistory,
+      activities: res.data.moved.activities,
+      deals: res.data.moved.deals,
+      credit_transactions: res.data.moved.creditTransactions,
+      notifications: res.data.moved.notifications,
+    },
+  };
+}
+
 // ─── RPC-style operations ─────────────────────────────────────────────────────
 
 export async function claimLead(leadId: string, _userId?: string): Promise<{ new_balance: number }> {
@@ -181,8 +248,13 @@ export async function claimLead(leadId: string, _userId?: string): Promise<{ new
   return { new_balance: 0 };
 }
 
-export async function claimLeadsForCall(_leadIds: string[], _userId?: string): Promise<void> {
-  await api.post("/api/leads/claim-for-call", { count: _leadIds.length || 15 });
+export async function claimLeadsForCall(leadIds: string[], _userId?: string): Promise<void> {
+  // When we have concrete IDs, ask the server to lock exactly those leads so the
+  // queue the TM sees matches what gets soft-locked. Falls back to count-based.
+  await api.post("/api/leads/claim-for-call", {
+    count: leadIds.length || 15,
+    leadIds: leadIds.length ? leadIds : undefined,
+  });
 }
 
 export async function returnLead(leadId: string, _userId?: string): Promise<{ new_balance: number }> {

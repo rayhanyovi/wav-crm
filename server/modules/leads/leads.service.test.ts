@@ -15,6 +15,7 @@ const db = vi.hoisted(() => {
       findMany: vi.fn(),
     },
     leadStatusHistory: { create: vi.fn() },
+    leadNote: { create: vi.fn() },
     notification: { createMany: vi.fn() },
     auditLog: { create: vi.fn() },
     $transaction: vi.fn(),
@@ -189,6 +190,36 @@ describe("updateLead side-effects", () => {
     await expect(updateLead(actor(), "nope", { notes: "x" } as never)).rejects.toMatchObject({
       code: "NOT_FOUND",
     });
+  });
+
+  it("schedules a callback as a Date and resets the notified flag", async () => {
+    const prev = { id: "l1", status: "NA", firstName: "A", lastName: "B", assignedToId: "u1", telemarketerOwnerId: "u1", adviserOwnerId: null, bounceCount: 0 };
+    db.lead.findFirst.mockResolvedValue(prev);
+    db.lead.update.mockResolvedValue({ ...prev });
+
+    await updateLead(actor(), "l1", {
+      callback_at: "2026-07-02T06:30:00.000Z",
+      callback_assigned_to: "tm-2",
+      callback_note: "wants 2pm",
+    } as never);
+
+    const data = db.lead.update.mock.calls.at(-1)![0].data;
+    expect(data.callbackAt).toBeInstanceOf(Date);
+    expect(data.callbackNotified).toBe(false);
+    expect(data.callbackAssignedTo).toBe("tm-2");
+    expect(data.callbackNote).toBe("wants 2pm");
+  });
+
+  it("clears a scheduled callback when callback_at is null", async () => {
+    const prev = { id: "l1", status: "NA", firstName: "A", lastName: "B", assignedToId: "u1", telemarketerOwnerId: "u1", adviserOwnerId: null, bounceCount: 0 };
+    db.lead.findFirst.mockResolvedValue(prev);
+    db.lead.update.mockResolvedValue({ ...prev });
+
+    await updateLead(actor(), "l1", { callback_at: null } as never);
+
+    const data = db.lead.update.mock.calls.at(-1)![0].data;
+    expect(data.callbackAt).toBeNull();
+    expect(data.callbackNotified).toBe(false);
   });
 });
 

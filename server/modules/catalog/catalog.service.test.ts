@@ -16,7 +16,7 @@ const db = vi.hoisted(() => ({
 
 vi.mock("../../lib/prisma.js", () => ({ prisma: db }));
 
-const { getFundsMeta, listFunds } = await import("./catalog.service.js");
+const { getFundsMeta, listFunds, listProducts, listBundles } = await import("./catalog.service.js");
 
 beforeEach(() => vi.clearAllMocks());
 
@@ -100,6 +100,38 @@ describe("getFundsMeta", () => {
     await expect(getFundsMeta()).resolves.toEqual({
       total: 1694,
       version: "1694:2026-06-14T19:24:56.351Z",
+    });
+  });
+
+  it("falls back to an 'empty' version when nothing has been seeded", async () => {
+    db.sgaFund.aggregate.mockResolvedValue({ _count: { _all: 0 }, _max: { seededAt: null } });
+    await expect(getFundsMeta()).resolves.toEqual({ total: 0, version: "0:empty" });
+  });
+});
+
+describe("listProducts", () => {
+  it("returns all products by default", async () => {
+    db.product.findMany.mockResolvedValue([{ id: "p1" }]);
+    const res = await listProducts({} as never);
+    expect(res).toHaveLength(1);
+    expect(db.product.findMany.mock.calls[0]![0].where).toEqual({});
+  });
+
+  it("filters to active products when active_only is set", async () => {
+    db.product.findMany.mockResolvedValue([]);
+    await listProducts({ active_only: true } as never);
+    expect(db.product.findMany.mock.calls[0]![0].where).toMatchObject({ isActive: true });
+  });
+});
+
+describe("listBundles", () => {
+  it("returns bundles with nested products, filtered by active_only", async () => {
+    db.bundle.findMany.mockResolvedValue([{ id: "b1", products: [] }]);
+    const res = await listBundles({ active_only: true } as never);
+    expect(res).toHaveLength(1);
+    expect(db.bundle.findMany.mock.calls[0]![0]).toMatchObject({
+      where: { isActive: true },
+      include: { products: { include: { product: true } } },
     });
   });
 });

@@ -1,0 +1,23 @@
+name: wav-crm-local
+
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: wav-crm-local-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: wav_crm
+    ports:
+      - "55432:5432"
+    volumes:
+      - wav_crm_local_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d wav_crm"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  wav_crm_local_pgdata:

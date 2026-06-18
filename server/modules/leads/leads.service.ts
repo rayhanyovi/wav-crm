@@ -19,6 +19,7 @@ import type {
   ConvertLeadInput,
   CreateLeadInput,
   ListQuery,
+  MergeDuplicateLeadsInput,
   UpdateLeadInput,
 } from "./leads.schema.js";
 import {
@@ -35,6 +36,48 @@ export interface Paginated<T> {
   page: number;
   pageSize: number;
   total: number;
+}
+
+export interface MergeDuplicateLeadsResult {
+  lead: Lead;
+  mergedSourceIds: string[];
+  moved: {
+    notes: number;
+    statusHistory: number;
+    activities: number;
+    deals: number;
+    creditTransactions: number;
+    notifications: number;
+  };
+}
+
+function phoneKey(phone: string | null | undefined): string {
+  return (phone ?? "").replace(/\D/g, "");
+}
+
+function isBlank(value: unknown): boolean {
+  if (value === null || value === undefined) return true;
+  return typeof value === "string" && value.trim() === "";
+}
+
+function firstPresent<T>(
+  target: T | null | undefined,
+  sources: Array<T | null | undefined>,
+): T | undefined {
+  if (!isBlank(target)) return undefined;
+  return sources.find((value) => !isBlank(value)) ?? undefined;
+}
+
+function mergeNotes(target: string | null | undefined, sources: Lead[]): string | undefined {
+  const parts = [target?.trim()].filter(Boolean) as string[];
+  for (const source of sources) {
+    const note = source.notes?.trim();
+    if (!note || parts.includes(note)) continue;
+    const name = `${source.firstName} ${source.lastName}`.trim() || source.id;
+    parts.push(`Merged from duplicate ${name}: ${note}`);
+  }
+  const merged = parts.join("\n\n");
+  return merged && merged !== (target ?? "") ? merged : undefined;
 }
 
 /** Maps the snake_case update DTO onto Prisma's camelCase fields (patch only). */
@@ -62,6 +105,14 @@ function toPrismaUpdate(input: UpdateLeadInput): Prisma.LeadUpdateInput {
   set("convertedContactId", input.converted_contact_id);
   set("factFindDone", input.fact_find_done);
   set("factFindNotes", input.fact_find_notes);
+  // Scheduled callback. Rescheduling (a non-null callback_at) resets the
+  // "due notification already sent" flag so the new time fires its own alert.
+  if (input.callback_at !== undefined) {
+    out.callbackAt = input.callback_at ? new Date(input.callback_at) : null;
+    out.callbackNotified = false;
+  }
+  set("callbackAssignedTo", input.callback_assigned_to);
+  set("callbackNote", input.callback_note);
   return out;
 }
 
@@ -154,6 +205,7 @@ export async function createLead(actor: Actor, input: CreateLeadInput): Promise<
     const lead = await tx.lead.create({
       data: {
         id: randomUUID(),
+        salutation: input.salutation,
         firstName: input.first_name,
         lastName: input.last_name,
         email: input.email,
@@ -162,6 +214,12 @@ export async function createLead(actor: Actor, input: CreateLeadInput): Promise<
         status: input.status,
         notes: input.notes,
         assignedToId: input.assigned_to_id,
+        telemarketerOwnerId: input.telemarketer_owner_id,
+        age: input.age,
+        gender: input.gender,
+        residentialStatus: input.residential_status,
+        incomeRange: input.income_range,
+        zipcode: input.zipcode,
         createdBy: actor.id,
       },
     });
@@ -226,6 +284,147 @@ export async function softDeleteLead(actor: Actor, id: string): Promise<void> {
   await prisma.$transaction(async (tx) => {
     await tx.lead.update({ where: { id }, data: { deletedAt: new Date() } });
     await writeAuditLog(tx, { userId: actor.id, action: "DELETE", entityId: id, old: lead, next: null });
+  });
+}
+
+/**
+ * True duplicate merge: keep one canonical lead, move dependent records from the
+ * duplicate rows, then soft-delete the source rows. Phone-key equality is
+ * enforced so this cannot be used as a random bulk delete.
+ */
+export async function mergeDuplicateLeads(
+  actor: Actor,
+  targetId: string,
+  input: MergeDuplicateLeadsInput,
+): Promise<MergeDuplicateLeadsResult> {
+  const sourceIds = Array.from(new Set(input.source_ids)).filter((id) => id !== targetId);
+  if (sourceIds.length === 0) {
+    throw new ConflictError("Choose at least one duplicate lead to merge");
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const rows = await tx.lead.findMany({
+      where: { id: { in: [targetId, ...sourceIds] }, deletedAt: null },
+    });
+    const target = rows.find((lead) => lead.id === targetId);
+    const sources = sourceIds
+      .map((id) => rows.find((lead) => lead.id === id))
+      .filter((lead): lead is Lead => Boolean(lead));
+
+    if (!target) throw new NotFoundError("Lead to keep not found");
+    if (sources.length !== sourceIds.length) {
+      throw new NotFoundError("One or more duplicate leads were not found");
+    }
+
+    const targetPhoneKey = phoneKey(target.phone);
+    if (targetPhoneKey.length < 6) {
+      throw new ConflictError("The lead to keep needs a valid phone number before merging");
+    }
+    const mismatched = sources.filter((source) => phoneKey(source.phone) !== targetPhoneKey);
+    if (mismatched.length > 0) {
+      throw new ConflictError("All merged leads must share the same phone number");
+    }
+
+    const sharedAdviserIds = await getSharedAdviserIdsForTelemarketer(tx, actor);
+    if (!canUpdateLead(actor, target, sharedAdviserIds)) {
+      throw new ForbiddenError("Not allowed to update the lead you want to keep");
+    }
+    const forbiddenSource = sources.find((source) => !canDeleteLead(actor, source));
+    if (forbiddenSource) {
+      throw new ForbiddenError("Not allowed to merge one or more selected duplicates");
+    }
+
+    const data: Prisma.LeadUpdateInput = {};
+    const setIfMissing = <K extends keyof Prisma.LeadUpdateInput>(
+      key: K,
+      value: Prisma.LeadUpdateInput[K] | undefined,
+    ) => {
+      if (value !== undefined) data[key] = value;
+    };
+
+    setIfMissing("salutation", firstPresent(target.salutation, sources.map((source) => source.salutation)));
+    setIfMissing("email", firstPresent(target.email, sources.map((source) => source.email)));
+    setIfMissing("age", firstPresent(target.age, sources.map((source) => source.age)));
+    setIfMissing("gender", firstPresent(target.gender, sources.map((source) => source.gender)));
+    setIfMissing("residentialStatus", firstPresent(target.residentialStatus, sources.map((source) => source.residentialStatus)));
+    setIfMissing("incomeRange", firstPresent(target.incomeRange, sources.map((source) => source.incomeRange)));
+    setIfMissing("zipcode", firstPresent(target.zipcode, sources.map((source) => source.zipcode)));
+    setIfMissing("personality", firstPresent(target.personality, sources.map((source) => source.personality)));
+    setIfMissing("preferredContactMethod", firstPresent(target.preferredContactMethod, sources.map((source) => source.preferredContactMethod)));
+    setIfMissing("bestTimeToCall", firstPresent(target.bestTimeToCall, sources.map((source) => source.bestTimeToCall)));
+    setIfMissing("appointmentDate", firstPresent(target.appointmentDate, sources.map((source) => source.appointmentDate)));
+    setIfMissing("appointmentTime", firstPresent(target.appointmentTime, sources.map((source) => source.appointmentTime)));
+    setIfMissing("appointmentResult", firstPresent(target.appointmentResult, sources.map((source) => source.appointmentResult)));
+    setIfMissing("otherStatusNote", firstPresent(target.otherStatusNote, sources.map((source) => source.otherStatusNote)));
+    setIfMissing("assignedToId", firstPresent(target.assignedToId, sources.map((source) => source.assignedToId)));
+    setIfMissing("telemarketerOwnerId", firstPresent(target.telemarketerOwnerId, sources.map((source) => source.telemarketerOwnerId)));
+    setIfMissing("adviserOwnerId", firstPresent(target.adviserOwnerId, sources.map((source) => source.adviserOwnerId)));
+    setIfMissing("lastBouncedAt", firstPresent(target.lastBouncedAt, sources.map((source) => source.lastBouncedAt)));
+    setIfMissing("convertedContactId", firstPresent(target.convertedContactId, sources.map((source) => source.convertedContactId)));
+    setIfMissing("convertedAt", firstPresent(target.convertedAt, sources.map((source) => source.convertedAt)));
+    setIfMissing("cooldownUntil", firstPresent(target.cooldownUntil, sources.map((source) => source.cooldownUntil)));
+    setIfMissing("lastContactedAt", firstPresent(target.lastContactedAt, sources.map((source) => source.lastContactedAt)));
+    setIfMissing("callbackAt", firstPresent(target.callbackAt, sources.map((source) => source.callbackAt)));
+    setIfMissing("callbackAssignedTo", firstPresent(target.callbackAssignedTo, sources.map((source) => source.callbackAssignedTo)));
+    setIfMissing("callbackNote", firstPresent(target.callbackNote, sources.map((source) => source.callbackNote)));
+    setIfMissing("financialGoal", firstPresent(target.financialGoal, sources.map((source) => source.financialGoal)));
+    setIfMissing("riskTolerance", firstPresent(target.riskTolerance, sources.map((source) => source.riskTolerance)));
+    setIfMissing("investmentHorizon", firstPresent(target.investmentHorizon, sources.map((source) => source.investmentHorizon)));
+    setIfMissing("monthlyInvestable", firstPresent(target.monthlyInvestable, sources.map((source) => source.monthlyInvestable)));
+    setIfMissing("existingInvestments", firstPresent(target.existingInvestments, sources.map((source) => source.existingInvestments)));
+    setIfMissing("factFindNotes", firstPresent(target.factFindNotes, sources.map((source) => source.factFindNotes)));
+    setIfMissing("factFindDone", firstPresent(target.factFindDone, sources.map((source) => source.factFindDone)));
+
+    const mergedNotes = mergeNotes(target.notes, sources);
+    if (mergedNotes !== undefined) data.notes = mergedNotes;
+    if (data.callbackAt !== undefined) data.callbackNotified = false;
+
+    let next = target;
+    if (Object.keys(data).length > 0) {
+      next = await tx.lead.update({ where: { id: targetId }, data });
+    }
+
+    const [notes, statusHistory, activities, deals, creditTransactions, notifications] = await Promise.all([
+      tx.leadNote.updateMany({ where: { leadId: { in: sourceIds } }, data: { leadId: targetId } }),
+      tx.leadStatusHistory.updateMany({ where: { leadId: { in: sourceIds } }, data: { leadId: targetId } }),
+      tx.activity.updateMany({ where: { leadId: { in: sourceIds } }, data: { leadId: targetId } }),
+      tx.deal.updateMany({ where: { leadId: { in: sourceIds } }, data: { leadId: targetId } }),
+      tx.creditTransaction.updateMany({ where: { leadId: { in: sourceIds } }, data: { leadId: targetId } }),
+      tx.notification.updateMany({
+        where: { entityType: "lead", entityId: { in: sourceIds } },
+        data: { entityId: targetId },
+      }),
+    ]);
+
+    await tx.lead.updateMany({
+      where: { id: { in: sourceIds } },
+      data: { deletedAt: new Date() },
+    });
+
+    await tx.leadNote.create({
+      data: {
+        leadId: targetId,
+        content: `Merged duplicate lead${sourceIds.length === 1 ? "" : "s"}: ${sourceIds.join(", ")}`,
+        createdBy: actor.id,
+      },
+    });
+    await writeAuditLog(tx, { userId: actor.id, action: "UPDATE", entityId: targetId, old: target, next });
+    for (const source of sources) {
+      await writeAuditLog(tx, { userId: actor.id, action: "DELETE", entityId: source.id, old: source, next: null });
+    }
+
+    return {
+      lead: next,
+      mergedSourceIds: sourceIds,
+      moved: {
+        notes: notes.count,
+        statusHistory: statusHistory.count,
+        activities: activities.count,
+        deals: deals.count,
+        creditTransactions: creditTransactions.count,
+        notifications: notifications.count,
+      },
+    };
   });
 }
 
@@ -390,6 +589,14 @@ export async function convertLead(
           email: input.email ?? lead.email ?? undefined,
           phone: input.phone ?? lead.phone ?? undefined,
           source: lead.source,
+          // Carry demographics from the lead so the fact-find isn't blank post-convert
+          gender: lead.gender ?? undefined,
+          age: lead.age ?? undefined,
+          zipcode: lead.zipcode ?? undefined,
+          residentialStatus: lead.residentialStatus ?? undefined,
+          incomeRange: lead.incomeRange ?? undefined,
+          preferredContactMethod: lead.preferredContactMethod ?? undefined,
+          bestTimeToCall: lead.bestTimeToCall ?? undefined,
           financialGoal: lead.financialGoal ?? undefined,
           riskTolerance: lead.riskTolerance ?? undefined,
           investmentHorizon: lead.investmentHorizon ?? undefined,
@@ -505,18 +712,30 @@ export async function claimForCall(
   if (!canClaimForCall(actor)) throw new ForbiddenError("Not allowed to claim leads for calling");
 
   const now = new Date();
+  const targeted = input.leadIds && input.leadIds.length > 0;
+  const ownershipFilter: Prisma.LeadWhereInput = targeted
+    ? { OR: [{ telemarketerOwnerId: null }, { telemarketerOwnerId: actor.id }] }
+    : { telemarketerOwnerId: null };
   const available = await prisma.lead.findMany({
     where: {
       deletedAt: null,
       isAbandoned: false,
-      telemarketerOwnerId: null,
-      OR: [
-        { status: "NA" },
-        { status: "COOLDOWN", cooldownUntil: { lte: now } },
+      // When the client sends specific IDs (filtered session / single-lead call),
+      // include still-open leads plus leads already in this caller's own queue.
+      // Otherwise pool only unowned leads.
+      ...(targeted ? { id: { in: input.leadIds } } : {}),
+      AND: [
+        ownershipFilter,
+        {
+          OR: [
+            { status: "NA" },
+            { status: "COOLDOWN", cooldownUntil: { lte: now } },
+          ],
+        },
       ],
     },
     orderBy: { createdAt: "asc" },
-    take: input.count,
+    take: targeted ? undefined : input.count,
   });
 
   if (available.length === 0) return [];

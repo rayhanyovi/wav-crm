@@ -5,6 +5,7 @@ import {
   fetchLeadNotes, addLeadNote, deleteLeadNote,
   bulkCreateLeads,
   claimLead, returnLead, convertLead, claimLeadsForCall,
+  mergeDuplicateLeads,
 } from "@/services/leads";
 import type { LeadFilters, CreateLeadPayload, UpdateLeadPayload, ConvertLeadPayload } from "@/services/leads";
 import type { Lead, LeadNote } from "@/data/types";
@@ -115,6 +116,50 @@ export function useBulkCreateLeads() {
     mutationFn: (leads: CreateLeadPayload[]) => bulkCreateLeads(leads),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["leads"] });
+    },
+  });
+}
+
+interface BulkResult { ok: number; failed: number }
+
+/** Soft-delete many leads via the per-lead endpoint (reuses its authz). Reports
+ *  how many succeeded vs. failed (e.g. rows the actor doesn't own). */
+export function useBulkDeleteLeads() {
+  const qc = useQueryClient();
+  return useMutation<BulkResult, Error, string[]>({
+    mutationFn: async (ids) => {
+      const results = await Promise.allSettled(ids.map((id) => deleteLead(id)));
+      const failed = results.filter((r) => r.status === "rejected").length;
+      return { ok: ids.length - failed, failed };
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["leads"] }),
+  });
+}
+
+/** Change status on many leads via the per-lead PATCH (fires the same side
+ *  effects — status history, abandonment, auto-note — as a single change). */
+export function useBulkUpdateLeadStatus() {
+  const qc = useQueryClient();
+  return useMutation<BulkResult, Error, { ids: string[]; status: Lead["status"]; userId: string }>({
+    mutationFn: async ({ ids, status, userId }) => {
+      const results = await Promise.allSettled(ids.map((id) => updateLead(id, { status }, userId)));
+      const failed = results.filter((r) => r.status === "rejected").length;
+      return { ok: ids.length - failed, failed };
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["leads"] }),
+  });
+}
+
+export function useMergeDuplicateLeads() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ targetId, sourceIds }: { targetId: string; sourceIds: string[] }) =>
+      mergeDuplicateLeads(targetId, sourceIds),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["leads"] });
+      qc.invalidateQueries({ queryKey: ["activities"] });
+      qc.invalidateQueries({ queryKey: ["deals"] });
+      qc.invalidateQueries({ queryKey: ["notifications"] });
     },
   });
 }

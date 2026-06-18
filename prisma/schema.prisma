@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // WAV CRM — Prisma schema (full, introspected from live Supabase DB)
 //
-// Source of truth: public schema, project auyynqzrhwsxbtukrbri
+// Source of truth: public schema, project kkfzbgbbjijdhlolkwux (live "wav-db")
 // Last sync: 2026-06-14
 //
 // To refresh: npm run prisma:pull (requires .env.server with DATABASE_URL)
@@ -199,6 +199,12 @@ model Lead {
   convertedAt            DateTime?          @map("converted_at") @db.Timestamptz
   cooldownUntil          DateTime?          @map("cooldown_until") @db.Timestamptz
   lastContactedAt        DateTime?          @map("last_contacted_at") @db.Timestamptz
+  // Scheduled callback ("call me back at 2PM"): when, who should take it, why, and
+  // whether the "due now" notification has already been emitted.
+  callbackAt             DateTime?          @map("callback_at") @db.Timestamptz
+  callbackAssignedTo     String?            @map("callback_assigned_to")
+  callbackNote           String?            @map("callback_note")
+  callbackNotified       Boolean            @default(false) @map("callback_notified")
   financialGoal          FinancialGoal?     @map("financial_goal")
   riskTolerance          RiskTolerance?     @map("risk_tolerance")
   investmentHorizon      InvestmentHorizon? @map("investment_horizon")
@@ -253,6 +259,14 @@ model Contact {
   phone               String?
   title               String?
   source              LeadSource         @default(OTHERS)
+  // Demographics carried over from the originating lead at conversion
+  gender                 String?         @map("gender")
+  age                    Int?            @map("age")
+  zipcode                String?         @map("zipcode")
+  residentialStatus      String?         @map("residential_status")
+  incomeRange            String?         @map("income_range")
+  preferredContactMethod String?         @map("preferred_contact_method")
+  bestTimeToCall         String?         @map("best_time_to_call")
   financialGoal       FinancialGoal?     @map("financial_goal")
   riskTolerance       RiskTolerance?     @map("risk_tolerance")
   investmentHorizon   InvestmentHorizon? @map("investment_horizon")

@@ -1,6 +1,7 @@
 import type { RequestHandler } from "express";
 import jwt from "jsonwebtoken";
 import { createPublicKey, type JsonWebKey, type KeyObject } from "node:crypto";
+import type { CrmUser } from "../../prisma/generated/client/index.js";
 import { env } from "../config/env.js";
 import { prisma } from "../lib/prisma.js";
 import { ForbiddenError, UnauthenticatedError } from "../lib/errors.js";
@@ -109,6 +110,62 @@ function bearerToken(header: string | undefined): string | null {
   return token.trim();
 }
 
+export function isDevAuthEnabled(): boolean {
+  return env.DEV_AUTH_ENABLED && env.NODE_ENV !== "production";
+}
+
+function devUserId(req: Parameters<RequestHandler>[0]): string | null {
+  if (!isDevAuthEnabled()) return null;
+  const raw = req.headers["x-dev-user-id"];
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  return value?.trim() || null;
+}
+
+async function delegatedAdviserIdsFor(user: Pick<CrmUser, "id" | "role">): Promise<string[]> {
+  if (user.role !== "TELEMARKETER") return [];
+  const grantors = await prisma.crmUser.findMany({
+    where: {
+      role: "ADVISER",
+      isActive: true,
+      telemarketerAccess: true,
+      telemarketerId: user.id,
+    },
+    select: { id: true },
+  });
+  return grantors.map((g) => g.id);
+}
+
+async function actorFromUser(user: CrmUser, authUserId: string): Promise<Actor> {
+  return {
+    id: user.id,
+    authUserId,
+    email: user.email,
+    role: user.role as CrmRole,
+    isActive: user.isActive,
+    creditBalance: user.creditBalance,
+    telemarketerAccess: user.telemarketerAccess,
+    telemarketerId: user.telemarketerId,
+    leadsAccess: user.leadsAccess,
+    delegatedAdviserIds: await delegatedAdviserIdsFor(user),
+  };
+}
+
+async function devActor(req: Parameters<RequestHandler>[0]): Promise<Actor | null> {
+  const id = devUserId(req);
+  if (!id) return null;
+
+  const user = await prisma.crmUser.findUnique({ where: { id } });
+  if (!user) throw new UnauthenticatedError("No CRM profile for this dev user");
+  if (!user.isActive || user.accountStatus !== "ACTIVE") {
+    throw new ForbiddenError("Dev CRM account is not active");
+  }
+  if (!user.role || !VALID_ROLES.has(user.role)) {
+    throw new ForbiddenError("Dev CRM account has no assigned role");
+  }
+
+  return actorFromUser(user, user.authUserId ? String(user.authUserId) : `dev:${user.id}`);
+}
+
 /**
  * Authenticates the request: verifies the bearer token, resolves the matching
  * crm_users row, and attaches it as `req.actor`. Rejects inactive accounts.
@@ -116,6 +173,13 @@ function bearerToken(header: string | undefined): string | null {
 export function requireAuth(verifier: TokenVerifier = supabaseJwtVerifier): RequestHandler {
   return async (req, _res, next) => {
     try {
+      const dev = await devActor(req);
+      if (dev) {
+        req.actor = dev;
+        next();
+        return;
+      }
+
       const token = bearerToken(req.headers.authorization);
       if (!token) throw new UnauthenticatedError("Missing bearer token");
 
@@ -130,35 +194,7 @@ export function requireAuth(verifier: TokenVerifier = supabaseJwtVerifier): Requ
         throw new ForbiddenError("Account has no assigned role");
       }
 
-      // A TM may be delegated dealing access by one or more advisers. Resolve
-      // those advisers so authz can let the TM act on their deals/proposals.
-      let delegatedAdviserIds: string[] = [];
-      if (user.role === "TELEMARKETER") {
-        const grantors = await prisma.crmUser.findMany({
-          where: {
-            role: "ADVISER",
-            isActive: true,
-            telemarketerAccess: true,
-            telemarketerId: user.id,
-          },
-          select: { id: true },
-        });
-        delegatedAdviserIds = grantors.map((g) => g.id);
-      }
-
-      const actor: Actor = {
-        id: user.id,
-        authUserId,
-        email: user.email,
-        role: user.role as CrmRole,
-        isActive: user.isActive,
-        creditBalance: user.creditBalance,
-        telemarketerAccess: user.telemarketerAccess,
-        telemarketerId: user.telemarketerId,
-        leadsAccess: user.leadsAccess,
-        delegatedAdviserIds,
-      };
-      req.actor = actor;
+      req.actor = await actorFromUser(user, authUserId);
       next();
     } catch (err) {
       next(err);
@@ -177,6 +213,13 @@ export function requireAuth(verifier: TokenVerifier = supabaseJwtVerifier): Requ
 export function requireSession(verifier: TokenVerifier = supabaseJwtVerifier): RequestHandler {
   return async (req, _res, next) => {
     try {
+      const dev = await devActor(req);
+      if (dev) {
+        req.actor = dev;
+        next();
+        return;
+      }
+
       const token = bearerToken(req.headers.authorization);
       if (!token) throw new UnauthenticatedError("Missing bearer token");
 

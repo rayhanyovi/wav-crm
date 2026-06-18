@@ -7,6 +7,7 @@ import type {
   ConvertLeadInput,
   CreateLeadInput,
   ListQuery,
+  MergeDuplicateLeadsInput,
   UpdateLeadInput,
 } from "./leads.schema.js";
 
@@ -33,6 +34,15 @@ export async function update(req: Request, res: Response): Promise<void> {
 export async function remove(req: Request, res: Response): Promise<void> {
   await service.softDeleteLead(getActor(req), req.params.id as string);
   res.status(204).send();
+}
+
+export async function mergeDuplicates(req: Request, res: Response): Promise<void> {
+  const result = await service.mergeDuplicateLeads(
+    getActor(req),
+    req.params.id as string,
+    req.body as MergeDuplicateLeadsInput,
+  );
+  res.json({ data: result });
 }
 
 export async function claim(req: Request, res: Response): Promise<void> {

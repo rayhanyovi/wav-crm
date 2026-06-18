@@ -1,21 +1,26 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Link } from "react-router-dom";
-import { Lock, Mail, TrendingUp, Send } from "lucide-react";
+import { Lock, Mail, TrendingUp, Send, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import type { User } from "@/data/types";
+import { DEV_AUTH_ENABLED, fetchDevAuthUsers } from "@/lib/devAuth";
 import { supabase } from "@/lib/supabase";
 import { mapAuthProfile, useAuthStore } from "@/store/useAuthStore";
 import { useNavigate } from "react-router-dom";
 
 export function LoginPage() {
-  const { login } = useAuthStore();
+  const { login, devLogin } = useAuthStore();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [devUsers, setDevUsers] = useState<User[]>([]);
+  const [devUserId, setDevUserId] = useState("");
 
   // "Set / reset password" mode — sends a password-reset email.
   // Works for first-time users (no password yet) and forgot-password alike.
@@ -24,6 +29,33 @@ export function LoginPage() {
   const [resetSent, setResetSent] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
   const [resetSubmitting, setResetSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!DEV_AUTH_ENABLED) return;
+    let cancelled = false;
+    fetchDevAuthUsers()
+      .then((users) => {
+        if (cancelled) return;
+        setDevUsers(users);
+        setDevUserId((current) => current || users[0]?.id || "");
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Unable to load dev users.");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const submitDevLogin = () => {
+    const user = devUsers.find((u) => u.id === devUserId);
+    if (!user) {
+      setError("Choose a dev user.");
+      return;
+    }
+    devLogin(user);
+    navigate("/");
+  };
 
   const sendResetEmail = async () => {
     setResetSubmitting(true);
@@ -56,7 +88,7 @@ export function LoginPage() {
 
     const { data: profile, error: profileError } = await supabase
       .from("crm_users")
-      .select("id,name,email,role,avatar,is_active,credit_balance,telemarketer_access,telemarketer_id,leads_access,created_at")
+      .select("id,name,email,role,avatar,is_active,credit_balance,telemarketer_access,telemarketer_id,leads_access,created_at,must_change_password")
       .eq("auth_user_id", authData.user.id)
       .single();
 
@@ -74,9 +106,67 @@ export function LoginPage() {
       return;
     }
 
-    login(mapAuthProfile(profile));
+    login(mapAuthProfile(profile), profile.must_change_password ?? false);
     navigate("/");
   };
+
+  if (DEV_AUTH_ENABLED) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background px-6 py-10">
+        <div className="w-full max-w-md">
+          <div className="mb-8">
+            <div className="mb-4 inline-flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-lg shadow-primary/25">
+                <TrendingUp className="h-6 w-6" />
+              </div>
+              <span className="text-3xl font-bold tracking-tight text-foreground">
+                Dealflow
+              </span>
+            </div>
+            <p className="text-lg font-medium text-foreground/80">
+              WAV Telemarketing &amp; Advisory CRM
+            </p>
+          </div>
+
+          <div className="space-y-4 rounded-xl border bg-card p-4">
+            <div className="space-y-1">
+              <p className="text-sm font-medium">Local Docker dev auth</p>
+              <p className="text-xs text-muted-foreground">
+                Pick a seeded CRM user to test role-specific workflows.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>User</Label>
+              <Select value={devUserId} onValueChange={setDevUserId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose user" />
+                </SelectTrigger>
+                <SelectContent>
+                  {devUsers.map((user) => (
+                    <SelectItem key={user.id} value={user.id}>
+                      {user.name} · {user.role}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {error && (
+              <div className="rounded-md border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                {error}
+              </div>
+            )}
+
+            <Button className="w-full gap-2" disabled={!devUserId} onClick={submitDevLogin}>
+              <Users className="h-4 w-4" />
+              Continue as selected user
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-6 py-10">

@@ -124,3 +124,11 @@ describe("canDeleteDeal", () => {
     expect(canDeleteDeal(actor({ role: "TELEMARKETER" }))).toBe(false);
   });
 });
+
+describe("deals.authz deny-by-default", () => {
+  it("canViewDeal / canMutateDeal deny an unrecognised role", () => {
+    const d = { assignedToId: null, telemarketerId: null };
+    expect(canViewDeal(actor({ role: "GUEST" as never }), d)).toBe(false);
+    expect(canMutateDeal(actor({ role: "GUEST" as never }), d)).toBe(false);
+  });
+});

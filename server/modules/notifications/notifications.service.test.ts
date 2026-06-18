@@ -8,7 +8,14 @@ const db = vi.hoisted(() => ({
     count: vi.fn(),
     update: vi.fn(),
     updateMany: vi.fn(),
+    createMany: vi.fn(),
   },
+  // listNotifications first sweeps due callbacks → reads/updates leads in a tx.
+  lead: {
+    findMany: vi.fn(),
+    updateMany: vi.fn(),
+  },
+  $transaction: vi.fn(),
 }));
 
 vi.mock("../../lib/prisma.js", () => ({ prisma: db }));
@@ -31,7 +38,11 @@ function actor(overrides: Partial<Actor> = {}): Actor {
   };
 }
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  // Default: no callbacks due, so the sweep is a no-op and doesn't hit $transaction.
+  db.lead.findMany.mockResolvedValue([]);
+});
 
 describe("listNotifications", () => {
   it("only returns own notifications (recipientId filter)", async () => {
@@ -52,6 +63,32 @@ describe("listNotifications", () => {
 
     const where = db.notification.findMany.mock.calls[0]![0].where;
     expect(where.isRead).toBe(false);
+  });
+
+  it("sweeps due callbacks: emits CALLBACK_DUE and marks them notified", async () => {
+    db.lead.findMany.mockResolvedValue([
+      { id: "lead-1", firstName: "Jane", lastName: "Doe", callbackNote: "wants 2pm" },
+    ]);
+    db.notification.findMany.mockResolvedValue([]);
+    db.notification.count.mockResolvedValue(0);
+
+    await listNotifications(actor({ id: "u1" }), { page: 1, pageSize: 25 } as never);
+
+    // Only this actor's due, un-notified callbacks are swept.
+    const sweepWhere = db.lead.findMany.mock.calls[0]![0].where;
+    expect(sweepWhere).toMatchObject({ callbackAssignedTo: "u1", callbackNotified: false });
+
+    expect(db.notification.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.arrayContaining([
+          expect.objectContaining({ type: "CALLBACK_DUE", recipientId: "u1", entityId: "lead-1" }),
+        ]),
+      }),
+    );
+    expect(db.lead.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: { in: ["lead-1"] } }, data: { callbackNotified: true } }),
+    );
+    expect(db.$transaction).toHaveBeenCalledTimes(1);
   });
 });
 

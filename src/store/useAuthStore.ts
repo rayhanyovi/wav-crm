@@ -2,6 +2,13 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { User } from "@/data/types";
 import { supabase } from "@/lib/supabase";
+import {
+  clearDevAuthUserId,
+  DEV_AUTH_ENABLED,
+  fetchDevAuthUser,
+  getDevAuthUserId,
+  setDevAuthUserId,
+} from "@/lib/devAuth";
 
 export type AccountStatus =
   | "PENDING_PROFILE"
@@ -42,7 +49,8 @@ interface AuthState {
   /** True when user must set a new password before accessing the app. */
   mustChangePassword: boolean;
   authReady: boolean;
-  login: (user: User) => void;
+  login: (user: User, mustChangePassword?: boolean) => void;
+  devLogin: (user: User) => void;
   loadSession: () => Promise<void>;
   logout: () => Promise<void>;
   /** Update the signed-in user's credit balance in place (e.g. after claim/return). */
@@ -79,12 +87,65 @@ export const useAuthStore = create<AuthState>()(
       preConfiguredRole: null,
       mustChangePassword: false,
       authReady: false,
-      login: (user) =>
-        set({ currentUser: user, accountStatus: "ACTIVE", authEmail: user.email, preConfiguredRole: null }),
+      login: (user, mustChangePassword = false) =>
+        set({ currentUser: user, accountStatus: "ACTIVE", authEmail: user.email, preConfiguredRole: null, mustChangePassword }),
+      devLogin: (user) => {
+        setDevAuthUserId(user.id);
+        set({
+          currentUser: user,
+          accountStatus: "ACTIVE",
+          authEmail: user.email,
+          requestedRole: null,
+          preConfiguredRole: null,
+          mustChangePassword: false,
+          authReady: true,
+        });
+      },
       clearMustChangePassword: () => set({ mustChangePassword: false }),
       setCreditBalance: (balance) =>
         set((s) => (s.currentUser ? { currentUser: { ...s.currentUser, credit_balance: balance } } : {})),
       loadSession: async () => {
+        if (DEV_AUTH_ENABLED) {
+          const devUserId = getDevAuthUserId();
+          if (!devUserId) {
+            set({
+              currentUser: null,
+              accountStatus: null,
+              authEmail: null,
+              requestedRole: null,
+              preConfiguredRole: null,
+              mustChangePassword: false,
+              authReady: true,
+            });
+            return;
+          }
+
+          try {
+            const user = await fetchDevAuthUser(devUserId);
+            set({
+              currentUser: user,
+              accountStatus: "ACTIVE",
+              authEmail: user.email,
+              requestedRole: null,
+              preConfiguredRole: null,
+              mustChangePassword: false,
+              authReady: true,
+            });
+          } catch {
+            clearDevAuthUserId();
+            set({
+              currentUser: null,
+              accountStatus: null,
+              authEmail: null,
+              requestedRole: null,
+              preConfiguredRole: null,
+              mustChangePassword: false,
+              authReady: true,
+            });
+          }
+          return;
+        }
+
         const { data: sessionData } = await supabase.auth.getSession();
         const authUser = sessionData.session?.user;
         if (!authUser) {
@@ -155,6 +216,20 @@ export const useAuthStore = create<AuthState>()(
         });
       },
       logout: async () => {
+        if (DEV_AUTH_ENABLED) {
+          clearDevAuthUserId();
+          set({
+            currentUser: null,
+            accountStatus: null,
+            authEmail: null,
+            requestedRole: null,
+            preConfiguredRole: null,
+            mustChangePassword: false,
+            authReady: true,
+          });
+          return;
+        }
+
         await supabase.auth.signOut();
         set({
           currentUser: null,

@@ -11,10 +11,50 @@ export interface Paginated<T> {
   total: number;
 }
 
+/**
+ * Lazily emit "callback due" notifications. Called when a user polls their
+ * notifications, so no cron/scheduler is needed: any of the actor's scheduled
+ * callbacks whose time has arrived (and that haven't been notified yet) produce
+ * one notification and are marked notified. Idempotent.
+ */
+async function sweepDueCallbacks(actor: Actor): Promise<void> {
+  const now = new Date();
+  const due = await prisma.lead.findMany({
+    where: {
+      deletedAt: null,
+      convertedAt: null,
+      callbackNotified: false,
+      callbackAt: { lte: now },
+      callbackAssignedTo: actor.id,
+    },
+    select: { id: true, firstName: true, lastName: true, callbackNote: true },
+  });
+  if (due.length === 0) return;
+
+  await prisma.$transaction([
+    prisma.notification.createMany({
+      data: due.map((l) => ({
+        recipientId: actor.id,
+        type: "CALLBACK_DUE",
+        title: "Callback due now",
+        message: `Time to call ${`${l.firstName} ${l.lastName}`.trim() || "a lead"} back${l.callbackNote ? ` — ${l.callbackNote}` : ""}.`,
+        entityType: "lead",
+        entityId: l.id,
+      })),
+    }),
+    prisma.lead.updateMany({
+      where: { id: { in: due.map((l) => l.id) } },
+      data: { callbackNotified: true },
+    }),
+  ]);
+}
+
 export async function listNotifications(
   actor: Actor,
   query: ListQuery,
 ): Promise<Paginated<Notification>> {
+  await sweepDueCallbacks(actor);
+
   const where: Prisma.NotificationWhereInput = { recipientId: actor.id };
   if (query.unread_only) where.isRead = false;
 

@@ -16,9 +16,15 @@ const db = vi.hoisted(() => ({
 
 vi.mock("../../lib/prisma.js", () => ({ prisma: db }));
 
-const { listActivities, getActivity, createActivity, addComment } = await import(
-  "./activities.service.js"
-);
+const {
+  listActivities,
+  getActivity,
+  createActivity,
+  updateActivity,
+  softDeleteActivity,
+  getComments,
+  addComment,
+} = await import("./activities.service.js");
 
 function actor(overrides: Partial<Actor> = {}): Actor {
   return {
@@ -114,5 +120,77 @@ describe("addComment", () => {
 
     await addComment(actor({ id: "u1" }), "act-1", { text: "hi" });
     expect(db.comment.create.mock.calls[0]![0].data.createdBy).toBe("u1");
+  });
+
+  it("throws NOT_FOUND when commenting on a missing activity", async () => {
+    db.activity.findFirst.mockResolvedValue(null);
+    await expect(addComment(actor(), "x", { text: "hi" })).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+});
+
+describe("updateActivity", () => {
+  it("throws NOT_FOUND when missing", async () => {
+    db.activity.findFirst.mockResolvedValue(null);
+    await expect(updateActivity(actor(), "x", { subject: "X" } as never)).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("forbids a non-creator non-MASTER", async () => {
+    db.activity.findFirst.mockResolvedValue(activity({ createdBy: "other" }));
+    await expect(
+      updateActivity(actor({ id: "u1" }), "act-1", { subject: "X" } as never),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("patches fields and can clear/ set scheduled & completed dates", async () => {
+    db.activity.findFirst.mockResolvedValue(activity({ createdBy: "u1" }));
+    db.activity.update.mockResolvedValue(activity());
+    db.auditLog.create.mockResolvedValue({});
+
+    await updateActivity(actor({ id: "u1" }), "act-1", {
+      subject: "S", description: "D", result: "COMPLETED",
+      scheduled_at: "2026-07-01T10:00:00.000Z", completed_at: null, assigned_to_id: "u2",
+    } as never);
+
+    const data = db.activity.update.mock.calls[0]![0].data;
+    expect(data.subject).toBe("S");
+    expect(data.scheduledAt).toBeInstanceOf(Date);
+    expect(data.completedAt).toBeNull();
+    expect(data.assignedToId).toBe("u2");
+  });
+});
+
+describe("softDeleteActivity", () => {
+  it("forbids non-MASTER", async () => {
+    await expect(softDeleteActivity(actor({ role: "ADVISER" }), "act-1")).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("sets deletedAt for MASTER", async () => {
+    db.activity.findFirst.mockResolvedValue(activity());
+    db.activity.update.mockResolvedValue({});
+    db.auditLog.create.mockResolvedValue({});
+
+    await softDeleteActivity(actor({ role: "MASTER" }), "act-1");
+    expect(db.activity.update.mock.calls[0]![0].data.deletedAt).toBeInstanceOf(Date);
+  });
+
+  it("throws NOT_FOUND when missing", async () => {
+    db.activity.findFirst.mockResolvedValue(null);
+    await expect(softDeleteActivity(actor({ role: "MASTER" }), "x")).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+});
+
+describe("getComments", () => {
+  it("returns comments for a viewable activity", async () => {
+    db.activity.findFirst.mockResolvedValue(activity({ createdBy: "u1" }));
+    db.comment.findMany.mockResolvedValue([{ id: "c1" }]);
+
+    const res = await getComments(actor({ id: "u1" }), "act-1");
+    expect(res).toHaveLength(1);
+    expect(db.comment.findMany.mock.calls[0]![0]).toMatchObject({ where: { activityId: "act-1" } });
+  });
+
+  it("throws NOT_FOUND when the activity is missing", async () => {
+    db.activity.findFirst.mockResolvedValue(null);
+    await expect(getComments(actor(), "x")).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 });

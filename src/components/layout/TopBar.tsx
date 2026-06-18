@@ -21,7 +21,7 @@ import { useAuthStore } from "@/store/useAuthStore";
 import { useCallSessionStore } from "@/store/useCallSessionStore";
 import { useCrmStore } from "@/store/useCrmStore";
 import { useLayoutStore } from "@/store/useLayoutStore";
-import { can } from "@/lib/permissions";
+import { can, isColdCaller } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -241,12 +241,13 @@ export function TopBar({
   );
 
   const startCallingButton =
-    can(currentUser, "TELEMARKETER") && !can(currentUser, "MASTER") ? (
+    isColdCaller(currentUser) ? (
       <Button
         size="sm"
         onClick={onStartCalling}
         className="gap-1.5"
         variant={sessionActive ? "secondary" : "default"}
+        aria-label={sessionActive ? "Session Active" : "Start Calling"}
         data-tour="start-calling"
       >
         <Phone className="h-4 w-4" />

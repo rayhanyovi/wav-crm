@@ -305,6 +305,19 @@ export function ContactDetailPage() {
                 <p><span className="text-muted-foreground">Phone:</span> {contact.phone || "—"}</p>
                 <p><span className="text-muted-foreground">Title:</span> {contact.title || "—"}</p>
                 <p><span className="text-muted-foreground">Source:</span> {contact.source?.replace("_", " ") || "—"}</p>
+                {(contact.gender || contact.age != null || contact.zipcode ||
+                  contact.residential_status || contact.income_range ||
+                  contact.preferred_contact_method || contact.best_time_to_call) && (
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-1 border-t pt-2 mt-1">
+                    {contact.gender && <p><span className="text-muted-foreground">Gender:</span> {contact.gender}</p>}
+                    {contact.age != null && <p><span className="text-muted-foreground">Age:</span> {contact.age}</p>}
+                    {contact.zipcode && <p><span className="text-muted-foreground">Postal:</span> {contact.zipcode}</p>}
+                    {contact.residential_status && <p><span className="text-muted-foreground">Residency:</span> {contact.residential_status}</p>}
+                    {contact.income_range && <p><span className="text-muted-foreground">Income:</span> {contact.income_range}</p>}
+                    {contact.preferred_contact_method && <p><span className="text-muted-foreground">Prefers:</span> {contact.preferred_contact_method}</p>}
+                    {contact.best_time_to_call && <p><span className="text-muted-foreground">Best time:</span> {contact.best_time_to_call}</p>}
+                  </div>
+                )}
                 <p><span className="text-muted-foreground">Client since:</span> {formatDate(contact.created_at)}</p>
               </>
             )}

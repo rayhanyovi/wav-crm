@@ -38,6 +38,13 @@ interface ApiContact {
   phone: string | null;
   title: string | null;
   source: LeadSource;
+  gender: string | null;
+  age: number | null;
+  zipcode: string | null;
+  residentialStatus: string | null;
+  incomeRange: string | null;
+  preferredContactMethod: string | null;
+  bestTimeToCall: string | null;
   financialGoal: string | null;
   riskTolerance: string | null;
   investmentHorizon: string | null;
@@ -68,6 +75,13 @@ function mapContact(r: ApiContact): Contact {
     phone: r.phone ?? undefined,
     title: r.title ?? undefined,
     source: r.source,
+    gender: r.gender ?? undefined,
+    age: r.age ?? undefined,
+    zipcode: r.zipcode ?? undefined,
+    residential_status: r.residentialStatus ?? undefined,
+    income_range: r.incomeRange ?? undefined,
+    preferred_contact_method: r.preferredContactMethod ?? undefined,
+    best_time_to_call: r.bestTimeToCall ?? undefined,
     financial_goal: (r.financialGoal as Contact["financial_goal"]) ?? undefined,
     risk_tolerance: (r.riskTolerance as Contact["risk_tolerance"]) ?? undefined,
     investment_horizon: (r.investmentHorizon as Contact["investment_horizon"]) ?? undefined,

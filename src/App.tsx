@@ -28,7 +28,10 @@ import { SetPasswordPage } from "@/pages/SetPasswordPage";
 import { canManage, roleLevel, hasLeadsAccess } from "@/lib/permissions";
 
 function ProtectedRoute({ children, minRole }: { children: React.ReactNode; minRole?: number }) {
-  const { currentUser, accountStatus, mustChangePassword } = useAuthStore();
+  const { currentUser, accountStatus, mustChangePassword, authReady } = useAuthStore();
+  if (!authReady) {
+    return <div className="min-h-screen bg-background" aria-label="Loading session" />;
+  }
   if (!currentUser) {
     if (accountStatus === "PENDING_PROFILE") return <Navigate to="/onboarding" replace />;
     if (accountStatus === "PENDING_APPROVAL" || accountStatus === "REJECTED")

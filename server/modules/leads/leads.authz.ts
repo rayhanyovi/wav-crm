@@ -48,13 +48,19 @@ export function canCreateLead(actor: Actor): boolean {
   return actor.role === "MASTER" || actor.role === "ADVISER" || actor.role === "TELEMARKETER";
 }
 
-/** leads_delete: MASTER, or the assigned/adviser owner of the row. */
+/** leads_delete: MASTER, or any owner of the row — assigned adviser, adviser
+ *  owner, or the telemarketer whose queue it sits in (so a TM can clean up the
+ *  leads they imported, e.g. accidental duplicate uploads). */
 export function canDeleteLead(
   actor: Actor,
-  lead: { assignedToId: string | null; adviserOwnerId: string | null },
+  lead: { assignedToId: string | null; adviserOwnerId: string | null; telemarketerOwnerId?: string | null },
 ): boolean {
   if (actor.role === "MASTER") return true;
-  return lead.assignedToId === actor.id || lead.adviserOwnerId === actor.id;
+  return (
+    lead.assignedToId === actor.id ||
+    lead.adviserOwnerId === actor.id ||
+    lead.telemarketerOwnerId === actor.id
+  );
 }
 
 /**

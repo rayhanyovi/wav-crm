@@ -69,6 +69,14 @@ export interface Contact extends FactFindFields {
   phone?: string;
   title?: string;
   source?: LeadSource;
+  // Demographics carried over from the originating lead at conversion
+  gender?: string;
+  age?: number;
+  zipcode?: string;
+  residential_status?: string;
+  income_range?: string;
+  preferred_contact_method?: string;
+  best_time_to_call?: string;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -129,6 +137,10 @@ export interface Lead extends FactFindFields {
   converted_contact_id?: string;
   converted_at?: string;
   last_contacted_at?: string;
+  // Scheduled callback ("call me back at 2PM")
+  callback_at?: string;          // ISO datetime the lead asked to be called back
+  callback_assigned_to?: string; // telemarketer who should take the callback
+  callback_note?: string;        // optional reason / context
   created_by: string;
   created_at: string;
   updated_at: string;

@@ -10,6 +10,7 @@ import {
   createLeadSchema,
   idParamSchema,
   listQuerySchema,
+  mergeDuplicateLeadsSchema,
   updateLeadSchema,
 } from "./leads.schema.js";
 
@@ -42,6 +43,12 @@ leadsRouter.post(
   "/claim-for-call",
   validate({ body: claimForCallSchema }),
   asyncHandler(controller.claimForCall),
+);
+
+leadsRouter.post(
+  "/:id/merge-duplicates",
+  validate({ params: idParamSchema, body: mergeDuplicateLeadsSchema }),
+  asyncHandler(controller.mergeDuplicates),
 );
 
 leadsRouter.post("/:id/claim", validate({ params: idParamSchema }), asyncHandler(controller.claim));

@@ -56,4 +56,9 @@ describe("contacts authz", () => {
     expect(canDeleteContact(actor({ role: "ADVISER" }))).toBe(false);
     expect(canDeleteContact(actor({ role: "TELEMARKETER" }))).toBe(false);
   });
+
+  it("canViewContact / canUpdateContact deny an unrecognised role", () => {
+    expect(canViewContact(actor({ role: "GUEST" as never }), { createdBy: "x" })).toBe(false);
+    expect(canUpdateContact(actor({ role: "GUEST" as never }), { createdBy: "x" })).toBe(false);
+  });
 });

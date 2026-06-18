@@ -13,13 +13,14 @@ const db = vi.hoisted(() => {
       update: vi.fn(),
       updateMany: vi.fn(),
     },
-    leadStatusHistory: { create: vi.fn() },
-    leadNote: { findMany: vi.fn(), create: vi.fn() },
+    leadStatusHistory: { create: vi.fn(), updateMany: vi.fn() },
+    leadNote: { findMany: vi.fn(), create: vi.fn(), updateMany: vi.fn() },
     contact: { create: vi.fn() },
-    deal: { create: vi.fn() },
+    deal: { create: vi.fn(), updateMany: vi.fn() },
+    activity: { updateMany: vi.fn() },
     crmUser: { findMany: vi.fn(), findUnique: vi.fn(), findUniqueOrThrow: vi.fn(), update: vi.fn() },
-    creditTransaction: { create: vi.fn() },
-    notification: { createMany: vi.fn() },
+    creditTransaction: { create: vi.fn(), updateMany: vi.fn() },
+    notification: { createMany: vi.fn(), updateMany: vi.fn() },
     auditLog: { create: vi.fn() },
     $transaction: vi.fn(),
   };
@@ -33,6 +34,7 @@ const {
   returnLead,
   convertLead,
   claimForCall,
+  mergeDuplicateLeads,
   getLeadNotes,
   addLeadNote,
   getLeadStatusHistory,
@@ -355,6 +357,34 @@ describe("claimForCall", () => {
     );
   });
 
+  it("allows targeted sessions to include leads already owned by the caller", async () => {
+    const pool = [{ id: "mine" }, { id: "open" }];
+    db.lead.findMany
+      .mockResolvedValueOnce(pool)
+      .mockResolvedValue(pool);
+    db.lead.updateMany.mockResolvedValue({ count: 2 });
+    db.$transaction.mockImplementation(async (ops: unknown[]) => ops);
+
+    const leads = await claimForCall(tmActor(), { count: 15, leadIds: ["mine", "open", "other"] });
+
+    expect(leads).toHaveLength(2);
+    const where = db.lead.findMany.mock.calls[0]![0].where;
+    expect(where).toEqual(expect.objectContaining({ id: { in: ["mine", "open", "other"] } }));
+    expect(where.AND).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          OR: expect.arrayContaining([{ telemarketerOwnerId: null }, { telemarketerOwnerId: "u1" }]),
+        }),
+      ]),
+    );
+    expect(db.lead.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ id: { in: ["mine", "open"] } }),
+        data: { telemarketerOwnerId: "u1" },
+      }),
+    );
+  });
+
   it("returns empty array when no leads are available", async () => {
     db.lead.findMany.mockResolvedValueOnce([]);
 
@@ -380,6 +410,93 @@ describe("claimForCall", () => {
       { count: 5 },
     );
     expect(result).toEqual([]);
+  });
+});
+
+// ─── mergeDuplicateLeads ───────────────────────────────────────────────────
+
+describe("mergeDuplicateLeads", () => {
+  beforeEach(() => {
+    db.leadNote.updateMany.mockResolvedValue({ count: 0 });
+    db.leadStatusHistory.updateMany.mockResolvedValue({ count: 0 });
+    db.activity.updateMany.mockResolvedValue({ count: 0 });
+    db.deal.updateMany.mockResolvedValue({ count: 0 });
+    db.creditTransaction.updateMany.mockResolvedValue({ count: 0 });
+    db.notification.updateMany.mockResolvedValue({ count: 0 });
+    db.lead.updateMany.mockResolvedValue({ count: 1 });
+    db.leadNote.create.mockResolvedValue({ id: "merge-note" });
+  });
+
+  it("moves dependent records into the kept lead and soft-deletes duplicates", async () => {
+    const target = appointmentLead({
+      id: "keep",
+      phone: "+65 5555 0000",
+      email: null,
+      notes: null,
+      status: "NA" as const,
+    });
+    const source = appointmentLead({
+      id: "dupe",
+      phone: "65 5555 0000",
+      email: "dupe@example.com",
+      notes: "Customer prefers afternoons",
+      status: "KIV" as const,
+    });
+    db.lead.findMany.mockResolvedValue([target, source]);
+    db.lead.update.mockResolvedValue({
+      ...target,
+      email: "dupe@example.com",
+      notes: "Merged from duplicate Aaron Lim: Customer prefers afternoons",
+    });
+    db.leadNote.updateMany.mockResolvedValue({ count: 2 });
+    db.leadStatusHistory.updateMany.mockResolvedValue({ count: 1 });
+    db.activity.updateMany.mockResolvedValue({ count: 3 });
+    db.deal.updateMany.mockResolvedValue({ count: 1 });
+    db.creditTransaction.updateMany.mockResolvedValue({ count: 1 });
+    db.notification.updateMany.mockResolvedValue({ count: 1 });
+
+    const result = await mergeDuplicateLeads(actor({ role: "MASTER" }), "keep", { source_ids: ["dupe"] });
+
+    expect(result.mergedSourceIds).toEqual(["dupe"]);
+    expect(result.moved).toMatchObject({
+      notes: 2,
+      statusHistory: 1,
+      activities: 3,
+      deals: 1,
+      creditTransactions: 1,
+      notifications: 1,
+    });
+    expect(db.lead.update.mock.calls[0]![0]).toMatchObject({
+      where: { id: "keep" },
+      data: expect.objectContaining({ email: "dupe@example.com" }),
+    });
+    expect(db.leadNote.updateMany).toHaveBeenCalledWith({
+      where: { leadId: { in: ["dupe"] } },
+      data: { leadId: "keep" },
+    });
+    expect(db.deal.updateMany).toHaveBeenCalledWith({
+      where: { leadId: { in: ["dupe"] } },
+      data: { leadId: "keep" },
+    });
+    expect(db.lead.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: { in: ["dupe"] } },
+        data: expect.objectContaining({ deletedAt: expect.any(Date) }),
+      }),
+    );
+  });
+
+  it("refuses to merge rows with different phone keys", async () => {
+    db.lead.findMany.mockResolvedValue([
+      appointmentLead({ id: "keep", phone: "11111111", status: "NA" as const }),
+      appointmentLead({ id: "dupe", phone: "22222222", status: "NA" as const }),
+    ]);
+
+    await expect(
+      mergeDuplicateLeads(actor({ role: "MASTER" }), "keep", { source_ids: ["dupe"] }),
+    ).rejects.toMatchObject({ code: "CONFLICT" });
+    expect(db.lead.updateMany).not.toHaveBeenCalled();
+    expect(db.leadNote.updateMany).not.toHaveBeenCalled();
   });
 });
 

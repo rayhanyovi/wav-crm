@@ -4,6 +4,7 @@ import {
   FileText,
   History,
   Phone,
+  PhoneCall,
   PhoneOff,
   User,
 } from "lucide-react";
@@ -18,6 +19,8 @@ import { useActivities } from "@/hooks/useActivities";
 import { useContact } from "@/hooks/useContacts";
 import { useDeals } from "@/hooks/useDeals";
 import { useUpdateLead } from "@/hooks/useLeads";
+import { useCreateActivity } from "@/hooks/useActivities";
+import { CallbackModal } from "@/components/leads/CallbackModal";
 import { LeadStatusBadge } from "@/components/common/StatusBadge";
 import { formatCurrency, formatDate } from "@/lib/format";
 import type { Lead, FinancialGoal, RiskTolerance, InvestmentHorizon } from "@/data/types";
@@ -42,13 +45,15 @@ interface CallSheetProps {
 }
 
 export function CallSheet({ lead }: CallSheetProps) {
-  const { startCall, endCall, liveNotes, setLiveNotes, phase, updateCurrentLead } =
-    useCallSessionStore();
+  const { startCall, endCall, liveNotes, setLiveNotes, phase, updateCurrentLead,
+    submitOutcome, nextLead, callDurationSeconds } = useCallSessionStore();
   const { data: activities = [] } = useActivities({ lead_id: lead?.id });
   const { data: deals = [] } = useDeals();
   const { data: convertedContact } = useContact(lead?.converted_contact_id);
   const updateLeadMutation = useUpdateLead();
+  const createActivityMutation = useCreateActivity();
   const { currentUser } = useAuthStore();
+  const [showCallbackModal, setShowCallbackModal] = useState(false);
   const { data: scripts = [] } = useScripts();
   const [selectedScriptId, setSelectedScriptId] = useState<string | null>(null);
   const [editingFF, setEditingFF] = useState(false);
@@ -59,6 +64,9 @@ export function CallSheet({ lead }: CallSheetProps) {
     monthly_investable: "",
     existing_investments: "",
     fact_find_notes: "",
+    gender: "",
+    age: "",
+    zipcode: "",
   });
 
   if (!lead)
@@ -86,8 +94,32 @@ export function CallSheet({ lead }: CallSheetProps) {
       monthly_investable: lead.monthly_investable != null ? String(lead.monthly_investable) : "",
       existing_investments: lead.existing_investments ?? "",
       fact_find_notes: lead.fact_find_notes ?? "",
+      gender: lead.gender ?? "",
+      age: lead.age != null ? String(lead.age) : "",
+      zipcode: lead.zipcode ?? "",
     });
     setEditingFF(true);
+  };
+
+  const handleScheduleCallback = async () => {
+    if (!lead || !currentUser) return;
+    // Log that we called, without changing the lead status
+    await createActivityMutation.mutateAsync({
+      type: "CALL",
+      subject: `Called — ${lead.first_name} ${lead.last_name} (scheduling callback)`,
+      description: liveNotes.trim() || undefined,
+      result: "FOLLOW_UP_NEEDED",
+      scheduled_at: new Date().toISOString(),
+      completed_at: new Date().toISOString(),
+      metadata: { duration_seconds: callDurationSeconds },
+      lead_id: lead.id,
+      assigned_to_id: currentUser.id,
+      created_by: currentUser.id,
+    }).catch((e) => console.error("Failed to log callback call", e));
+    // Increment call count in session stats, no pickup
+    submitOutcome(false);
+    // Open the callback scheduler
+    setShowCallbackModal(true);
   };
 
   const saveFF = () => {
@@ -100,6 +132,9 @@ export function CallSheet({ lead }: CallSheetProps) {
       existing_investments: ffForm.existing_investments || undefined,
       fact_find_notes: ffForm.fact_find_notes || undefined,
       fact_find_done: !!(ffForm.financial_goal && ffForm.risk_tolerance && ffForm.investment_horizon),
+      gender: ffForm.gender || undefined,
+      age: ffForm.age ? parseInt(ffForm.age, 10) : undefined,
+      zipcode: ffForm.zipcode || undefined,
     };
     updateLeadMutation.mutate({
       id: lead.id,
@@ -257,6 +292,27 @@ export function CallSheet({ lead }: CallSheetProps) {
                 <label className="text-[11px] text-muted-foreground">Existing Investments</label>
                 <Input className="h-7 text-xs" value={ffForm.existing_investments} onChange={(e) => setFfForm((f) => ({ ...f, existing_investments: e.target.value }))} placeholder="CPF, endowment, unit trusts…" />
               </div>
+              <div className="grid grid-cols-3 gap-2">
+                <div className="space-y-1">
+                  <label className="text-[11px] text-muted-foreground">Gender</label>
+                  <Select value={ffForm.gender} onValueChange={(v) => setFfForm((f) => ({ ...f, gender: v }))}>
+                    <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Select" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Male">Male</SelectItem>
+                      <SelectItem value="Female">Female</SelectItem>
+                      <SelectItem value="Other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[11px] text-muted-foreground">Age</label>
+                  <Input type="number" className="h-7 text-xs" value={ffForm.age} onChange={(e) => setFfForm((f) => ({ ...f, age: e.target.value }))} placeholder="e.g. 35" min={18} max={99} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[11px] text-muted-foreground">Postal Code</label>
+                  <Input className="h-7 text-xs" value={ffForm.zipcode} onChange={(e) => setFfForm((f) => ({ ...f, zipcode: e.target.value }))} placeholder="e.g. 560123" />
+                </div>
+              </div>
               <div className="space-y-1">
                 <label className="text-[11px] text-muted-foreground">Notes</label>
                 <Textarea rows={2} className="text-xs" value={ffForm.fact_find_notes} onChange={(e) => setFfForm((f) => ({ ...f, fact_find_notes: e.target.value }))} placeholder="Client concerns, preferences…" />
@@ -283,6 +339,13 @@ export function CallSheet({ lead }: CallSheetProps) {
                   {lead.investment_horizon && <div><span className="text-muted-foreground">Horizon: </span><span className="font-medium">{HORIZON_LABELS[lead.investment_horizon]}</span></div>}
                   {lead.monthly_investable && <div><span className="text-muted-foreground">Monthly investable: </span><span className="font-medium">SGD {lead.monthly_investable.toLocaleString()}</span></div>}
                   {lead.existing_investments && <div><span className="text-muted-foreground">Existing: </span><span>{lead.existing_investments}</span></div>}
+                  {(lead.gender || lead.age || lead.zipcode) && (
+                    <div className="flex gap-3 flex-wrap border-t pt-1.5 mt-1">
+                      {lead.gender && <span><span className="text-muted-foreground">Gender: </span><span className="font-medium">{lead.gender}</span></span>}
+                      {lead.age && <span><span className="text-muted-foreground">Age: </span><span className="font-medium">{lead.age}</span></span>}
+                      {lead.zipcode && <span><span className="text-muted-foreground">Postal: </span><span className="font-medium">{lead.zipcode}</span></span>}
+                    </div>
+                  )}
                   {lead.fact_find_notes && <p className="text-muted-foreground italic border-t pt-1.5 mt-1">{lead.fact_find_notes}</p>}
                 </div>
               ) : (
@@ -410,15 +473,39 @@ export function CallSheet({ lead }: CallSheetProps) {
         </Button>
       )}
       {phase === "calling" && (
-        <Button
-          onClick={endCall}
-          variant="destructive"
-          className="w-full gap-2"
-          size="lg"
-        >
-          <PhoneOff className="h-4 w-4" />
-          End Call
-        </Button>
+        <div className="space-y-2">
+          <Button
+            onClick={endCall}
+            variant="destructive"
+            className="w-full gap-2"
+            size="lg"
+          >
+            <PhoneOff className="h-4 w-4" />
+            End Call
+          </Button>
+          <Button
+            onClick={handleScheduleCallback}
+            variant="outline"
+            className="w-full gap-2"
+            size="lg"
+            disabled={createActivityMutation.isPending}
+          >
+            <PhoneCall className="h-4 w-4" />
+            Schedule Callback
+          </Button>
+        </div>
+      )}
+
+      {lead && (
+        <CallbackModal
+          lead={lead}
+          open={showCallbackModal}
+          onClose={() => setShowCallbackModal(false)}
+          onSaved={() => {
+            setShowCallbackModal(false);
+            nextLead();
+          }}
+        />
       )}
     </div>
   );

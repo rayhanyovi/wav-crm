@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { DEV_AUTH_ENABLED, getDevAuthUserId } from "./devAuth";
 
 /** Paginated list envelope returned by every list endpoint. */
 export interface Page<T> {
@@ -14,6 +15,7 @@ export interface Envelope<T> {
 }
 
 async function getToken(): Promise<string | null> {
+  if (DEV_AUTH_ENABLED) return null;
   const { data } = await supabase.auth.getSession();
   return data.session?.access_token ?? null;
 }
@@ -27,7 +29,9 @@ async function request<T>(
 ): Promise<T> {
   const token = await getToken();
   const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const devUserId = getDevAuthUserId();
+  if (devUserId) headers["x-dev-user-id"] = devUserId;
+  else if (token) headers["Authorization"] = `Bearer ${token}`;
 
   const res = await fetch(`${BASE}${path}`, {
     method,
