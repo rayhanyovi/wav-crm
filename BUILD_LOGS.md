@@ -2,6 +2,13 @@
 
 Entries are newest-first. Always prepend — do not append.
 
+## 2026-06-18 — Production duplicate leads merged by phone
+
+- Ran the production duplicate-lead merge batch using phone digits as the grouping key and the app's true merge service, not random deletion.
+- Applied result: 145 duplicate phone groups merged into 145 kept leads; active leads are now 717, duplicate phone groups are 0, and rows in duplicate groups are 0.
+- Preservation check: 9 groups had a worked/touched lead and those touched rows were the merge targets; all 145 merged-away source rows had touch score 0. The merge service carries missing fields forward, moves linked lead records, writes merge notes/audit logs, and only then soft-deletes the duplicate source.
+- Verified production audit artifacts: 145 recent soft-deleted source leads, 145 merge notes, 145 lead DELETE audit rows, and 145 lead UPDATE audit rows. Apply report: `tmp/lead-merge-plan-20260618-041121.csv`.
+
 ## 2026-06-18 — Live duplicate leads audit
 
 - Ran a read-only duplicate-lead audit against the active Supabase profile using phone digits as the grouping key.

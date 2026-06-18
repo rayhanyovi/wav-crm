@@ -141,26 +141,9 @@ export async function listLeads(actor: Actor, query: ListQuery): Promise<Paginat
   if (query.status) where.status = query.status;
   if (query.source) where.source = query.source;
 
-  const sharedAdviserIds = await getSharedAdviserIdsForTelemarketer(prisma, actor);
-  const telemarketerScope: Prisma.LeadWhereInput = {
-    OR: [
-      { telemarketerOwnerId: actor.id },
-      { telemarketerOwnerId: null },
-      ...(sharedAdviserIds.length > 0
-        ? [
-            { assignedToId: { in: sharedAdviserIds } },
-            { adviserOwnerId: { in: sharedAdviserIds } },
-          ]
-        : []),
-    ],
-  };
-
+  // MASTER sees all leads. Advisers and Telemarketers only see leads they uploaded.
   const scopeFilter: Prisma.LeadWhereInput | null =
-    actor.role === "MASTER" || (actor.role === "ADVISER" && actor.leadsAccess)
-      ? null
-      : actor.role === "TELEMARKETER"
-        ? telemarketerScope
-        : { OR: [{ assignedToId: actor.id }, { adviserOwnerId: actor.id }] };
+    actor.role === "MASTER" ? null : { createdBy: actor.id };
 
   const searchFilter: Prisma.LeadWhereInput | null = query.search
     ? {
