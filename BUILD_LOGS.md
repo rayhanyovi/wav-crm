@@ -2,6 +2,12 @@
 
 Entries are newest-first. Always prepend — do not append.
 
+## 2026-06-18 — Live duplicate leads audit
+
+- Ran a read-only duplicate-lead audit against the active Supabase profile using phone digits as the grouping key.
+- Result: 862 active leads, 145 duplicate phone groups, 290 rows in duplicate groups, 145 soft-delete candidates, 0 groups requiring manual review for multiple worked rows.
+- No production lead data was changed. The generated CSV report is under ignored `tmp/` and the current cleanup script remains dry-run-first.
+
 ## 2026-06-18 — Production migration applied
 
 - Added and applied an idempotent Supabase migration: `20260618033942_crm_leads_callbacks_and_dev_auth_support.sql`.
