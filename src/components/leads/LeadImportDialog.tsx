@@ -26,6 +26,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useAuthStore } from "@/store/useAuthStore";
+import { toast } from "@/store/useToastStore";
 import { useBulkCreateLeads, useLeads } from "@/hooks/useLeads";
 import { isTelemarketer } from "@/lib/permissions";
 import type { LeadStatus, LeadSource } from "@/data/types";
@@ -262,7 +263,7 @@ export function LeadImportDialog({ open, onClose }: Props) {
   const [parsed, setParsed] = useState<ParsedRow[]>([]);
   const [importing, setImporting] = useState(false);
   const [skipDuplicates, setSkipDuplicates] = useState(true);
-  const [done, setDone] = useState<{ ok: number; skipped: number; duplicates: number } | null>(null);
+  const [done, setDone] = useState<{ ok: number; skipped: number; duplicates: number; failed: number } | null>(null);
   const [defaultSource, setDefaultSource] = useState<LeadSource>("AP_MARKETING");
   const [fileName, setFileName] = useState<string | null>(null);
   // Multi-sheet support
@@ -354,7 +355,6 @@ export function LeadImportDialog({ open, onClose }: Props) {
     const rows = parsed.filter((r, i) => r._valid && (!skipDuplicates || !dupFlags[i]));
     const skipped = parsed.filter((r) => !r._valid).length;
     const duplicates = skipDuplicates ? parsed.filter((r, i) => r._valid && dupFlags[i]).length : 0;
-    const ok = rows.length;
 
     const payloads = rows.map((row) => ({
       salutation: row.salutation,
@@ -377,12 +377,20 @@ export function LeadImportDialog({ open, onClose }: Props) {
     }));
 
     bulkCreateMutation.mutate(payloads, {
-      onSuccess: () => {
+      onSuccess: (result) => {
         setImporting(false);
-        setDone({ ok, skipped, duplicates });
+        setDone({
+          ok: result.created.length,
+          skipped,
+          duplicates,
+          failed: result.failed.length,
+        });
       },
-      onError: () => {
+      onError: (err) => {
         setImporting(false);
+        toast.error(
+          `Import failed: ${err instanceof Error ? err.message : "unknown error"}. Please try again.`,
+        );
       },
     });
   };
@@ -599,8 +607,12 @@ export function LeadImportDialog({ open, onClose }: Props) {
           ) : (
             /* Success state */
             <div className="flex flex-col items-center justify-center py-10 gap-3 text-center">
-              <CheckCircle2 className="h-12 w-12 text-green-500" />
-              <h3 className="text-lg font-semibold">{done.ok} leads imported</h3>
+              {done.failed > 0 ? (
+                <AlertCircle className="h-12 w-12 text-amber-500" />
+              ) : (
+                <CheckCircle2 className="h-12 w-12 text-green-500" />
+              )}
+              <h3 className="text-lg font-semibold">{done.ok} of {done.ok + done.failed} leads imported</h3>
               {done.duplicates > 0 && (
                 <p className="text-sm text-amber-600 dark:text-amber-400">
                   {done.duplicates} duplicate{done.duplicates === 1 ? "" : "s"} skipped (phone already exists)
@@ -609,7 +621,17 @@ export function LeadImportDialog({ open, onClose }: Props) {
               {done.skipped > 0 && (
                 <p className="text-sm text-muted-foreground">{done.skipped} rows skipped (missing name)</p>
               )}
-              <p className="text-sm text-muted-foreground">They are now visible in your Leads list.</p>
+              {done.failed > 0 && (
+                <p className="text-sm text-destructive max-w-sm">
+                  {done.failed} lead{done.failed === 1 ? "" : "s"} couldn't be saved. Re-upload the same
+                  file to retry them — leads already imported will be skipped as duplicates.
+                </p>
+              )}
+              <p className="text-sm text-muted-foreground">
+                {done.ok > 0
+                  ? "Imported leads are now visible in your Leads list."
+                  : "No leads were added."}
+              </p>
             </div>
           )}
         </div>

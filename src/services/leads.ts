@@ -326,6 +326,50 @@ export async function deleteLeadNote(noteId: string): Promise<void> {
 
 // ─── Bulk import (no batch API endpoint — falls back to sequential creates) ───
 
-export async function bulkCreateLeads(leads: CreateLeadPayload[]): Promise<Lead[]> {
-  return Promise.all(leads.map((l) => createLead(l)));
+export interface BulkCreateResult {
+  /** Leads that were successfully created. */
+  created: Lead[];
+  /** Rows that failed every attempt, with the last error message. */
+  failed: { payload: CreateLeadPayload; error: string }[];
+}
+
+// Each createLead opens its own Prisma interactive transaction, and the DB
+// connection pool is small. Firing every row at once (Promise.all) exhausts the
+// pool, times out most transactions, and — because Promise.all fails fast — a
+// single failure discards the whole batch even though some rows already
+// committed. So we cap concurrency and use allSettled so one bad row can't sink
+// the rest, then retry the failures once (most failures are transient timeouts).
+const BULK_CONCURRENCY = 5;
+
+async function runInBatches(
+  leads: CreateLeadPayload[],
+): Promise<{ created: Lead[]; failed: { payload: CreateLeadPayload; error: string }[] }> {
+  const created: Lead[] = [];
+  const failed: { payload: CreateLeadPayload; error: string }[] = [];
+
+  for (let i = 0; i < leads.length; i += BULK_CONCURRENCY) {
+    const batch = leads.slice(i, i + BULK_CONCURRENCY);
+    const results = await Promise.allSettled(batch.map((l) => createLead(l)));
+    results.forEach((res, j) => {
+      if (res.status === "fulfilled") {
+        created.push(res.value);
+      } else {
+        const error = res.reason instanceof Error ? res.reason.message : String(res.reason);
+        failed.push({ payload: batch[j], error });
+      }
+    });
+  }
+  return { created, failed };
+}
+
+export async function bulkCreateLeads(leads: CreateLeadPayload[]): Promise<BulkCreateResult> {
+  const first = await runInBatches(leads);
+  if (first.failed.length === 0) return first;
+
+  // One retry pass for the rows that failed (typically transient pool timeouts).
+  const retry = await runInBatches(first.failed.map((f) => f.payload));
+  return {
+    created: [...first.created, ...retry.created],
+    failed: retry.failed,
+  };
 }
