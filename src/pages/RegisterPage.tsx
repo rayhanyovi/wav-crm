@@ -8,10 +8,14 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/lib/supabase";
 import {
   ALLOWED_REGISTRATION_DOMAIN,
+  allowsAnyRegistrationEmail,
+  getRegistrationEmailPolicy,
   isAllowedRegistrationEmail,
 } from "@/lib/auth-domain";
 
 export function RegisterPage() {
+  const registrationEmailPolicy = getRegistrationEmailPolicy();
+  const allowAnyRegistrationEmail = allowsAnyRegistrationEmail(registrationEmailPolicy);
   const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -21,9 +25,11 @@ export function RegisterPage() {
     event?.preventDefault();
     setError(null);
 
-    if (!isAllowedRegistrationEmail(email)) {
+    if (!isAllowedRegistrationEmail(email, registrationEmailPolicy)) {
       setError(
-        `Registration is restricted to @${ALLOWED_REGISTRATION_DOMAIN} email addresses.`,
+        allowAnyRegistrationEmail
+          ? "Enter a valid email address."
+          : `Registration is restricted to @${ALLOWED_REGISTRATION_DOMAIN} email addresses.`,
       );
       return;
     }
@@ -85,7 +91,9 @@ export function RegisterPage() {
         ) : (
           <form onSubmit={submit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Work email</Label>
+              <Label htmlFor="email">
+                {allowAnyRegistrationEmail ? "Email" : "Work email"}
+              </Label>
               <div className="relative">
                 <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -93,14 +101,20 @@ export function RegisterPage() {
                   type="email"
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
-                  placeholder={`you@${ALLOWED_REGISTRATION_DOMAIN}`}
+                  placeholder={
+                    allowAnyRegistrationEmail
+                      ? "you@example.com"
+                      : `you@${ALLOWED_REGISTRATION_DOMAIN}`
+                  }
                   className="pl-9"
                   autoComplete="email"
                   required
                 />
               </div>
               <p className="text-xs text-muted-foreground">
-                Only @{ALLOWED_REGISTRATION_DOMAIN} addresses can register.
+                {allowAnyRegistrationEmail
+                  ? "Staging registration accepts any email address."
+                  : `Only @${ALLOWED_REGISTRATION_DOMAIN} addresses can register.`}
               </p>
             </div>
 

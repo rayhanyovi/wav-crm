@@ -54,6 +54,7 @@ To move off Vercel: deploy `server/index.ts` to any Node host. Nothing in
 | Var | Scope | Notes |
 |-----|-------|-------|
 | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` | client | Inlined into the browser bundle by Vite. |
+| `VITE_REGISTRATION_EMAIL_POLICY` | client | `company` keeps signup restricted to `@sg-alliance.com` plus explicit test allowlist. Use `any` only for staging so any valid email can start signup. Defaults to `company` when omitted. |
 | `DATABASE_URL` | **server only** | **Pooled** Supabase connection (pgBouncer, port 6543, `?pgbouncer=true`). |
 | `DIRECT_URL` | server only | Direct connection — only for `prisma db pull`/migrations. |
 | `SUPABASE_JWT_SECRET` | **server only** | Verifies the access token. |

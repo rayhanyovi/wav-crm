@@ -58,6 +58,57 @@ Entries are newest-first. Always prepend — do not append.
 - `npm run test:coverage` exits 0 (all 90% line/stmt/func thresholds met). Docker e2e re-confirmed **4/4** (no app code changed — tests + config only).
 - Note: a couple of low-value branches remain uncovered and below per-file ideal but above the suite thresholds — `leads.service.ts` claimForCall/convert credit branches, a few nullish guards. Broadening further into UI/network code would be low-value churn.
 
+## 2026-06-23 — CallSheet Dialer Tools trimmed
+
+- Reduced CallSheet Toolkit/Dialer Tools to only the requested lead fields: primary number, email, positioning cue, age, first name, last name, gender, income range, and postal code.
+- Removed the over-broad Lead Properties display so internal lead metadata no longer appears in the calling panel.
+- Verified with `npm run build`.
+
+## 2026-06-23 — CallSheet Dialer Tools lead properties expanded
+
+- Added a full Lead Properties section to CallSheet Dialer Tools so callers can see the lead's identity, contact, profile, status, appointment, callback, fact-find, ownership, lifecycle, and record metadata from the Toolkit tab.
+- Completed the frontend lead mapper for previously omitted lead fields including personality, preferred contact method, best time to call, appointment result, products discussed, last bounced/cooldown timestamps, and related lifecycle properties.
+- Verified `npm run build` and `npm run typecheck:server` pass; Vite was already running on `http://localhost:5173`.
+
+## 2026-06-23 — Lead demographic update mapping fixed
+
+- Verified live Supabase Jeewan leads from `/Users/rayhan/Downloads/Jeewan - 150 leads 17_6_26.xlsx`: all 150 active leads have `age` and `zipcode`, with 0 missing ages, 0 missing postal codes, and 0 active duplicate phone groups.
+- Found the Excel itself has 50 rows where `Postcode` is blank but a 6-digit postal code appears under `Date of Birth`; the DB still has postal codes for all 150 because overlapping rows kept the prior zipcode data.
+- Fixed `updateLead` so edits persist `residential_status`, `income_range`, and `zipcode`, and added a regression test for those fields.
+
+## 2026-06-23 — Jeewan 150-lead cleanup corrected
+
+- Replaced the mistaken Jeewan 3,000-lead import with the actual `/Users/rayhan/Downloads/Jeewan - 150 leads 17_6_26.xlsx` source of truth in live Supabase.
+- Inserted 100 missing Jeewan leads, updated 50 untouched overlapping leads with Excel fields, and soft-deleted 2,950 untouched Jeewan-attached leads that were not in the 150-lead file; no leads attached to other advisers were targeted.
+- Verified Jeewan now has 150 active attached leads, 150 distinct Excel phones present, 0 missing Excel phones, 0 active non-file Jeewan leads, and 0 active duplicate phone groups.
+
+## 2026-06-22 — Staging registration email policy
+
+- Added `VITE_REGISTRATION_EMAIL_POLICY` with production-safe default behavior: omitted/`company` keeps registration restricted to `@sg-alliance.com` plus explicit test allowlist, while `any` lets staging accept any syntactically valid email.
+- Updated the register page copy, placeholder, and validation to reflect the active policy so staging no longer shows the SG Alliance-only message.
+- Documented the env var in `.env.local.example` and deployment docs.
+- Verified: `npm run test -- src/lib/auth-domain.test.ts` and `npm run build`.
+
+## 2026-06-22 — Jeewan Excel lead cleanliness verified
+
+- Re-audited live Supabase against `/Users/rayhan/Downloads/2026-02-10 - WAV_Dwayne - 3000 leads.xlsx` using normalized phone digits as the key.
+- Verified active state: Jeewan has exactly 3,000 active leads from the Excel file, all 3,000 are both `created_by` and `assigned_to_id` Jeewan, with 3,000 distinct active phones, 0 missing Excel phones, 0 duplicate active phone groups, and 0 active Jeewan rows outside the file.
+- Verified cross-creator state: the Excel phone set has 3,000 active rows across all creators and 3,000 distinct phones, so no active duplicate exists elsewhere for those phones.
+- Noted historical debris only: 1,050 Jeewan rows remain soft-deleted from prior failed attempts, plus 1,050 notifications tied to those deleted lead IDs; these were not hard-deleted.
+
+## 2026-06-22 — Jeewan lead import and reminder-only notifications
+
+- Imported the 3,000-row Excel lead file into live Supabase as active leads created/assigned to Jeewan Singh; verification found 3,000 active matching phone keys, all `NA` / `AP_MARKETING`, with 3,000 `CREATE` audit rows and no notifications created for the import.
+- Muted lead/deal transition notifications in server side effects, including `LEAD_ASSIGNED`, `LEAD_BOUNCED`, `APPOINTMENT_SET`, and `DEAL_STAGE_CHANGED`.
+- Limited the notification feed to reminder types only and added lazy `APPOINTMENT_TODAY` / `CALLBACK_TODAY` sweeps while preserving existing `CALLBACK_DUE`; the optional 2-hour pre-reminder is not implemented yet.
+- Verified targeted notification/side-effect tests and server typecheck pass; full server suite still has unrelated `listLeads` expectation failures in `server/modules/leads/leads.service.test.ts`.
+
+## 2026-06-21 — Live Jeewan lead upload audit
+
+- Audited live Supabase data against `/Users/rayhan/Downloads/2026-02-10 - WAV_Dwayne - 3000 leads.xlsx`.
+- The Excel file has 3,000 valid rows with 3,000 unique phone keys, but Jeewan has 0 active leads from the file in production; only 50 file phones ever matched Jeewan rows, and those 410 rows are soft-deleted.
+- Found Jeewan created/deleted 1,050 lead rows on 2026-06-21 Jakarta time across 150 unique phones, leaving 1,050 unread `LEAD_ASSIGNED` notifications attached to deleted lead IDs; no DB cleanup or re-import was performed in this pass.
+
 <!-- NEW ENTRIES GO HERE -->
 
 ## 2026-06-18 — 90% coverage gates + Docker E2E smoke
