@@ -22,7 +22,7 @@ import { useUpdateLead } from "@/hooks/useLeads";
 import { useCreateActivity } from "@/hooks/useActivities";
 import { CallbackModal } from "@/components/leads/CallbackModal";
 import { LeadStatusBadge } from "@/components/common/StatusBadge";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { formatCurrency, formatDate, formatDateTime } from "@/lib/format";
 import type { Lead, FinancialGoal, RiskTolerance, InvestmentHorizon } from "@/data/types";
 import { Link } from "react-router-dom";
 import { useAuthStore } from "@/store/useAuthStore";
@@ -39,6 +39,42 @@ const TOLERANCE_LABELS: Record<RiskTolerance, string> = {
 const HORIZON_LABELS: Record<InvestmentHorizon, string> = {
   SHORT: "Short-term (< 3 yrs)", MEDIUM: "Medium-term (3–7 yrs)", LONG: "Long-term (7+ yrs)",
 };
+
+interface LeadPropertyItem {
+  label: string;
+  value: string | number | boolean | null | undefined;
+  wide?: boolean;
+}
+
+function displayValue(value: LeadPropertyItem["value"]): string {
+  if (value === true) return "Yes";
+  if (value === false) return "No";
+  if (value === null || value === undefined || value === "") return "—";
+  return String(value);
+}
+
+function displayEnum(value: string | null | undefined): string {
+  if (!value) return "—";
+  return value.replace(/_/g, " ");
+}
+
+function displayList(value: string[] | null | undefined): string {
+  return value && value.length > 0 ? value.join(", ") : "—";
+}
+
+function displayMoney(value: number | null | undefined): string {
+  if (value === null || value === undefined) return "—";
+  return `SGD ${value.toLocaleString()}`;
+}
+
+function displayStatusHistory(lead: Lead): string {
+  const history = lead.status_history ?? [];
+  if (history.length === 0) return "—";
+  const latest = history
+    .slice()
+    .sort((a, b) => new Date(b.changed_at).getTime() - new Date(a.changed_at).getTime())[0];
+  return `${history.length} entr${history.length === 1 ? "y" : "ies"}${latest ? `, latest ${latest.status} on ${formatDate(latest.changed_at)}` : ""}`;
+}
 
 interface CallSheetProps {
   lead: Lead | undefined;
@@ -85,6 +121,107 @@ export function CallSheet({ lead }: CallSheetProps) {
       (a, b) =>
         new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
     );
+
+  const leadPropertyGroups: Array<{ title: string; items: LeadPropertyItem[] }> = [
+    {
+      title: "Identity",
+      items: [
+        { label: "Lead ID", value: lead.id, wide: true },
+        { label: "Salutation", value: lead.salutation },
+        { label: "First name", value: lead.first_name },
+        { label: "Last name", value: lead.last_name },
+      ],
+    },
+    {
+      title: "Contact",
+      items: [
+        { label: "Phone", value: lead.phone },
+        { label: "Email", value: lead.email },
+        { label: "Preferred contact", value: lead.preferred_contact_method },
+        { label: "Best time to call", value: lead.best_time_to_call },
+      ],
+    },
+    {
+      title: "Profile",
+      items: [
+        { label: "Age", value: lead.age },
+        { label: "Gender", value: lead.gender },
+        { label: "Residential status", value: lead.residential_status },
+        { label: "Income range", value: lead.income_range },
+        { label: "Postal code", value: lead.zipcode },
+        { label: "Personality", value: lead.personality },
+      ],
+    },
+    {
+      title: "Lead State",
+      items: [
+        { label: "Status", value: displayEnum(lead.status) },
+        { label: "Source", value: displayEnum(lead.source) },
+        { label: "Notes", value: lead.notes, wide: true },
+        { label: "Abandoned", value: lead.is_abandoned ?? false },
+        { label: "Abandoned at", value: formatDateTime(lead.abandoned_at) },
+        { label: "Other status note", value: lead.other_status_note, wide: true },
+        { label: "Products discussed", value: displayList(lead.products_discussed), wide: true },
+      ],
+    },
+    {
+      title: "Appointment",
+      items: [
+        { label: "Appointment date", value: formatDate(lead.appointment_date) },
+        { label: "Appointment time", value: lead.appointment_time },
+        { label: "Appointment result", value: displayEnum(lead.appointment_result) },
+      ],
+    },
+    {
+      title: "Callback",
+      items: [
+        { label: "Callback at", value: formatDateTime(lead.callback_at) },
+        { label: "Callback assigned to", value: lead.callback_assigned_to },
+        { label: "Callback note", value: lead.callback_note, wide: true },
+      ],
+    },
+    {
+      title: "Fact Find",
+      items: [
+        { label: "Financial goal", value: lead.financial_goal ? GOAL_LABELS[lead.financial_goal] : undefined },
+        { label: "Risk tolerance", value: lead.risk_tolerance ? TOLERANCE_LABELS[lead.risk_tolerance] : undefined },
+        { label: "Investment horizon", value: lead.investment_horizon ? HORIZON_LABELS[lead.investment_horizon] : undefined },
+        { label: "Monthly investable", value: displayMoney(lead.monthly_investable) },
+        { label: "Existing investments", value: lead.existing_investments, wide: true },
+        { label: "Fact find done", value: lead.fact_find_done ?? false },
+        { label: "Fact find notes", value: lead.fact_find_notes, wide: true },
+      ],
+    },
+    {
+      title: "Ownership",
+      items: [
+        { label: "Assigned to", value: lead.assigned_to_id },
+        { label: "Telemarketer owner", value: lead.telemarketer_owner_id },
+        { label: "Adviser owner", value: lead.adviser_owner_id },
+        { label: "Created by", value: lead.created_by },
+      ],
+    },
+    {
+      title: "Lifecycle",
+      items: [
+        { label: "Bounce count", value: lead.bounce_count ?? 0 },
+        { label: "Last bounced at", value: formatDateTime(lead.last_bounced_at) },
+        { label: "Cooldown until", value: formatDateTime(lead.cooldown_until) },
+        { label: "Converted contact", value: lead.converted_contact_id },
+        { label: "Converted at", value: formatDateTime(lead.converted_at) },
+        { label: "Last contacted at", value: formatDateTime(lead.last_contacted_at) },
+        { label: "Status history", value: displayStatusHistory(lead), wide: true },
+      ],
+    },
+    {
+      title: "Record",
+      items: [
+        { label: "Created at", value: formatDateTime(lead.created_at) },
+        { label: "Updated at", value: formatDateTime(lead.updated_at) },
+        { label: "Deleted at", value: formatDateTime(lead.deleted_at) },
+      ],
+    },
+  ];
 
   const openFF = () => {
     setFfForm({
@@ -223,6 +360,35 @@ export function CallSheet({ lead }: CallSheetProps) {
                   {lead.notes ||
                     "Confirm investment goals and risk appetite before pitching the offer."}
                 </p>
+              </div>
+            </div>
+            <div className="border-t pt-3">
+              <p className="mb-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                Lead Properties
+              </p>
+              <div className="space-y-3">
+                {leadPropertyGroups.map((group) => (
+                  <div key={group.title} className="space-y-1.5">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      {group.title}
+                    </p>
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+                      {group.items.map((item) => (
+                        <div
+                          key={`${group.title}-${item.label}`}
+                          className={item.wide ? "col-span-2 min-w-0" : "min-w-0"}
+                        >
+                          <p className="text-[10px] leading-tight text-muted-foreground">
+                            {item.label}
+                          </p>
+                          <p className="break-words text-xs leading-snug text-foreground">
+                            {displayValue(item.value)}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>

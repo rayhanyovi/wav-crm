@@ -69,7 +69,7 @@ describe("listLeads", () => {
     expect(db.lead.findMany.mock.calls[0]![0]).toMatchObject({ skip: 10, take: 10 });
   });
 
-  it("does not scope adviser leads when Lead Access is enabled", async () => {
+  it("scopes adviser leads to rows they uploaded", async () => {
     db.lead.findMany.mockResolvedValue([{ id: "l1" }]);
     db.lead.count.mockResolvedValue(1);
 
@@ -81,11 +81,12 @@ describe("listLeads", () => {
     expect(db.lead.findMany.mock.calls[0]![0].where).toMatchObject({
       deletedAt: null,
       isAbandoned: false,
+      createdBy: "adv-1",
     });
     expect(db.lead.findMany.mock.calls[0]![0].where.OR).toBeUndefined();
   });
 
-  it("filters adviser leads to assigned/adviser-owned rows without Lead Access", async () => {
+  it("scopes adviser leads to uploaded rows even without Lead Access", async () => {
     db.lead.findMany.mockResolvedValue([{ id: "l1" }]);
     db.lead.count.mockResolvedValue(1);
 
@@ -95,11 +96,13 @@ describe("listLeads", () => {
     } as never);
 
     expect(db.lead.findMany.mock.calls.at(-1)![0].where).toMatchObject({
-      OR: [{ assignedToId: "adv-1" }, { adviserOwnerId: "adv-1" }],
+      deletedAt: null,
+      isAbandoned: false,
+      createdBy: "adv-1",
     });
   });
 
-  it("includes leads owned by advisers who assigned this telemarketer", async () => {
+  it("scopes telemarketer leads to rows they uploaded", async () => {
     db.crmUser.findMany.mockResolvedValue([{ id: "adv-1" }]);
     db.lead.findMany.mockResolvedValue([{ id: "l1" }]);
     db.lead.count.mockResolvedValue(1);
@@ -109,21 +112,12 @@ describe("listLeads", () => {
       pageSize: 25,
     } as never);
 
-    expect(db.crmUser.findMany).toHaveBeenCalledWith({
-      where: {
-        role: "ADVISER",
-        isActive: true,
-        telemarketerAccess: true,
-        telemarketerId: "tm-1",
-      },
-      select: { id: true },
+    expect(db.crmUser.findMany).not.toHaveBeenCalled();
+    expect(db.lead.findMany.mock.calls[0]![0].where).toMatchObject({
+      deletedAt: null,
+      isAbandoned: false,
+      createdBy: "tm-1",
     });
-    expect(db.lead.findMany.mock.calls[0]![0].where.OR).toEqual([
-      { telemarketerOwnerId: "tm-1" },
-      { telemarketerOwnerId: null },
-      { assignedToId: { in: ["adv-1"] } },
-      { adviserOwnerId: { in: ["adv-1"] } },
-    ]);
   });
 });
 
@@ -172,6 +166,24 @@ describe("updateLead side-effects", () => {
     await updateLead(actor(), "l1", { notes: "hi" } as never);
 
     expect(db.leadStatusHistory.create).not.toHaveBeenCalled();
+  });
+
+  it("persists demographic fields on update", async () => {
+    const prev = { id: "l1", status: "NA", firstName: "A", lastName: "B", assignedToId: "u1", telemarketerOwnerId: "u1", adviserOwnerId: null, bounceCount: 0 };
+    db.lead.findFirst.mockResolvedValue(prev);
+    db.lead.update.mockResolvedValue({ ...prev });
+
+    await updateLead(actor(), "l1", {
+      residential_status: "Singapore Citizen",
+      income_range: "SGD 2500 and above",
+      zipcode: "560429",
+    } as never);
+
+    expect(db.lead.update.mock.calls.at(-1)![0].data).toMatchObject({
+      residentialStatus: "Singapore Citizen",
+      incomeRange: "SGD 2500 and above",
+      zipcode: "560429",
+    });
   });
 
   it("allows an assigned telemarketer to update an adviser's lead", async () => {

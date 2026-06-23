@@ -45,41 +45,22 @@ describe("deriveStatusColumns", () => {
 });
 
 describe("buildLeadNotifications", () => {
-  it("emits APPOINTMENT_SET when status becomes APPOINTMENT with an assignee", () => {
+  it("does not emit APPOINTMENT_SET when status becomes APPOINTMENT", () => {
     const prev = lead({ status: "NA", assignedToId: "adv-1" });
     const next = lead({ status: "APPOINTMENT", assignedToId: "adv-1", appointmentDate: "2026-07-01" });
-    const rows = buildLeadNotifications(prev, next);
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ type: "APPOINTMENT_SET", recipientId: "adv-1", entityId: "lead-1" });
-    expect(rows[0]?.message).toContain("2026-07-01");
+    expect(buildLeadNotifications(prev, next)).toEqual([]);
   });
 
-  it("emits LEAD_ASSIGNED when the assignee changes", () => {
+  it("does not emit LEAD_ASSIGNED when the assignee changes", () => {
     const rows = buildLeadNotifications(lead({ assignedToId: null }), lead({ assignedToId: "adv-2" }));
-    expect(rows).toEqual([expect.objectContaining({ type: "LEAD_ASSIGNED", recipientId: "adv-2" })]);
+    expect(rows).toEqual([]);
   });
 
-  it("emits LEAD_BOUNCED to the previous TM owner on a bounce", () => {
+  it("does not emit LEAD_BOUNCED on a bounce", () => {
     const prev = lead({ telemarketerOwnerId: "tm-1", bounceCount: 0 });
     const next = lead({ telemarketerOwnerId: "tm-1", bounceCount: 1 });
     const rows = buildLeadNotifications(prev, next);
-    expect(rows).toEqual([expect.objectContaining({ type: "LEAD_BOUNCED", recipientId: "tm-1" })]);
-  });
-
-  it("falls back to a generic name and omits the date when both are missing", () => {
-    const prev = lead({ status: "NA", assignedToId: "adv-1", firstName: " ", lastName: " " });
-    const next = lead({ status: "APPOINTMENT", assignedToId: "adv-1", firstName: " ", lastName: " ", appointmentDate: null });
-    const rows = buildLeadNotifications(prev, next);
-    expect(rows[0]?.message).toContain("A lead");
-    expect(rows[0]?.message).not.toMatch(/\d{4}-\d{2}-\d{2}/);
-  });
-
-  it("does not emit LEAD_BOUNCED when there is no previous TM owner", () => {
-    const rows = buildLeadNotifications(
-      lead({ telemarketerOwnerId: null, bounceCount: 0 }),
-      lead({ telemarketerOwnerId: null, bounceCount: 1 }),
-    );
-    expect(rows.find((r) => r.type === "LEAD_BOUNCED")).toBeUndefined();
+    expect(rows).toEqual([]);
   });
 
   it("emits nothing for an inert update", () => {

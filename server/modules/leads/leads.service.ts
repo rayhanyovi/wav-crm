@@ -93,6 +93,9 @@ function toPrismaUpdate(input: UpdateLeadInput): Prisma.LeadUpdateInput {
   set("phone", input.phone);
   set("age", input.age);
   set("gender", input.gender);
+  set("residentialStatus", input.residential_status);
+  set("incomeRange", input.income_range);
+  set("zipcode", input.zipcode);
   set("status", input.status);
   set("source", input.source);
   set("notes", input.notes);

@@ -12,24 +12,13 @@ function deal(overrides: Partial<Deal> = {}): Pick<Deal, "id" | "title" | "assig
 }
 
 describe("buildDealNotifications", () => {
-  it("emits DEAL_STAGE_CHANGED to the assignee when a deal has one", () => {
+  it("does not emit DEAL_STAGE_CHANGED when a deal has an assignee", () => {
     const rows = buildDealNotifications(deal({ assignedToId: "adv-1" }), "PROPOSAL");
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({
-      type: "DEAL_STAGE_CHANGED",
-      recipientId: "adv-1",
-      entityId: "deal-1",
-    });
-    expect(rows[0]?.message).toContain("PROPOSAL");
+    expect(rows).toEqual([]);
   });
 
   it("emits nothing when the deal is unassigned", () => {
     const rows = buildDealNotifications(deal({ assignedToId: null }), "PROPOSAL");
-    expect(rows).toHaveLength(0);
-  });
-
-  it("includes the deal title in the notification message", () => {
-    const rows = buildDealNotifications(deal({ assignedToId: "adv-1", title: "John Doe" }), "WON");
-    expect(rows[0]?.message).toContain("John Doe");
+    expect(rows).toEqual([]);
   });
 });

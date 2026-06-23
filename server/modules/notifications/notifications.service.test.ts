@@ -40,7 +40,7 @@ function actor(overrides: Partial<Actor> = {}): Actor {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  // Default: no callbacks due, so the sweep is a no-op and doesn't hit $transaction.
+  // Default: no appointment/callback reminders due, so sweeps are no-ops.
   db.lead.findMany.mockResolvedValue([]);
 });
 
@@ -53,6 +53,7 @@ describe("listNotifications", () => {
 
     const where = db.notification.findMany.mock.calls[0]![0].where;
     expect(where.recipientId).toBe("u1");
+    expect(where.type).toEqual({ in: ["APPOINTMENT_TODAY", "CALLBACK_TODAY", "CALLBACK_DUE"] });
   });
 
   it("filters unread_only when requested", async () => {
@@ -66,9 +67,12 @@ describe("listNotifications", () => {
   });
 
   it("sweeps due callbacks: emits CALLBACK_DUE and marks them notified", async () => {
-    db.lead.findMany.mockResolvedValue([
-      { id: "lead-1", firstName: "Jane", lastName: "Doe", callbackNote: "wants 2pm" },
-    ]);
+    db.lead.findMany
+      .mockResolvedValueOnce([
+        { id: "lead-1", firstName: "Jane", lastName: "Doe", callbackNote: "wants 2pm" },
+      ])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
     db.notification.findMany.mockResolvedValue([]);
     db.notification.count.mockResolvedValue(0);
 
@@ -89,6 +93,66 @@ describe("listNotifications", () => {
       expect.objectContaining({ where: { id: { in: ["lead-1"] } }, data: { callbackNotified: true } }),
     );
     expect(db.$transaction).toHaveBeenCalledTimes(1);
+  });
+
+  it("sweeps today's appointments into APPOINTMENT_TODAY reminders", async () => {
+    db.lead.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        { id: "lead-2", firstName: "Ada", lastName: "Lovelace", appointmentTime: "14:00" },
+      ])
+      .mockResolvedValueOnce([]);
+    db.notification.findMany.mockResolvedValue([]);
+    db.notification.count.mockResolvedValue(0);
+
+    await listNotifications(actor({ id: "adv-1" }), { page: 1, pageSize: 25 } as never);
+
+    const appointmentWhere = db.lead.findMany.mock.calls[1]![0].where;
+    expect(appointmentWhere).toMatchObject({
+      status: "APPOINTMENT",
+      appointmentDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      OR: [
+        { assignedToId: "adv-1" },
+        { deals: { some: { assignedToId: "adv-1", deletedAt: null } } },
+      ],
+    });
+    expect(db.notification.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.arrayContaining([
+          expect.objectContaining({ type: "APPOINTMENT_TODAY", recipientId: "adv-1", entityId: "lead-2" }),
+        ]),
+      }),
+    );
+  });
+
+  it("sweeps today's callbacks into CALLBACK_TODAY without marking the callback notified", async () => {
+    db.lead.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          id: "lead-3",
+          firstName: "Grace",
+          lastName: "Hopper",
+          callbackAt: new Date(),
+          callbackNote: "after lunch",
+        },
+      ]);
+    db.notification.findMany.mockResolvedValue([]);
+    db.notification.count.mockResolvedValue(0);
+
+    await listNotifications(actor({ id: "tm-1" }), { page: 1, pageSize: 25 } as never);
+
+    const callbackWhere = db.lead.findMany.mock.calls[2]![0].where;
+    expect(callbackWhere).toMatchObject({ callbackAssignedTo: "tm-1", callbackNotified: false });
+    expect(db.notification.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.arrayContaining([
+          expect.objectContaining({ type: "CALLBACK_TODAY", recipientId: "tm-1", entityId: "lead-3" }),
+        ]),
+      }),
+    );
+    expect(db.lead.updateMany).not.toHaveBeenCalled();
   });
 });
 
@@ -123,6 +187,10 @@ describe("markAllRead", () => {
 
     expect(result.count).toBe(5);
     const where = db.notification.updateMany.mock.calls[0]![0].where;
-    expect(where).toMatchObject({ recipientId: "u1", isRead: false });
+    expect(where).toMatchObject({
+      recipientId: "u1",
+      isRead: false,
+      type: { in: ["APPOINTMENT_TODAY", "CALLBACK_TODAY", "CALLBACK_DUE"] },
+    });
   });
 });

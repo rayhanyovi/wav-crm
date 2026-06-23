@@ -30,20 +30,27 @@ interface ApiLead {
   residentialStatus: string | null;
   incomeRange: string | null;
   zipcode: string | null;
+  personality: string | null;
+  preferredContactMethod: string | null;
+  bestTimeToCall: string | null;
   status: LeadStatus;
   source: LeadSource;
   notes: string | null;
   appointmentDate: string | null;
   appointmentTime: string | null;
+  appointmentResult: Lead["appointment_result"] | null;
   isAbandoned: boolean;
   abandonedAt: string | null;
   otherStatusNote: string | null;
+  productsDiscussed: string[] | null;
   assignedToId: string | null;
   telemarketerOwnerId: string | null;
   adviserOwnerId: string | null;
   bounceCount: number | null;
+  lastBouncedAt: string | null;
   convertedContactId: string | null;
   convertedAt: string | null;
+  cooldownUntil: string | null;
   lastContactedAt: string | null;
   callbackAt: string | null;
   callbackAssignedTo: string | null;
@@ -82,20 +89,27 @@ function mapLead(r: ApiLead): Lead {
     residential_status: r.residentialStatus ?? undefined,
     income_range: r.incomeRange ?? undefined,
     zipcode: r.zipcode ?? undefined,
+    personality: r.personality ?? undefined,
+    preferred_contact_method: r.preferredContactMethod ?? undefined,
+    best_time_to_call: r.bestTimeToCall ?? undefined,
     status: r.status,
     source: r.source,
     notes: r.notes ?? undefined,
     appointment_date: r.appointmentDate ?? undefined,
     appointment_time: r.appointmentTime ?? undefined,
+    appointment_result: r.appointmentResult ?? undefined,
     is_abandoned: r.isAbandoned ?? false,
     abandoned_at: r.abandonedAt ?? undefined,
     other_status_note: r.otherStatusNote ?? undefined,
+    products_discussed: r.productsDiscussed ?? undefined,
     assigned_to_id: r.assignedToId ?? undefined,
     telemarketer_owner_id: r.telemarketerOwnerId ?? undefined,
     adviser_owner_id: r.adviserOwnerId ?? undefined,
     bounce_count: r.bounceCount ?? undefined,
+    last_bounced_at: r.lastBouncedAt ?? undefined,
     converted_contact_id: r.convertedContactId ?? undefined,
     converted_at: r.convertedAt ?? undefined,
+    cooldown_until: r.cooldownUntil ?? undefined,
     last_contacted_at: r.lastContactedAt ?? undefined,
     callback_at: r.callbackAt ?? undefined,
     callback_assigned_to: r.callbackAssignedTo ?? undefined,

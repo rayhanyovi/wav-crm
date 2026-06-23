@@ -23,22 +23,14 @@ export async function recordStageHistory(
   });
 }
 
-/** Builds notification rows for a stage transition (no I/O). */
+/** Deal stage notifications are muted while the bell is reminder-only. */
 export function buildDealNotifications(
   deal: Pick<Deal, "id" | "title" | "assignedToId">,
   toStage: DealStage,
 ): Prisma.NotificationCreateManyInput[] {
-  if (!deal.assignedToId) return [];
-  return [
-    {
-      recipientId: deal.assignedToId,
-      type: "DEAL_STAGE_CHANGED",
-      title: "Deal stage changed",
-      message: `Deal "${deal.title}" moved to ${toStage}.`,
-      entityType: "deal",
-      entityId: deal.id,
-    },
-  ];
+  void deal;
+  void toStage;
+  return [];
 }
 
 export async function emitDealNotifications(
