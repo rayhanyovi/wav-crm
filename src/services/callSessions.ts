@@ -1,4 +1,4 @@
-import { api, type Envelope } from "@/lib/api";
+import { api, type Envelope, type Page } from "@/lib/api";
 import type { CallSession } from "@/data/types";
 
 export interface CallSessionFilters {
@@ -35,9 +35,14 @@ function mapCallSession(r: ApiCallSession): CallSession {
 
 // ─── Service functions ────────────────────────────────────────────────────────
 
-export async function fetchCallSessions(_filters?: CallSessionFilters): Promise<CallSession[]> {
-  // No GET /api/call-sessions endpoint — return empty for now
-  return [];
+export async function fetchCallSessions(filters?: CallSessionFilters): Promise<CallSession[]> {
+  const res = await api.get<Page<ApiCallSession>>("/api/call-sessions", {
+    page: 1,
+    pageSize: 500,
+  });
+  const sessions = res.data.map(mapCallSession);
+  if (!filters?.userId) return sessions;
+  return sessions.filter((session) => session.user_id === filters.userId);
 }
 
 export async function createCallSession(payload: CreateCallSessionPayload): Promise<CallSession> {

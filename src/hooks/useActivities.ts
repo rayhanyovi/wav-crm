@@ -45,8 +45,11 @@ export function useCreateActivity() {
 
   return useMutation({
     mutationFn: (payload: CreateActivityPayload) => createActivity(payload),
-    onSuccess: () => {
+    onSuccess: (_activity, payload) => {
       qc.invalidateQueries({ queryKey: activityKeys.all });
+      if (payload.type === "CALL" && payload.lead_id) {
+        qc.invalidateQueries({ queryKey: ["leads"] });
+      }
     },
   });
 }

@@ -65,6 +65,7 @@ export async function createActivity(actor: Actor, input: CreateActivityInput): 
   if (!canCreateActivity(actor)) throw new ForbiddenError("Not allowed to create activities");
 
   return prisma.$transaction(async (tx) => {
+    const completedAt = input.completed_at ? new Date(input.completed_at) : undefined;
     const activity = await tx.activity.create({
       data: {
         id: randomUUID(),
@@ -73,14 +74,22 @@ export async function createActivity(actor: Actor, input: CreateActivityInput): 
         description: input.description,
         result: input.result,
         scheduledAt: input.scheduled_at ? new Date(input.scheduled_at) : undefined,
-        completedAt: input.completed_at ? new Date(input.completed_at) : undefined,
+        completedAt,
         leadId: input.lead_id,
         dealId: input.deal_id,
         contactId: input.contact_id,
         assignedToId: input.assigned_to_id,
+        metadata: input.metadata as Prisma.InputJsonValue | undefined,
         createdBy: actor.id,
       },
     });
+
+    if (input.type === "CALL" && input.lead_id) {
+      await tx.lead.update({
+        where: { id: input.lead_id },
+        data: { lastContactedAt: completedAt ?? new Date() },
+      });
+    }
 
     await writeAuditLog(tx, { userId: actor.id, action: "CREATE", entityId: activity.id, old: null, next: activity });
     return activity;

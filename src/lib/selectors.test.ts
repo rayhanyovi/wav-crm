@@ -78,12 +78,27 @@ describe("getDaysSince", () => {
 });
 
 describe("getTodayCallStats", () => {
-  it("counts today's calls, pickups, and session duration for the user", () => {
+  it("counts today's calls, pickups, and call activity duration for the user", () => {
+    const now = new Date().toISOString();
+    const acts = [
+      act({ type: "CALL", created_by: "u1", created_at: now, result: "COMPLETED", metadata: { duration_seconds: 120 } }),
+      act({ type: "CALL", created_by: "u1", created_at: now, result: "NO_ANSWER", metadata: { duration_seconds: 30 } }),
+      act({ type: "CALL", created_by: "other", created_at: now }),
+    ];
+    const sessions = [] as CallSession[];
+
+    expect(getTodayCallStats(acts, "u1", sessions)).toEqual({
+      callsMade: 2,
+      pickups: 1,
+      totalDurationSeconds: 150,
+    });
+  });
+
+  it("uses saved session duration when call activities do not have duration metadata", () => {
     const now = new Date().toISOString();
     const acts = [
       act({ type: "CALL", created_by: "u1", created_at: now, result: "COMPLETED" }),
       act({ type: "CALL", created_by: "u1", created_at: now, result: "NO_ANSWER" }),
-      act({ type: "CALL", created_by: "other", created_at: now }),
     ];
     const sessions = [{ user_id: "u1", started_at: now, total_duration_seconds: 600 }] as CallSession[];
 

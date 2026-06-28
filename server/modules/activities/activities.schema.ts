@@ -1,7 +1,14 @@
 import { z } from "zod";
 
 const ACTIVITY_TYPES = ["CALL", "EMAIL", "MEETING", "TASK", "NOTE", "FOLLOW_UP"] as const;
-const ACTIVITY_RESULTS = ["COMPLETED", "NO_ANSWER", "FOLLOW_UP_NEEDED", "MEETING_SCHEDULED"] as const;
+const ACTIVITY_RESULTS = [
+  "COMPLETED",
+  "NO_ANSWER",
+  "FOLLOW_UP_NEEDED",
+  "MEETING_SCHEDULED",
+  "CANCELLED",
+  "FAILED",
+] as const;
 
 const activityType = z.enum(ACTIVITY_TYPES);
 const activityResult = z.enum(ACTIVITY_RESULTS);
@@ -32,6 +39,7 @@ export const createActivitySchema = z.object({
   deal_id: z.string().optional(),
   contact_id: z.string().optional(),
   assigned_to_id: z.string().optional(),
+  metadata: z.record(z.unknown()).optional(),
 });
 
 export const updateActivitySchema = z

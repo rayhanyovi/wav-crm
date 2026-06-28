@@ -1,5 +1,15 @@
 import type { Activity, Deal, Lead } from "@/data/types";
 
+function getActivityDurationSeconds(activity: Activity): number {
+  const value = activity.metadata?.duration_seconds;
+  if (typeof value === "number" && Number.isFinite(value) && value > 0) return value;
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+  return 0;
+}
+
 export function getLastContactedDate(
   leadId: string,
   activities: Activity[],
@@ -64,11 +74,16 @@ export function getTodayCallStats(activities: Activity[], userId: string, callSe
   );
   const callsMade = todayCalls.length;
   const pickups = todayCalls.filter((a) => a.result !== "NO_ANSWER").length;
+  const activityDurationSeconds = todayCalls.reduce(
+    (sum, activity) => sum + getActivityDurationSeconds(activity),
+    0,
+  );
 
   const todaySessions = callSessions.filter(
     (s) => s.user_id === userId && new Date(s.started_at) >= todayStart
   );
-  const totalDurationSeconds = todaySessions.reduce((sum, s) => sum + s.total_duration_seconds, 0);
+  const sessionDurationSeconds = todaySessions.reduce((sum, s) => sum + s.total_duration_seconds, 0);
+  const totalDurationSeconds = Math.max(activityDurationSeconds, sessionDurationSeconds);
 
   return { callsMade, pickups, totalDurationSeconds };
 }

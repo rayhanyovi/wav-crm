@@ -13,6 +13,7 @@ import { useContact } from "@/hooks/useContacts";
 import { useProducts } from "@/hooks/useProducts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { TimeInput } from "@/components/common/TimeInput";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -383,12 +384,9 @@ export function LeadDetailPage() {
                     </div>
                     <div className="space-y-1">
                       <Label>Appointment Time</Label>
-                      <Input
-                        type="time"
+                      <TimeInput
                         value={form.appointment_time || ""}
-                        onChange={(e) =>
-                          setForm({ ...form, appointment_time: e.target.value })
-                        }
+                        onValueChange={(value) => setForm({ ...form, appointment_time: value || undefined })}
                       />
                     </div>
                   </div>

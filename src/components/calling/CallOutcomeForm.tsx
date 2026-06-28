@@ -4,6 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { TimeInput } from "@/components/common/TimeInput";
 import { useCallSessionStore } from "@/store/useCallSessionStore";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useCreateActivity } from "@/hooks/useActivities";
@@ -339,10 +340,9 @@ export function CallOutcomeForm({ lead }: CallOutcomeFormProps) {
               onChange={(e) => setMeetingDate(e.target.value)}
               className="text-sm flex-1"
             />
-            <Input
-              type="time"
+            <TimeInput
               value={meetingTime}
-              onChange={(e) => setMeetingTime(e.target.value)}
+              onValueChange={setMeetingTime}
               className="text-sm flex-1"
             />
           </div>
@@ -389,10 +389,9 @@ export function CallOutcomeForm({ lead }: CallOutcomeFormProps) {
               onChange={(e) => setFollowUpDate(e.target.value)}
               className="text-sm flex-1"
             />
-            <Input
-              type="time"
+            <TimeInput
               value={followUpTime}
-              onChange={(e) => setFollowUpTime(e.target.value)}
+              onValueChange={setFollowUpTime}
               className="text-sm flex-1"
             />
           </div>

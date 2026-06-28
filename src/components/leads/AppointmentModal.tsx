@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { TimeInput } from "@/components/common/TimeInput";
 import {
   Select,
   SelectContent,
@@ -173,11 +174,10 @@ export function AppointmentModal({ lead, open, onClose, onConverted }: Appointme
                   onChange={(e) => setAppointmentDate(e.target.value)}
                   className="flex-1"
                 />
-                <Input
+                <TimeInput
                   id="ap-time"
-                  type="time"
                   value={appointmentTime}
-                  onChange={(e) => setAppointmentTime(e.target.value)}
+                  onValueChange={setAppointmentTime}
                   className="flex-1"
                 />
               </div>

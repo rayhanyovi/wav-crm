@@ -9,6 +9,7 @@ const db = vi.hoisted(() => ({
     create: vi.fn(),
     update: vi.fn(),
   },
+  lead: { update: vi.fn() },
   comment: { findMany: vi.fn(), create: vi.fn() },
   auditLog: { create: vi.fn() },
   $transaction: vi.fn(),
@@ -103,6 +104,39 @@ describe("createActivity", () => {
 
     await createActivity(actor({ id: "u1" }), { type: "CALL", subject: "Test" } as never);
     expect(db.activity.create.mock.calls[0]![0].data.createdBy).toBe("u1");
+  });
+
+  it("persists metadata for call details", async () => {
+    const created = activity();
+    db.activity.create.mockResolvedValue(created);
+    db.auditLog.create.mockResolvedValue({});
+
+    await createActivity(actor({ id: "u1" }), {
+      type: "CALL",
+      subject: "Test",
+      metadata: { duration_seconds: 45 },
+    } as never);
+
+    expect(db.activity.create.mock.calls[0]![0].data.metadata).toEqual({ duration_seconds: 45 });
+  });
+
+  it("updates lead lastContactedAt when logging a call", async () => {
+    const created = activity();
+    db.activity.create.mockResolvedValue(created);
+    db.lead.update.mockResolvedValue({});
+    db.auditLog.create.mockResolvedValue({});
+
+    await createActivity(actor({ id: "u1" }), {
+      type: "CALL",
+      subject: "Test",
+      lead_id: "lead-1",
+      completed_at: "2026-07-01T10:30:00.000Z",
+    } as never);
+
+    expect(db.lead.update).toHaveBeenCalledWith({
+      where: { id: "lead-1" },
+      data: { lastContactedAt: new Date("2026-07-01T10:30:00.000Z") },
+    });
   });
 });
 

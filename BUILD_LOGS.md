@@ -109,6 +109,18 @@ Entries are newest-first. Always prepend — do not append.
 - The Excel file has 3,000 valid rows with 3,000 unique phone keys, but Jeewan has 0 active leads from the file in production; only 50 file phones ever matched Jeewan rows, and those 410 rows are soft-deleted.
 - Found Jeewan created/deleted 1,050 lead rows on 2026-06-21 Jakarta time across 150 unique phones, leaving 1,050 unread `LEAD_ASSIGNED` notifications attached to deleted lead IDs; no DB cleanup or re-import was performed in this pass.
 
+## 2026-06-28 — Dashboard dialer time updates from call outcomes
+
+- Fixed call outcome duration persistence by sending activity `metadata` from the client and accepting/storing it through the activities API.
+- Updated dashboard call stats to read today's per-call `duration_seconds` metadata, with saved call sessions as a fallback/aggregate guard, so Time on Dialer updates after completed calls.
+- Wired the client call-session list service to the existing API endpoint and added regression coverage for selector duration logic and activity metadata persistence.
+
+## 2026-06-28 — Appointment time entry and call queue rotation
+
+- Replaced segmented native time inputs in appointment/follow-up flows with a reusable text time input that accepts values like `4:30 pm`, `430pm`, `4pm`, and `16:30` while storing canonical `HH:mm`.
+- Updated CALL activity logging to stamp the lead's `lastContactedAt`, invalidated lead caches after call logs, and sorted start-calling queues so recently attempted leads move behind untouched or older-attempted leads.
+- Added parser and activity-service regression tests; verified targeted tests, client build, and server typecheck.
+
 <!-- NEW ENTRIES GO HERE -->
 
 ## 2026-06-18 — 90% coverage gates + Docker E2E smoke

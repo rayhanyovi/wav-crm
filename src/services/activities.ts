@@ -126,6 +126,7 @@ export async function createActivity(payload: CreateActivityPayload): Promise<Ac
     deal_id: payload.deal_id,
     contact_id: payload.contact_id,
     assigned_to_id: payload.assigned_to_id,
+    metadata: payload.metadata,
   });
   return mapActivity(res.data);
 }

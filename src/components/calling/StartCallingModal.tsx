@@ -99,6 +99,10 @@ function countActive(f: CallFilters): number {
   return n;
 }
 
+function lastContactedTime(lead: Lead): number {
+  return lead.last_contacted_at ? new Date(lead.last_contacted_at).getTime() : 0;
+}
+
 export function StartCallingModal({ open, onClose }: StartCallingModalProps) {
   const { deals } = useCrmStore();
   const { data: leads = [] } = useLeads({ includeAbandoned: false });
@@ -158,6 +162,12 @@ export function StartCallingModal({ open, onClose }: StartCallingModalProps) {
         const aCooldown = a.status === "COOLDOWN" ? 1 : 0;
         const bCooldown = b.status === "COOLDOWN" ? 1 : 0;
         if (aCooldown !== bCooldown) return bCooldown - aCooldown;
+
+        // Leads just attempted stay in the pool if still workable, but move
+        // behind untouched or older-attempted leads for the next session.
+        const aLastContacted = lastContactedTime(a);
+        const bLastContacted = lastContactedTime(b);
+        if (aLastContacted !== bLastContacted) return aLastContacted - bLastContacted;
 
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       });
