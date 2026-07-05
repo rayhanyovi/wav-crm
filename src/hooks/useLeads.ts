@@ -46,6 +46,15 @@ export function useLead(id: string | undefined) {
   });
 }
 
+function optimisticLeadPatch(payload: UpdateLeadPayload): Partial<Lead> {
+  const { callback_at, callback_assigned_to, callback_note, ...rest } = payload;
+  const patch: Partial<Lead> = { ...rest };
+  if (callback_at !== undefined) patch.callback_at = callback_at ?? undefined;
+  if (callback_assigned_to !== undefined) patch.callback_assigned_to = callback_assigned_to ?? undefined;
+  if (callback_note !== undefined) patch.callback_note = callback_note ?? undefined;
+  return patch;
+}
+
 export function useCreateLead() {
   const qc = useQueryClient();
   return useMutation({
@@ -66,12 +75,13 @@ export function useUpdateLead() {
     onMutate: async ({ id, payload }) => {
       await qc.cancelQueries({ queryKey: ["leads"] });
       const snapshots: [unknown, Lead[]][] = [];
+      const patch = optimisticLeadPatch(payload);
 
       qc.getQueriesData<Lead[]>({ queryKey: ["leads", "list"] }).forEach(([key, data]) => {
         if (data) {
           snapshots.push([key, data]);
           qc.setQueryData<Lead[]>(key as Parameters<typeof qc.setQueryData>[0], (old) =>
-            old?.map((l) => (l.id === id ? { ...l, ...payload } : l)) ?? []
+            old?.map((l) => (l.id === id ? { ...l, ...patch } : l)) ?? []
           );
         }
       });
@@ -79,7 +89,7 @@ export function useUpdateLead() {
       // Also update the detail cache if present
       const prevDetail = qc.getQueryData<Lead>(leadKeys.detail(id));
       if (prevDetail) {
-        qc.setQueryData<Lead>(leadKeys.detail(id), { ...prevDetail, ...payload });
+        qc.setQueryData<Lead>(leadKeys.detail(id), { ...prevDetail, ...patch });
       }
 
       return { snapshots, prevDetail };

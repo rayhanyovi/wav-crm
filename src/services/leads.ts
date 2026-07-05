@@ -14,7 +14,25 @@ export interface LeadFilters {
 }
 
 export type CreateLeadPayload = Omit<Lead, "id" | "created_at" | "updated_at" | "deleted_at" | "status_history">;
-export type UpdateLeadPayload = Partial<Omit<Lead, "id" | "created_at" | "updated_at" | "status_history">>;
+type LeadPatchFields = Omit<
+  Lead,
+  | "id"
+  | "created_at"
+  | "updated_at"
+  | "status_history"
+  | "callback_at"
+  | "callback_assigned_to"
+  | "callback_note"
+  | "call_attempt_count"
+  | "no_answer_count"
+  | "last_call_attempt_at"
+  | "last_no_answer_at"
+>;
+export type UpdateLeadPayload = Partial<LeadPatchFields> & {
+  callback_at?: string | null;
+  callback_assigned_to?: string | null;
+  callback_note?: string | null;
+};
 
 // ─── API response shape (Prisma camelCase) ────────────────────────────────────
 
@@ -52,6 +70,10 @@ interface ApiLead {
   convertedAt: string | null;
   cooldownUntil: string | null;
   lastContactedAt: string | null;
+  callAttemptCount: number | null;
+  noAnswerCount: number | null;
+  lastCallAttemptAt: string | null;
+  lastNoAnswerAt: string | null;
   callbackAt: string | null;
   callbackAssignedTo: string | null;
   callbackNote: string | null;
@@ -111,6 +133,10 @@ function mapLead(r: ApiLead): Lead {
     converted_at: r.convertedAt ?? undefined,
     cooldown_until: r.cooldownUntil ?? undefined,
     last_contacted_at: r.lastContactedAt ?? undefined,
+    call_attempt_count: r.callAttemptCount ?? undefined,
+    no_answer_count: r.noAnswerCount ?? undefined,
+    last_call_attempt_at: r.lastCallAttemptAt ?? undefined,
+    last_no_answer_at: r.lastNoAnswerAt ?? undefined,
     callback_at: r.callbackAt ?? undefined,
     callback_assigned_to: r.callbackAssignedTo ?? undefined,
     callback_note: r.callbackNote ?? undefined,
@@ -145,6 +171,8 @@ export function mapLeadRow(row: any): Lead {
     ...row,
     age: row.age ?? undefined,
     bounce_count: row.bounce_count ?? undefined,
+    call_attempt_count: row.call_attempt_count ?? undefined,
+    no_answer_count: row.no_answer_count ?? undefined,
     is_abandoned: row.is_abandoned ?? false,
     products_discussed: row.products_discussed ?? undefined,
   };

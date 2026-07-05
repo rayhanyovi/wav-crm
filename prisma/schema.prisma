@@ -2,7 +2,7 @@
 // WAV CRM — Prisma schema (full, introspected from live Supabase DB)
 //
 // Source of truth: public schema, project kkfzbgbbjijdhlolkwux (live "wav-db")
-// Last sync: 2026-06-14
+// Last sync: 2026-07-06
 //
 // To refresh: npm run prisma:pull (requires .env.server with DATABASE_URL)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -199,6 +199,10 @@ model Lead {
   convertedAt            DateTime?          @map("converted_at") @db.Timestamptz
   cooldownUntil          DateTime?          @map("cooldown_until") @db.Timestamptz
   lastContactedAt        DateTime?          @map("last_contacted_at") @db.Timestamptz
+  callAttemptCount       Int                @default(0) @map("call_attempt_count")
+  noAnswerCount          Int                @default(0) @map("no_answer_count")
+  lastCallAttemptAt      DateTime?          @map("last_call_attempt_at") @db.Timestamptz
+  lastNoAnswerAt         DateTime?          @map("last_no_answer_at") @db.Timestamptz
   // Scheduled callback ("call me back at 2PM"): when, who should take it, why, and
   // whether the "due now" notification has already been emitted.
   callbackAt             DateTime?          @map("callback_at") @db.Timestamptz

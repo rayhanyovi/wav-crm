@@ -15,7 +15,16 @@ import { useAuthStore } from "@/store/useAuthStore";
 import { useLeads, useClaimLeadsForCall } from "@/hooks/useLeads";
 import { useCallSessionStore } from "@/store/useCallSessionStore";
 import { isAdviser, isColdCaller, isMaster } from "@/lib/permissions";
-import { CALL_SESSION_SIZE } from "@/lib/callQueue";
+import {
+  ATTEMPT_BUCKET_OPTIONS,
+  CALL_SESSION_SIZE,
+  attemptBucketLabel,
+  isFinalAttemptBucket,
+  lastCallAttemptTime,
+  matchesAttemptBucket,
+  type AttemptBucket,
+} from "@/lib/callQueue";
+import { STATUS_LABELS } from "@/lib/leadStatusReasons";
 import type { Lead, LeadSource } from "@/data/types";
 
 interface StartCallingModalProps {
@@ -40,6 +49,7 @@ interface CallFilters {
   income: string;       // "ALL" or an exact income_range value
   residential: string;  // "ALL" or an exact residential_status value
   source: string;       // "ALL" or a LeadSource
+  attemptBucket: AttemptBucket;
   ageMin: string;       // numeric text
   ageMax: string;       // numeric text
   zipcode: string;      // prefix match
@@ -51,6 +61,7 @@ const EMPTY_FILTERS: CallFilters = {
   income: "ALL",
   residential: "ALL",
   source: "ALL",
+  attemptBucket: "ALL",
   ageMin: "",
   ageMax: "",
   zipcode: "",
@@ -77,6 +88,7 @@ function matchesFilters(l: Lead, f: CallFilters, userId: string | undefined): bo
   if (f.income !== "ALL" && (l.income_range ?? "").trim() !== f.income) return false;
   if (f.residential !== "ALL" && (l.residential_status ?? "").trim() !== f.residential) return false;
   if (f.source !== "ALL" && l.source !== f.source) return false;
+  if (!matchesAttemptBucket(l, f.attemptBucket)) return false;
   if (f.zipcode.trim() && !(l.zipcode ?? "").trim().startsWith(f.zipcode.trim())) return false;
 
   const min = f.ageMin ? parseInt(f.ageMin, 10) : null;
@@ -94,13 +106,10 @@ function countActive(f: CallFilters): number {
   if (f.income !== "ALL") n++;
   if (f.residential !== "ALL") n++;
   if (f.source !== "ALL") n++;
+  if (f.attemptBucket !== "ALL") n++;
   if (f.zipcode.trim()) n++;
   if (f.ageMin || f.ageMax) n++;
   return n;
-}
-
-function lastContactedTime(lead: Lead): number {
-  return lead.last_contacted_at ? new Date(lead.last_contacted_at).getTime() : 0;
 }
 
 export function StartCallingModal({ open, onClose }: StartCallingModalProps) {
@@ -135,8 +144,7 @@ export function StartCallingModal({ open, onClose }: StartCallingModalProps) {
     return leads
       .filter((l) => {
         if (l.deleted_at || DEAD_STATUSES.has(l.status)) return false;
-        if (l.callback_at && !isAssignedCallback(l)) return false;
-        if (dueCallbackAt(l) !== null) return true; // a due callback is always workable
+        if (l.callback_at) return dueCallbackAt(l) !== null; // future callbacks wait until due
         if (l.status === "NA") return true;
         if (l.status === "COOLDOWN") {
           return !l.cooldown_until || new Date(l.cooldown_until).getTime() <= now;
@@ -153,21 +161,17 @@ export function StartCallingModal({ open, onClose }: StartCallingModalProps) {
           return aCb - bCb;
         }
 
-        // Recently bounced leads (no-show returned) float to the top
-        const aBounced = a.last_bounced_at && a.status === "NA" ? new Date(a.last_bounced_at).getTime() : 0;
-        const bBounced = b.last_bounced_at && b.status === "NA" ? new Date(b.last_bounced_at).getTime() : 0;
-        if (aBounced !== bBounced) return bBounced - aBounced;
-
-        // Cooldown-expired leads come next
-        const aCooldown = a.status === "COOLDOWN" ? 1 : 0;
-        const bCooldown = b.status === "COOLDOWN" ? 1 : 0;
-        if (aCooldown !== bCooldown) return bCooldown - aCooldown;
+        // 3x+ no-answer leads stay available but sink below fresher work unless
+        // the caller explicitly filters into that bucket.
+        const aFinal = isFinalAttemptBucket(a) ? 1 : 0;
+        const bFinal = isFinalAttemptBucket(b) ? 1 : 0;
+        if (aFinal !== bFinal) return aFinal - bFinal;
 
         // Leads just attempted stay in the pool if still workable, but move
         // behind untouched or older-attempted leads for the next session.
-        const aLastContacted = lastContactedTime(a);
-        const bLastContacted = lastContactedTime(b);
-        if (aLastContacted !== bLastContacted) return aLastContacted - bLastContacted;
+        const aLastAttempt = lastCallAttemptTime(a);
+        const bLastAttempt = lastCallAttemptTime(b);
+        if (aLastAttempt !== bLastAttempt) return aLastAttempt - bLastAttempt;
 
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       });
@@ -251,8 +255,8 @@ export function StartCallingModal({ open, onClose }: StartCallingModalProps) {
 
   const queueDescription = usesColdPool
     ? filters.scope === "MY_UPLOADS"
-      ? `Up to ${CALL_SESSION_SIZE} leads you uploaded, with bounced and cooldown-expired prospects first.`
-      : `Up to ${CALL_SESSION_SIZE} leads from the shared NA pool, with bounced and cooldown-expired prospects first.`
+      ? `Up to ${CALL_SESSION_SIZE} leads you uploaded, with never-called and oldest-attempted prospects first.`
+      : `Up to ${CALL_SESSION_SIZE} leads from the shared calling pool, with never-called and oldest-attempted prospects first.`
     : "Leads past the TM cold-call phase — appointments to confirm and follow ups to close.";
 
   const emptyMessage = usesColdPool
@@ -377,6 +381,23 @@ export function StartCallingModal({ open, onClose }: StartCallingModalProps) {
                   </div>
                 </div>
 
+                <div className="space-y-1">
+                  <span className="text-[11px] text-muted-foreground">Call attempts</span>
+                  <Select
+                    value={filters.attemptBucket}
+                    onValueChange={(v) => setFilters((f) => ({ ...f, attemptBucket: v as AttemptBucket }))}
+                  >
+                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {ATTEMPT_BUCKET_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value} className="text-xs">
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 {/* Zipcode prefix */}
                 <div className="space-y-1">
                   <span className="text-[11px] text-muted-foreground">Postal code starts with</span>
@@ -454,7 +475,9 @@ export function StartCallingModal({ open, onClose }: StartCallingModalProps) {
                     </span>
                     <span className="text-xs text-muted-foreground capitalize">
                       {l.callback_at && new Date(l.callback_at).getTime() <= Date.now()
-                        ? "📞 callback due"
+                        ? "Callback due"
+                        : attemptBucketLabel(l)
+                        ? attemptBucketLabel(l)
                         : currentUser && isMyUploadedLead(l, currentUser.id)
                         ? (
                             <span className="inline-flex items-center gap-1">
@@ -463,12 +486,12 @@ export function StartCallingModal({ open, onClose }: StartCallingModalProps) {
                             </span>
                           )
                         : l.last_bounced_at && l.status === "NA"
-                        ? "↑ bounced back"
+                        ? "Bounced back"
                         : l.status === "COOLDOWN"
-                        ? "↻ cooldown expired"
+                        ? "Cooldown expired"
                         : l.status === "APPOINTMENT"
-                        ? "📅 appointment"
-                        : l.status.toLowerCase()}
+                        ? "Appointment"
+                        : STATUS_LABELS[l.status]}
                     </span>
                   </li>
                 ))}

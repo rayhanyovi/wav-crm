@@ -29,7 +29,7 @@ const STATUS_COLORS: Record<LeadStatus, string> = {
 };
 
 const STATUS_LABELS: Record<LeadStatus, string> = {
-  NA:             "NA",
+  NA:             "New",
   APPOINTMENT:    "Appointment",
   NOT_INTERESTED: "Not Interested",
   AVOID:          "Avoid",

@@ -112,6 +112,10 @@ function toPrismaUpdate(input: UpdateLeadInput): Prisma.LeadUpdateInput {
   // "due notification already sent" flag so the new time fires its own alert.
   if (input.callback_at !== undefined) {
     out.callbackAt = input.callback_at ? new Date(input.callback_at) : null;
+    if (input.callback_at === null) {
+      out.callbackAssignedTo = null;
+      out.callbackNote = null;
+    }
     out.callbackNotified = false;
   }
   set("callbackAssignedTo", input.callback_assigned_to);
@@ -669,6 +673,10 @@ export async function convertLead(
         convertedContactId: contactId,
         convertedAt: new Date(),
         notes: input.notes ?? lead.notes,
+        callbackAt: null,
+        callbackAssignedTo: null,
+        callbackNote: null,
+        callbackNotified: false,
         ...deriveStatusColumns(lead.status, "APPOINTMENT"),
       },
     });
@@ -702,6 +710,13 @@ export async function claimForCall(
   const ownershipFilter: Prisma.LeadWhereInput = targeted
     ? { OR: [{ telemarketerOwnerId: null }, { telemarketerOwnerId: actor.id }] }
     : { telemarketerOwnerId: null };
+  const dueCallbackFilter: Prisma.LeadWhereInput = {
+    callbackAt: { lte: now },
+    status: { notIn: ["APPOINTMENT", "AVOID", "NOT_INTERESTED", "OTHERS"] },
+    ...(actor.role === "MASTER"
+      ? {}
+      : { OR: [{ callbackAssignedTo: null }, { callbackAssignedTo: actor.id }] }),
+  };
   const available = await prisma.lead.findMany({
     where: {
       deletedAt: null,
@@ -716,11 +731,15 @@ export async function claimForCall(
           OR: [
             { status: "NA" },
             { status: "COOLDOWN", cooldownUntil: { lte: now } },
+            dueCallbackFilter,
           ],
         },
       ],
     },
-    orderBy: { createdAt: "asc" },
+    orderBy: [
+      { lastCallAttemptAt: { sort: "asc", nulls: "first" } },
+      { createdAt: "desc" },
+    ],
     take: targeted ? undefined : input.count,
   });
 

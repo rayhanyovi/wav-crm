@@ -231,6 +231,8 @@ describe("updateLead side-effects", () => {
 
     const data = db.lead.update.mock.calls.at(-1)![0].data;
     expect(data.callbackAt).toBeNull();
+    expect(data.callbackAssignedTo).toBeNull();
+    expect(data.callbackNote).toBeNull();
     expect(data.callbackNotified).toBe(false);
   });
 });

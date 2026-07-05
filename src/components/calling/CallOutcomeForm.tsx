@@ -15,6 +15,7 @@ import { assignableAdvisersFor } from "@/lib/dealAssignment";
 import { isColdCaller } from "@/lib/permissions";
 import { STATUS_REASONS, AUTO_RESULT, STATUS_LABELS, TM_STATUS_OPTIONS, type TmCallStatus } from "@/lib/leadStatusReasons";
 import type { ActivityResult, Lead } from "@/data/types";
+import type { UpdateLeadPayload } from "@/services/leads";
 import { ChevronRight, PhoneOff } from "lucide-react";
 
 // ─── Adviser results (post-handoff context) ──────────────────────────────────
@@ -109,6 +110,10 @@ export function CallOutcomeForm({ lead }: CallOutcomeFormProps) {
       metadata.follow_up_scheduled_at = new Date(followUpDateTime).toISOString();
     if (showProspectValue && hasValidProspectValue)
       metadata.prospect_value = prospectValueNumber;
+    const rescheduledCallbackIso = isTM && tmStatus === "KIV" && followUpDateTime
+      ? new Date(followUpDateTime).toISOString()
+      : null;
+    if (rescheduledCallbackIso) metadata.rescheduled_callback_at = rescheduledCallbackIso;
     if (isTM) {
       metadata.previous_status = lead.status;
       metadata.new_status = tmStatus;
@@ -163,9 +168,15 @@ export function CallOutcomeForm({ lead }: CallOutcomeFormProps) {
       // TM: update the lead's status to match the call outcome (NA/KIV/AVOID/OTHERS).
       // APPOINTMENT is handled below alongside the appointment fields.
       if (isTM && tmStatus !== "APPOINTMENT") {
+        const leadPatch: UpdateLeadPayload = {
+          status: tmStatus,
+          callback_at: rescheduledCallbackIso,
+          callback_assigned_to: rescheduledCallbackIso ? currentUser.id : null,
+          callback_note: rescheduledCallbackIso ? (finalNotes || reason || "Follow up needed") : null,
+        };
         await updateLeadMutation.mutateAsync({
           id: lead.id,
-          payload: { status: tmStatus },
+          payload: leadPatch,
           userId: currentUser.id,
         });
       }
@@ -209,6 +220,9 @@ export function CallOutcomeForm({ lead }: CallOutcomeFormProps) {
               status: "APPOINTMENT",
               appointment_date: meetingDate,
               appointment_time: meetingTime,
+              callback_at: null,
+              callback_assigned_to: null,
+              callback_note: null,
             },
             userId: currentUser.id,
           });

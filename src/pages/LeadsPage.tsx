@@ -8,6 +8,7 @@ import { useCallSessionStore } from "@/store/useCallSessionStore";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "@/store/useToastStore";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -45,6 +46,12 @@ import { formatDate } from "@/lib/format";
 import { flyDotToNav } from "@/lib/flyToNav";
 import { getLastContactedDate } from "@/lib/selectors";
 import { canEdit, canLogActivity, isMaster, isAdviser, isTelemarketer, isColdCaller } from "@/lib/permissions";
+import {
+  ATTEMPT_BUCKET_OPTIONS,
+  attemptBucketLabel,
+  matchesAttemptBucket,
+  type AttemptBucket,
+} from "@/lib/callQueue";
 import { Link, useNavigate } from "react-router-dom";
 import type { LeadStatus, LeadSource } from "@/data/types";
 import {
@@ -82,7 +89,7 @@ const SOURCE_LABELS: Record<LeadSource, string> = {
 };
 
 const STATUS_LABELS: Record<LeadStatus, string> = {
-  NA: "NA",
+  NA: "New",
   APPOINTMENT: "Appointment",
   NOT_INTERESTED: "Not Interested",
   AVOID: "Avoid",
@@ -170,6 +177,7 @@ export function LeadsPage() {
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("ALL");
   const [filterSource, setFilterSource] = useState("ALL");
+  const [filterAttemptBucket, setFilterAttemptBucket] = useState<AttemptBucket>("ALL");
   const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "created", dir: "desc" });
   const [page, setPage] = useState(1);
 
@@ -224,6 +232,7 @@ export function LeadsPage() {
         return false;
       if (filterStatus !== "ALL" && l.status !== filterStatus) return false;
       if (filterSource !== "ALL" && l.source !== filterSource) return false;
+      if (!matchesAttemptBucket(l, filterAttemptBucket)) return false;
       return true;
     })
     .sort((a, b) => {
@@ -331,7 +340,7 @@ export function LeadsPage() {
   };
 
   // Reset to page 1 + clear selection whenever any filter or sort changes
-  useEffect(() => { setPage(1); setSelectedIds(new Set()); }, [search, filterStatus, filterSource, showAbandoned, sort]);
+  useEffect(() => { setPage(1); setSelectedIds(new Set()); }, [search, filterStatus, filterSource, filterAttemptBucket, showAbandoned, sort]);
 
   // While a row animates out (conversion), freeze the displayed rows so the
   // exiting row keeps its place until the animation finishes.
@@ -492,7 +501,7 @@ export function LeadsPage() {
               <SelectItem value="ALL">All Statuses</SelectItem>
               {STATUSES.map((s) => (
                 <SelectItem key={s} value={s}>
-                  {s}
+                  {STATUS_LABELS[s]}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -506,6 +515,18 @@ export function LeadsPage() {
               {SOURCES.map((s) => (
                 <SelectItem key={s} value={s}>
                   {SOURCE_LABELS[s]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={filterAttemptBucket} onValueChange={(value) => setFilterAttemptBucket(value as AttemptBucket)}>
+            <SelectTrigger className="w-44">
+              <SelectValue placeholder="Call attempts" />
+            </SelectTrigger>
+            <SelectContent>
+              {ATTEMPT_BUCKET_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -668,7 +689,17 @@ export function LeadsPage() {
                       {lead.phone || "..."}
                     </TableCell>
                     <TableCell>
-                      <LeadStatusBadge status={lead.status} />
+                      <div className="flex flex-col items-start gap-1">
+                        <LeadStatusBadge status={lead.status} />
+                        {attemptBucketLabel(lead) && (
+                          <Badge
+                            variant="outline"
+                            className="border-slate-200 bg-slate-50 px-1.5 py-0 text-[10px] text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                          >
+                            {attemptBucketLabel(lead)}
+                          </Badge>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {SOURCE_LABELS[lead.source] ?? lead.source}

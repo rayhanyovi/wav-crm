@@ -46,6 +46,7 @@ import { StatusUpdateModal } from "@/components/leads/StatusUpdateModal";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { canEdit, canLogActivity, canManage, isAdviser } from "@/lib/permissions";
 import { buildGoogleCalendarUrl, downloadIcs } from "@/lib/calendar";
+import { STATUS_LABELS } from "@/lib/leadStatusReasons";
 import { toast } from "@/store/useToastStore";
 import type { LeadStatus, LeadSource, DealStage, Lead, AppointmentResult } from "@/data/types";
 
@@ -343,7 +344,7 @@ export function LeadDetailPage() {
                     <SelectContent>
                       {(["NA", "APPOINTMENT", "NOT_INTERESTED", "AVOID", "KIV", "OTHERS"] as LeadStatus[]).map((s) => (
                         <SelectItem key={s} value={s}>
-                          {s.replace("_", " ")}
+                          {STATUS_LABELS[s]}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -907,7 +908,7 @@ export function LeadDetailPage() {
                   </span>
                   <span className="block text-xs text-muted-foreground font-normal mt-0.5">
                     {opt === "MET" && "Appointment held"}
-                    {opt === "NO_SHOW" && "Lead bounces back to NA"}
+                    {opt === "NO_SHOW" && "Lead bounces back to New"}
                     {opt === "RESCHEDULED" && "Clears date for rebooking"}
                     {opt === "CANCELLED" && "Appointment cancelled"}
                   </span>
@@ -916,7 +917,7 @@ export function LeadDetailPage() {
             </div>
             {outcomeResult === "NO_SHOW" && (
               <div className="rounded-md bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800 p-2.5 text-xs text-orange-700 dark:text-orange-400">
-                ↩ This lead will be bounced back to <strong>NA</strong> status for recalling.
+                This lead will be bounced back to <strong>New</strong> status for recalling.
                 Bounce count: {(lead.bounce_count ?? 0) + 1}
               </div>
             )}

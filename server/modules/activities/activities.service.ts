@@ -25,6 +25,12 @@ export interface Paginated<T> {
   total: number;
 }
 
+function callAttemptedAt(input: CreateActivityInput, completedAt: Date | undefined): Date {
+  if (completedAt) return completedAt;
+  if (input.scheduled_at) return new Date(input.scheduled_at);
+  return new Date();
+}
+
 export async function listActivities(actor: Actor, query: ListQuery): Promise<Paginated<Activity>> {
   if (!canListActivities(actor)) throw new ForbiddenError("Not allowed to view activities");
 
@@ -85,9 +91,23 @@ export async function createActivity(actor: Actor, input: CreateActivityInput): 
     });
 
     if (input.type === "CALL" && input.lead_id) {
+      const attemptedAt = callAttemptedAt(input, completedAt);
+      const leadData: Prisma.LeadUpdateInput = {
+        lastContactedAt: attemptedAt,
+        callAttemptCount: { increment: 1 },
+        lastCallAttemptAt: attemptedAt,
+        callbackAt: null,
+        callbackAssignedTo: null,
+        callbackNote: null,
+        callbackNotified: false,
+      };
+      if (input.result === "NO_ANSWER") {
+        leadData.noAnswerCount = { increment: 1 };
+        leadData.lastNoAnswerAt = attemptedAt;
+      }
       await tx.lead.update({
         where: { id: input.lead_id },
-        data: { lastContactedAt: completedAt ?? new Date() },
+        data: leadData,
       });
     }
 

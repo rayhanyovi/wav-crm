@@ -11,6 +11,16 @@ const leadStatusColors: Record<LeadStatus, string> = {
   COOLDOWN:       "bg-cyan-100 text-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-400",
 };
 
+const leadStatusLabels: Record<LeadStatus, string> = {
+  NA:             "New",
+  APPOINTMENT:    "Appointment",
+  NOT_INTERESTED: "Not Interested",
+  AVOID:          "Avoid",
+  KIV:            "KIV",
+  OTHERS:         "Others",
+  COOLDOWN:       "Cooldown",
+};
+
 const dealStageColors: Record<DealStage, string> = {
   CALLING:     "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
   APPOINTMENT: "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400",
@@ -53,7 +63,7 @@ export function LeadStatusBadge({ status, className }: { status: LeadStatus } & 
   return (
     <span className={cn(badgeClassName, leadStatusColors[status], className)}>
       <BadgeDot />
-      {status}
+      {leadStatusLabels[status]}
     </span>
   );
 }
@@ -79,10 +89,14 @@ export function ActivityTypeBadge({ type, className }: { type: ActivityType } & 
 
 export function ActivityResultBadge({ result, className }: { result: ActivityResult | undefined | null } & BadgeProps) {
   if (!result) return <span className="text-xs text-muted-foreground">-</span>;
+  const label = result
+    .replace(/_/g, " ")
+    .toLowerCase()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
   return (
     <span className={cn(badgeClassName, activityResultColors[result], className)}>
       <BadgeDot />
-      {result.replace(/_/g, " ")}
+      {label}
     </span>
   );
 }

@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { TimeInput } from "@/components/common/TimeInput";
 import {
   Select,
   SelectContent,
@@ -32,10 +33,37 @@ interface Props {
   onSaved?: () => void;
 }
 
-/** Format a Date as the local value a <input type="datetime-local"> expects. */
-function toLocalInput(d: Date): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+function pad(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+function toLocalDate(d: Date): string {
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function toLocalTime(d: Date): string {
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function localDateTime(date: string, time: string): string {
+  return date && time ? `${date}T${time}` : "";
+}
+
+function laterToday(): Date {
+  const d = new Date();
+  d.setMinutes(d.getMinutes() + 120, 0, 0);
+  return d;
+}
+
+function tomorrowAt(hour: number, minute = 0): Date {
+  const d = todayAt(hour, minute);
+  d.setDate(d.getDate() + 1);
+  return d;
+}
+
+/** Kept local to avoid timezone drift from ISO round-tripping before submit. */
+function toLocalParts(d: Date): { date: string; time: string } {
+  return { date: toLocalDate(d), time: toLocalTime(d) };
 }
 
 function todayAt(hour: number, minute = 0): Date {
@@ -49,8 +77,9 @@ export function CallbackModal({ lead, open, onClose, onSaved }: Props) {
   const updateLead = useUpdateLead();
   const { data: users = [] } = useUsers();
 
-  const initial = lead.callback_at ? new Date(lead.callback_at) : todayAt(14, 0);
-  const [when, setWhen] = useState(toLocalInput(initial));
+  const initial = toLocalParts(lead.callback_at ? new Date(lead.callback_at) : todayAt(14, 0));
+  const [callbackDate, setCallbackDate] = useState(initial.date);
+  const [callbackTime, setCallbackTime] = useState(initial.time);
   const [note, setNote] = useState(lead.callback_note ?? "");
   const telemarketers = useMemo(
     () =>
@@ -69,14 +98,21 @@ export function CallbackModal({ lead, open, onClose, onSaved }: Props) {
 
   useEffect(() => {
     if (!open) return;
-    setWhen(toLocalInput(lead.callback_at ? new Date(lead.callback_at) : todayAt(14, 0)));
+    const next = toLocalParts(lead.callback_at ? new Date(lead.callback_at) : todayAt(14, 0));
+    setCallbackDate(next.date);
+    setCallbackTime(next.time);
     setNote(lead.callback_note ?? "");
     setAssigneeId(defaultAssigneeId);
   }, [defaultAssigneeId, lead.callback_at, lead.callback_note, open]);
 
-  const setPreset = (d: Date) => setWhen(toLocalInput(d));
+  const setPreset = (d: Date) => {
+    const next = toLocalParts(d);
+    setCallbackDate(next.date);
+    setCallbackTime(next.time);
+  };
 
   const save = () => {
+    const when = localDateTime(callbackDate, callbackTime);
     if (!currentUser || !when) return;
     const iso = new Date(when).toISOString();
     updateLead.mutate(
@@ -85,7 +121,7 @@ export function CallbackModal({ lead, open, onClose, onSaved }: Props) {
         payload: {
           callback_at: iso,
           callback_assigned_to: assigneeId || currentUser.id,
-          callback_note: note.trim() || undefined,
+          callback_note: note.trim() || null,
         },
         userId: currentUser.id,
       },
@@ -103,13 +139,11 @@ export function CallbackModal({ lead, open, onClose, onSaved }: Props) {
 
   const clearCallback = () => {
     if (!currentUser) return;
-    // Clearing requires sending explicit nulls (PATCH only writes provided keys);
-    // the optional-only payload type can't express that, so cast for this call.
     const clearPayload = {
       callback_at: null,
       callback_assigned_to: null,
       callback_note: null,
-    } as unknown as UpdateLeadPayload;
+    } satisfies UpdateLeadPayload;
     updateLead.mutate(
       {
         id: lead.id,
@@ -125,8 +159,6 @@ export function CallbackModal({ lead, open, onClose, onSaved }: Props) {
     );
   };
 
-  const now = new Date();
-
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-md">
@@ -140,23 +172,14 @@ export function CallbackModal({ lead, open, onClose, onSaved }: Props) {
         <div className="space-y-4 py-1">
           {/* Quick presets */}
           <div className="flex flex-wrap gap-1.5">
-            <Button type="button" variant="outline" size="sm" className="text-xs" onClick={() => setPreset(new Date(now.getTime() + 60 * 60 * 1000))}>
-              In 1 hour
+            <Button type="button" variant="outline" size="sm" className="text-xs" onClick={() => setPreset(laterToday())}>
+              Later today
             </Button>
-            <Button type="button" variant="outline" size="sm" className="text-xs" onClick={() => setPreset(todayAt(14, 0))}>
-              Today 2 PM
+            <Button type="button" variant="outline" size="sm" className="text-xs" onClick={() => setPreset(tomorrowAt(10, 0))}>
+              Tomorrow 10:00
             </Button>
-            <Button type="button" variant="outline" size="sm" className="text-xs" onClick={() => setPreset(todayAt(17, 0))}>
-              Today 5 PM
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="text-xs"
-              onClick={() => { const d = todayAt(10, 0); d.setDate(d.getDate() + 1); setPreset(d); }}
-            >
-              Tomorrow 10 AM
+            <Button type="button" variant="outline" size="sm" className="text-xs" onClick={() => setPreset(tomorrowAt(14, 0))}>
+              Tomorrow 14:00
             </Button>
           </div>
 
@@ -164,12 +187,21 @@ export function CallbackModal({ lead, open, onClose, onSaved }: Props) {
             <Label htmlFor="cb-when" className="flex items-center gap-1.5">
               <Clock className="h-3.5 w-3.5" /> Call back at
             </Label>
-            <Input
-              id="cb-when"
-              type="datetime-local"
-              value={when}
-              onChange={(e) => setWhen(e.target.value)}
-            />
+            <div className="flex gap-2">
+              <Input
+                id="cb-date"
+                type="date"
+                value={callbackDate}
+                onChange={(e) => setCallbackDate(e.target.value)}
+                className="flex-1"
+              />
+              <TimeInput
+                id="cb-time"
+                value={callbackTime}
+                onValueChange={setCallbackTime}
+                className="flex-1"
+              />
+            </div>
           </div>
 
           <div className="space-y-1.5">
@@ -210,7 +242,7 @@ export function CallbackModal({ lead, open, onClose, onSaved }: Props) {
           ) : <span />}
           <div className="flex gap-2">
             <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-            <Button type="button" onClick={save} disabled={updateLead.isPending || !when} className="gap-1.5">
+            <Button type="button" onClick={save} disabled={updateLead.isPending || !callbackDate || !callbackTime} className="gap-1.5">
               <PhoneCall className="h-4 w-4" />
               {lead.callback_at ? "Update callback" : "Schedule callback"}
             </Button>

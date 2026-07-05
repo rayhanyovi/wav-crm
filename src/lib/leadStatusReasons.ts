@@ -7,7 +7,7 @@ import type { LeadStatus, ActivityResult } from "@/data/types";
 // ─── Reason options per status ────────────────────────────────────────────────
 export const STATUS_REASONS: Record<LeadStatus, string[]> = {
   NA: [
-    "No Answer / Rang Out",
+    "No answer / rang out",
     "Voicemail Left",
     "Busy / Engaged Tone",
     "Wrong Number",
@@ -57,7 +57,7 @@ export const AUTO_RESULT: Record<LeadStatus, ActivityResult> = {
 };
 
 export const STATUS_LABELS: Record<LeadStatus, string> = {
-  NA:             "NA",
+  NA:             "New",
   KIV:            "KIV",
   NOT_INTERESTED: "Not Interested",
   AVOID:          "Avoid",
@@ -72,7 +72,7 @@ export const STATUS_LABELS: Record<LeadStatus, string> = {
 export type TmCallStatus = "NA" | "KIV" | "AVOID" | "NOT_INTERESTED" | "APPOINTMENT" | "OTHERS";
 
 export const TM_STATUS_OPTIONS: { value: TmCallStatus; label: string; description: string }[] = [
-  { value: "NA",             label: "Couldn't Reach Them",      description: "No pickup, voicemail, busy line, or wrong number — try again later" },
+  { value: "NA",             label: "No answer attempt",        description: "No pickup, voicemail, busy line, or wrong number — try again later" },
   { value: "KIV",            label: "Interested, Not Ready Yet", description: "They're open to it but need more time — schedule a follow-up" },
   { value: "APPOINTMENT",    label: "Appointment Set",          description: "They agreed to meet with an adviser" },
   { value: "NOT_INTERESTED", label: "Not Interested",           description: "Politely declined for now — not hostile, just not interested" },

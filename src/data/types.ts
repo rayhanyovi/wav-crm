@@ -137,6 +137,10 @@ export interface Lead extends FactFindFields {
   converted_contact_id?: string;
   converted_at?: string;
   last_contacted_at?: string;
+  call_attempt_count?: number; // total logged call attempts
+  no_answer_count?: number;    // explicit no-answer attempts; NA status remains "New"
+  last_call_attempt_at?: string;
+  last_no_answer_at?: string;
   // Scheduled callback ("call me back at 2PM")
   callback_at?: string;          // ISO datetime the lead asked to be called back
   callback_assigned_to?: string; // telemarketer who should take the callback

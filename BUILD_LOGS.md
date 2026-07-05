@@ -121,6 +121,13 @@ Entries are newest-first. Always prepend — do not append.
 - Updated CALL activity logging to stamp the lead's `lastContactedAt`, invalidated lead caches after call logs, and sorted start-calling queues so recently attempted leads move behind untouched or older-attempted leads.
 - Added parser and activity-service regression tests; verified targeted tests, client build, and server typecheck.
 
+## 2026-07-06 — Callback cleanup and no-answer queue rotation
+
+- Added lead call-attempt tracking (`call_attempt_count`, `no_answer_count`, `last_call_attempt_at`, `last_no_answer_at`) with an idempotent Supabase migration that backfills from CALL activities.
+- Updated CALL activity side effects to increment attempt counters, stamp timestamps, and clear stale callback fields; KIV follow-up outcomes now reschedule callback time instead of leaving the old due callback in place.
+- Reworked callback scheduling UX to separate date + time inputs with quick presets, and added no-answer bucket filters/badges plus oldest-attempt queue ordering.
+- Verified targeted server tests, server typecheck, and production build. Repo-wide lint still fails on pre-existing generated/coverage/source lint debt. Live `wav-db-new` migration was not applied because the workspace does not expose a verifiable `wav-db-new` Supabase target/CLI.
+
 <!-- NEW ENTRIES GO HERE -->
 
 ## 2026-06-18 — 90% coverage gates + Docker E2E smoke

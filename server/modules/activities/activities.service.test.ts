@@ -120,7 +120,7 @@ describe("createActivity", () => {
     expect(db.activity.create.mock.calls[0]![0].data.metadata).toEqual({ duration_seconds: 45 });
   });
 
-  it("updates lead lastContactedAt when logging a call", async () => {
+  it("tracks call attempts and clears stale callbacks when logging a call", async () => {
     const created = activity();
     db.activity.create.mockResolvedValue(created);
     db.lead.update.mockResolvedValue({});
@@ -135,8 +135,35 @@ describe("createActivity", () => {
 
     expect(db.lead.update).toHaveBeenCalledWith({
       where: { id: "lead-1" },
-      data: { lastContactedAt: new Date("2026-07-01T10:30:00.000Z") },
+      data: {
+        lastContactedAt: new Date("2026-07-01T10:30:00.000Z"),
+        callAttemptCount: { increment: 1 },
+        lastCallAttemptAt: new Date("2026-07-01T10:30:00.000Z"),
+        callbackAt: null,
+        callbackAssignedTo: null,
+        callbackNote: null,
+        callbackNotified: false,
+      },
     });
+  });
+
+  it("increments the no-answer bucket for no-answer calls", async () => {
+    const created = activity();
+    db.activity.create.mockResolvedValue(created);
+    db.lead.update.mockResolvedValue({});
+    db.auditLog.create.mockResolvedValue({});
+
+    await createActivity(actor({ id: "u1" }), {
+      type: "CALL",
+      subject: "Test",
+      lead_id: "lead-1",
+      result: "NO_ANSWER",
+      completed_at: "2026-07-01T10:30:00.000Z",
+    } as never);
+
+    const data = db.lead.update.mock.calls.at(-1)![0].data;
+    expect(data.noAnswerCount).toEqual({ increment: 1 });
+    expect(data.lastNoAnswerAt).toEqual(new Date("2026-07-01T10:30:00.000Z"));
   });
 });
 

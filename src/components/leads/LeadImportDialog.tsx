@@ -513,7 +513,7 @@ export function LeadImportDialog({ open, onClose }: Props) {
 
               {/* Paste area */}
               <Textarea
-                placeholder={"First Name\tLast Name\tPhone\tEmail\tStatus\tSource\nAli\tBin Ahmad\t+65 9xxx xxxx\t\tNA\tCOLD_CALL"}
+                placeholder={"First Name\tLast Name\tPhone\tEmail\tStatus\tSource\nAli\tBin Ahmad\t+65 9xxx xxxx\t\tNew\tCOLD_CALL"}
                 value={text}
                 onChange={(e) => handleParse(e.target.value)}
                 rows={5}
