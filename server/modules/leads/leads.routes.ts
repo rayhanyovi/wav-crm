@@ -5,6 +5,7 @@ import { validate } from "../../middleware/validate.js";
 import * as controller from "./leads.controller.js";
 import {
   addNoteSchema,
+  bulkCreateLeadsSchema,
   claimForCallSchema,
   convertLeadSchema,
   createLeadSchema,
@@ -26,6 +27,12 @@ leadsRouter.use(requireAuth());
 leadsRouter.get("/", validate({ query: listQuerySchema }), asyncHandler(controller.list));
 
 leadsRouter.post("/", validate({ body: createLeadSchema }), asyncHandler(controller.create));
+
+leadsRouter.post(
+  "/bulk",
+  validate({ body: bulkCreateLeadsSchema }),
+  asyncHandler(controller.bulkCreate),
+);
 
 leadsRouter.get("/:id", validate({ params: idParamSchema }), asyncHandler(controller.getById));
 

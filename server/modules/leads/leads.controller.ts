@@ -3,6 +3,7 @@ import { getActor } from "../../middleware/auth.js";
 import * as service from "./leads.service.js";
 import type {
   AddNoteInput,
+  BulkCreateLeadsInput,
   ClaimForCallInput,
   ConvertLeadInput,
   CreateLeadInput,
@@ -24,6 +25,11 @@ export async function getById(req: Request, res: Response): Promise<void> {
 export async function create(req: Request, res: Response): Promise<void> {
   const lead = await service.createLead(getActor(req), req.body as CreateLeadInput);
   res.status(201).json({ data: lead });
+}
+
+export async function bulkCreate(req: Request, res: Response): Promise<void> {
+  const result = await service.bulkCreateLeads(getActor(req), req.body as BulkCreateLeadsInput);
+  res.status(201).json({ data: result });
 }
 
 export async function update(req: Request, res: Response): Promise<void> {

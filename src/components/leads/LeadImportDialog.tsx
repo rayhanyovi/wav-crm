@@ -264,6 +264,7 @@ export function LeadImportDialog({ open, onClose }: Props) {
   const [importing, setImporting] = useState(false);
   const [skipDuplicates, setSkipDuplicates] = useState(true);
   const [done, setDone] = useState<{ ok: number; skipped: number; duplicates: number; failed: number } | null>(null);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [defaultSource, setDefaultSource] = useState<LeadSource>("AP_MARKETING");
   const [fileName, setFileName] = useState<string | null>(null);
   // Multi-sheet support
@@ -376,9 +377,11 @@ export function LeadImportDialog({ open, onClose }: Props) {
       updated_at: new Date().toISOString(),
     }));
 
-    bulkCreateMutation.mutate(payloads, {
+    setProgress({ done: 0, total: payloads.length });
+    bulkCreateMutation.mutate({ leads: payloads, onProgress: (done, total) => setProgress({ done, total }) }, {
       onSuccess: (result) => {
         setImporting(false);
+        setProgress(null);
         setDone({
           ok: result.created.length,
           skipped,
@@ -388,6 +391,7 @@ export function LeadImportDialog({ open, onClose }: Props) {
       },
       onError: (err) => {
         setImporting(false);
+        setProgress(null);
         toast.error(
           `Import failed: ${err instanceof Error ? err.message : "unknown error"}. Please try again.`,
         );
@@ -404,6 +408,7 @@ export function LeadImportDialog({ open, onClose }: Props) {
     setSelectedSheet(0);
     setXlsxBuffer(null);
     setSkipDuplicates(true);
+    setProgress(null);
     onClose();
   };
 
@@ -636,17 +641,31 @@ export function LeadImportDialog({ open, onClose }: Props) {
           )}
         </div>
 
-        <DialogFooter className="pt-2 border-t">
+        <DialogFooter className="pt-2 border-t flex-col gap-2">
+          {importing && progress && progress.total > 500 && (
+            <div className="w-full space-y-1">
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>Uploading…</span>
+                <span>{progress.done} / {progress.total}</span>
+              </div>
+              <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-primary transition-all duration-300"
+                  style={{ width: `${Math.round((progress.done / progress.total) * 100)}%` }}
+                />
+              </div>
+            </div>
+          )}
           {!done ? (
-            <>
-              <Button variant="outline" onClick={handleClose}>Cancel</Button>
+            <div className="flex gap-2 justify-end w-full">
+              <Button variant="outline" onClick={handleClose} disabled={importing}>Cancel</Button>
               <Button
                 disabled={importRows.length === 0 || importing}
                 onClick={handleImport}
               >
                 {importing ? "Importing…" : `Import ${importRows.length} Leads`}
               </Button>
-            </>
+            </div>
           ) : (
             <Button onClick={handleClose}>Done</Button>
           )}

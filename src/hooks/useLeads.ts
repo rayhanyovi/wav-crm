@@ -123,7 +123,13 @@ export function useDeleteLead() {
 export function useBulkCreateLeads() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (leads: CreateLeadPayload[]) => bulkCreateLeads(leads),
+    mutationFn: ({
+      leads,
+      onProgress,
+    }: {
+      leads: CreateLeadPayload[];
+      onProgress?: (done: number, total: number) => void;
+    }) => bulkCreateLeads(leads, onProgress),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["leads"] });
     },

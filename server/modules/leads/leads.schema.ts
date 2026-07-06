@@ -121,6 +121,14 @@ export const mergeDuplicateLeadsSchema = z.object({
   source_ids: z.array(z.string().min(1)).min(1).max(25),
 });
 
+/** Body for POST /leads/bulk — batch import up to 500 leads per request. */
+export const bulkCreateLeadsSchema = z.object({
+  leads: z
+    .array(createLeadSchema)
+    .min(1, "at least one lead required")
+    .max(500, "max 500 leads per request"),
+});
+
 /** Body for POST /leads/:id/notes */
 export const addNoteSchema = z.object({
   content: z.string().trim().min(1, "content is required").max(5000),
@@ -128,6 +136,7 @@ export const addNoteSchema = z.object({
 
 export type ListQuery = z.infer<typeof listQuerySchema>;
 export type CreateLeadInput = z.infer<typeof createLeadSchema>;
+export type BulkCreateLeadsInput = z.infer<typeof bulkCreateLeadsSchema>;
 export type UpdateLeadInput = z.infer<typeof updateLeadSchema>;
 export type ConvertLeadInput = z.infer<typeof convertLeadSchema>;
 export type ClaimForCallInput = z.infer<typeof claimForCallSchema>;

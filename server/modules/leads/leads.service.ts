@@ -15,6 +15,7 @@ import {
 } from "./leads.authz.js";
 import type {
   AddNoteInput,
+  BulkCreateLeadsInput,
   ClaimForCallInput,
   ConvertLeadInput,
   CreateLeadInput,
@@ -230,6 +231,44 @@ export async function createLead(actor: Actor, input: CreateLeadInput): Promise<
     });
     return lead;
   });
+}
+
+export interface BulkCreateResult {
+  created: number;
+  skipped: number;
+}
+
+export async function bulkCreateLeads(
+  actor: Actor,
+  input: BulkCreateLeadsInput,
+): Promise<BulkCreateResult> {
+  if (!canCreateLead(actor)) throw new ForbiddenError("Not allowed to create leads");
+
+  const rows = input.leads.map((lead) => ({
+    id: randomUUID(),
+    salutation: lead.salutation ?? null,
+    firstName: lead.first_name,
+    lastName: lead.last_name,
+    email: lead.email ?? null,
+    phone: lead.phone ?? null,
+    source: lead.source,
+    status: lead.status,
+    notes: lead.notes ?? null,
+    assignedToId: lead.assigned_to_id ?? null,
+    telemarketerOwnerId: lead.telemarketer_owner_id ?? null,
+    age: lead.age ?? null,
+    gender: lead.gender ?? null,
+    residentialStatus: lead.residential_status ?? null,
+    incomeRange: lead.income_range ?? null,
+    zipcode: lead.zipcode ?? null,
+    createdBy: actor.id,
+  }));
+
+  // createMany skips rows that violate unique constraints (e.g. duplicate phone)
+  // rather than erroring — this is the desired behaviour for bulk import.
+  const result = await prisma.lead.createMany({ data: rows, skipDuplicates: true });
+
+  return { created: result.count, skipped: rows.length - result.count };
 }
 
 export async function updateLead(actor: Actor, id: string, input: UpdateLeadInput): Promise<Lead> {
