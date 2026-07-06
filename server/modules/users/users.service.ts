@@ -1,4 +1,4 @@
-import type { CrmUser, Prisma } from "../../../prisma/generated/client/index.js";
+import { type CrmUser, type Prisma, Role } from "../../../prisma/generated/client/index.js";
 import { prisma } from "../../lib/prisma.js";
 import { ForbiddenError, NotFoundError } from "../../lib/errors.js";
 import type { Actor } from "../../middleware/context.js";
@@ -93,7 +93,7 @@ export async function approveUser(actor: Actor, id: string, role: string): Promi
     if (!prev) throw new NotFoundError("User not found");
     const next = await tx.crmUser.update({
       where: { id },
-      data: { role, isActive: true, accountStatus: "ACTIVE", requestedRole: null },
+      data: { role: role as Role, isActive: true, accountStatus: "ACTIVE", requestedRole: null },
     });
     await writeAuditLog(tx, { userId: actor.id, action: "UPDATE", entityId: id, old: prev, next });
     return next;
@@ -126,7 +126,7 @@ export async function completeOnboarding(
 ): Promise<CrmUser> {
   return prisma.crmUser.update({
     where: { id: actor.id },
-    data: { name, requestedRole, accountStatus: "PENDING_APPROVAL" },
+    data: { name, requestedRole: requestedRole as Role, accountStatus: "PENDING_APPROVAL" },
   });
 }
 

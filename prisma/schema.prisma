@@ -20,6 +20,12 @@ datasource db {
 
 // ─── Enums ──────────────────────────────────────────────────────────────────
 
+enum Role {
+  MASTER
+  ADVISER
+  TELEMARKETER
+}
+
 enum LeadStatus {
   NA
   APPOINTMENT
@@ -28,8 +34,6 @@ enum LeadStatus {
   KIV
   OTHERS
   COOLDOWN
-
-  @@map("lead_status")
 }
 
 enum LeadSource {
@@ -37,8 +41,6 @@ enum LeadSource {
   LP_MARKETING
   OWN_SOURCE
   OTHERS
-
-  @@map("lead_source")
 }
 
 enum AppointmentResult {
@@ -46,8 +48,6 @@ enum AppointmentResult {
   NO_SHOW
   RESCHEDULED
   CANCELLED
-
-  @@map("appointment_result")
 }
 
 enum ActivityType {
@@ -57,8 +57,6 @@ enum ActivityType {
   TASK
   NOTE
   FOLLOW_UP
-
-  @@map("activity_type")
 }
 
 enum ActivityResult {
@@ -68,8 +66,6 @@ enum ActivityResult {
   MEETING_SCHEDULED
   CANCELLED
   FAILED
-
-  @@map("activity_result")
 }
 
 enum DealStage {
@@ -79,8 +75,6 @@ enum DealStage {
   SUBMITTED
   WON
   LOST
-
-  @@map("deal_stage")
 }
 
 enum DealProposalStatus {
@@ -89,7 +83,7 @@ enum DealProposalStatus {
   ACCEPTED
   REJECTED
 
-  @@map("deal_proposal_status")
+  @@map("ProposalStatus")
 }
 
 enum FinancialGoal {
@@ -99,8 +93,6 @@ enum FinancialGoal {
   INCOME
   EMERGENCY_FUND
   OTHER
-
-  @@map("financial_goal")
 }
 
 enum RiskTolerance {
@@ -109,16 +101,12 @@ enum RiskTolerance {
   BALANCED
   GROWTH
   AGGRESSIVE
-
-  @@map("risk_tolerance")
 }
 
 enum InvestmentHorizon {
   SHORT
   MEDIUM
   LONG
-
-  @@map("investment_horizon")
 }
 
 enum AuditAction {
@@ -130,16 +118,12 @@ enum AuditAction {
   STATUS_CHANGE
   CONVERSION
   ARCHIVE
-
-  @@map("audit_action")
 }
 
 enum CreditAction {
   RETURN
   CLAIM
   ADMIN_ASSIGN
-
-  @@map("credit_action")
 }
 
 // ─── Core models ────────────────────────────────────────────────────────────
@@ -149,7 +133,7 @@ model CrmUser {
   authUserId         String?  @map("auth_user_id") @db.Uuid
   name               String
   email              String
-  role               String?
+  role               Role?
   avatar             String?
   isActive           Boolean  @default(true) @map("is_active")
   creditBalance      Int      @default(0) @map("credit_balance")
@@ -157,7 +141,7 @@ model CrmUser {
   telemarketerId     String?  @map("telemarketer_id")
   phone              String?
   accountStatus      String   @default("ACTIVE") @map("account_status")
-  requestedRole      String?  @map("requested_role")
+  requestedRole      Role?    @map("requested_role")
   leadsAccess        Boolean  @default(true) @map("leads_access")
   createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt          DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
