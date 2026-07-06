@@ -26,6 +26,25 @@ enum Role {
   TELEMARKETER
 }
 
+enum AccountStatus {
+  ACTIVE
+  PENDING_PROFILE
+  PENDING_APPROVAL
+  REJECTED
+}
+
+enum NotificationType {
+  APPOINTMENT_SET
+  LEAD_ASSIGNED
+  LEAD_BOUNCED
+  DEAL_STAGE_CHANGED
+  APPOINTMENT_TODAY
+  CALLBACK_DUE
+  CALLBACK_TODAY
+  DEAL
+  SYSTEM
+}
+
 enum LeadStatus {
   NA
   APPOINTMENT
@@ -140,7 +159,7 @@ model CrmUser {
   telemarketerAccess Boolean  @default(false) @map("telemarketer_access")
   telemarketerId     String?  @map("telemarketer_id")
   phone              String?
-  accountStatus      String   @default("ACTIVE") @map("account_status")
+  accountStatus      AccountStatus @default(ACTIVE) @map("account_status")
   requestedRole      Role?    @map("requested_role")
   leadsAccess        Boolean  @default(true) @map("leads_access")
   createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz
@@ -409,7 +428,7 @@ model Comment {
 model Notification {
   id          String    @id @default(uuid())
   recipientId String    @map("recipient_id")
-  type        String
+  type        NotificationType
   title       String
   message     String
   entityType  String    @map("entity_type")
